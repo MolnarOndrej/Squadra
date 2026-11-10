@@ -1,4 +1,4 @@
-// A soft line on a stretched quad, optionally dashed and scrolling: space lanes and the order preview.
+// Antialiased route dashes with optional motion and a dark backing for bright backgrounds.
 // uv.x runs along the line, uv.y across it. _Tint is a linear-space HDR color; _Length is in world units.
 Shader "Squadra/Line"
 {
@@ -25,7 +25,7 @@ Shader "Squadra/Line"
 
         Pass
         {
-            Blend One One
+            Blend One OneMinusSrcAlpha
             ZWrite Off
             Cull Off
 
@@ -66,22 +66,26 @@ Shader "Squadra/Line"
             half4 Frag(Varyings input) : SV_Target
             {
                 float across = abs(input.uv.y * 2.0 - 1.0);
-                float body = pow(saturate(1.0 - across), 1.5);
-
                 float x = input.uv.x * _Length;
-                float ends = smoothstep(0.0, max(_EndFade, 1e-3), x) * smoothstep(0.0, max(_EndFade, 1e-3), _Length - x);
+                float aa = max(fwidth(input.uv.y) * 2.0, 1e-3);
+                float dx = max(fwidth(x), 1e-4);
+                float nearestEnd = min(x, _Length - x);
+                float ends = smoothstep(0.0, max(min(_EndFade, _Length * 0.35), 1e-3), nearestEnd);
+                float spine = 1.0 - smoothstep(0.28 - aa * 0.5, 0.28 + aa * 0.5, across);
+                float glow = (1.0 - smoothstep(0.18, 1.0, across)) * 0.18;
 
                 float dash = 1.0;
                 if (_Dash > 0.0001)
                 {
                     float period = _Dash + _Gap;
-                    float t = frac((x - _Time.y * _Scroll) / period) * period;
-                    float edge = max(fwidth(x), 1e-4);
-                    dash = smoothstep(0.0, edge, t) * (1.0 - smoothstep(_Dash - edge, _Dash, t));
+                    float phase = frac((x - _Time.y * _Scroll) / period + 0.5) * period - period * 0.5;
+                    float halfDash = _Dash * 0.5;
+                    dash = 1.0 - smoothstep(halfDash - dx * 0.5, halfDash + dx * 0.5, abs(phase));
                 }
 
-                float alpha = body * ends * dash * _Tint.a;
-                return half4(_Tint.rgb * alpha, 0.0);
+                float opacity = dash * ends * _Tint.a;
+                float backing = (1.0 - smoothstep(0.30, 0.91, across)) * 0.64;
+                return half4(_Tint.rgb * (spine + glow) * opacity, backing * opacity);
             }
             ENDHLSL
         }

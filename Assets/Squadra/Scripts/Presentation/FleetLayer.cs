@@ -28,6 +28,13 @@ namespace Squadra
             public Vector2[] Offsets;
             public float[] Phases;
             public TextMeshPro Label;
+            public TransitRoute Route;
+        }
+
+        sealed class TransitRoute
+        {
+            public LineStyle Lead;
+            public LineStyle Wake;
         }
 
         struct Spark
@@ -42,17 +49,20 @@ namespace Squadra
 
         readonly Dictionary<int, Transit> transits = new Dictionary<int, Transit>();
         readonly Stack<TextMeshPro> labelPool = new Stack<TextMeshPro>();
+        readonly Stack<TransitRoute> routePool = new Stack<TransitRoute>();
         readonly List<Spark> sparks = new List<Spark>(256);
 
         DotBatch batch;
         Match match;
         IReadOnlyList<WorldView> worlds;
+        Material lineMaterial;
         float[] shownDots;
 
-        public void Bind(Match boundMatch, IReadOnlyList<WorldView> boundWorlds)
+        public void Bind(Match boundMatch, IReadOnlyList<WorldView> boundWorlds, Material routeMaterial)
         {
             match = boundMatch;
             worlds = boundWorlds;
+            lineMaterial = routeMaterial;
             shownDots = new float[worlds.Count];
             for (int i = 0; i < shownDots.Length; i++)
                 shownDots[i] = DotCount(match.Nodes[i].Ships);
@@ -107,6 +117,7 @@ namespace Squadra
                 Offsets = offsets,
                 Phases = phases,
                 Label = RentLabel(fleet),
+                Route = RentRoute(fleet.Faction),
             };
         }
 
@@ -116,6 +127,35 @@ namespace Squadra
             transits.Remove(fleetId);
             transit.Label.gameObject.SetActive(false);
             labelPool.Push(transit.Label);
+            transit.Route.Lead.Visible = false;
+            transit.Route.Wake.Visible = false;
+            routePool.Push(transit.Route);
+        }
+
+        TransitRoute RentRoute(Faction faction)
+        {
+            TransitRoute route = routePool.Count > 0 ? routePool.Pop() : new TransitRoute
+            {
+                Lead = new LineStyle(Shapes.CreateQuad("Fleet Course", transform, lineMaterial, -42))
+                {
+                    Width = 0.14f,
+                    Dash = 0.23f,
+                    Gap = 0.17f,
+                    Scroll = 0.9f,
+                    EndFade = 0.08f,
+                },
+                Wake = new LineStyle(Shapes.CreateQuad("Fleet Wake", transform, lineMaterial, -44))
+                {
+                    Width = 0.10f,
+                    Dash = 0.16f,
+                    Gap = 0.18f,
+                    EndFade = 0.08f,
+                },
+            };
+            Color tint = Palette.Of(faction);
+            route.Lead.Tint = Palette.Hdr(Palette.Bright(tint, 0.25f), 1.4f, 0.84f);
+            route.Wake.Tint = Palette.Hdr(Palette.Bright(tint, 0.18f), 1f, 0.62f);
+            return route;
         }
 
         TextMeshPro RentLabel(Fleet fleet)
@@ -201,6 +241,8 @@ namespace Squadra
             {
                 Fleet fleet = transit.Fleet;
                 Vector2 center = Vector2.Lerp(transit.Start, transit.End, fleet.Progress);
+                transit.Route.Lead.Set(center, transit.End);
+                transit.Route.Wake.Set(transit.Start, center);
                 Vector2 direction = transit.Direction;
                 var normal = new Vector2(-direction.y, direction.x);
 

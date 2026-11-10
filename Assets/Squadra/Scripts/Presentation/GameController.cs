@@ -33,6 +33,8 @@ namespace Squadra
         int selected = -1;
         int hovered = -1;
         LineStyle orderPreview;
+        LineStyle[,] idleLanes;
+        bool[,] activeLanes;
         float noticeUntil;
         string notice;
 
@@ -51,7 +53,7 @@ namespace Squadra
             match.ShipProduced += OnShipProduced;
             match.CaptureCompleted += OnCaptureCompleted;
 
-            fleets.Bind(match, worlds);
+            fleets.Bind(match, worlds, lineMaterial);
             BuildLanes();
         }
 
@@ -80,7 +82,7 @@ namespace Squadra
             }
 
             fleets.Tick(deltaTime);
-            UpdateOrderPreview();
+            UpdateRoutes();
             hud.SetStatus(match);
             if (match.Status == MatchStatus.InProgress) hud.SetHint(CurrentHint());
         }
@@ -211,7 +213,9 @@ namespace Squadra
 
         void BuildLanes()
         {
-            // Every pair of worlds has a direct route: draw them as faint lanes so the map reads at a glance.
+            // Every pair of worlds has a direct route. Keep the idle lanes readable under active orders.
+            idleLanes = new LineStyle[worlds.Length, worlds.Length];
+            activeLanes = new bool[worlds.Length, worlds.Length];
             for (int a = 0; a < worlds.Length; a++)
             {
                 for (int b = a + 1; b < worlds.Length; b++)
@@ -219,24 +223,24 @@ namespace Squadra
                     GetRoute(a, b, out Vector2 from, out Vector2 to);
                     var lane = new LineStyle(Shapes.CreateQuad("Lane", transform, lineMaterial, -50))
                     {
-                        Tint = Palette.Hdr(Palette.Starlight, 1f, 0.17f),
-                        Width = 0.035f,
-                        Dash = 0.07f,
-                        Gap = 0.2f,
-                        Scroll = 0f,
-                        EndFade = 0.6f,
+                        Tint = Palette.Hdr(Palette.Starlight, 0.66f, 0.53f),
+                        Width = 0.10f,
+                        Dash = 0.13f,
+                        Gap = 0.16f,
+                        EndFade = 0.04f,
                     };
                     lane.Set(from, to);
+                    idleLanes[a, b] = lane;
                 }
             }
 
             orderPreview = new LineStyle(Shapes.CreateQuad("Order Preview", transform, lineMaterial, 8))
             {
-                Width = 0.11f,
-                Dash = 0.24f,
+                Width = 0.16f,
+                Dash = 0.26f,
                 Gap = 0.16f,
-                Scroll = 1.4f,
-                EndFade = 0.25f,
+                Scroll = 1.15f,
+                EndFade = 0.05f,
             };
             orderPreview.Visible = false;
         }
@@ -249,16 +253,32 @@ namespace Squadra
             to = worlds[target].Position - direction * worlds[target].OrbitRadius;
         }
 
-        void UpdateOrderPreview()
+        void UpdateRoutes()
         {
             bool show = selected >= 0 && hovered >= 0 && hovered != selected
                 && match.CanLaunch(Player, selected, hovered);
             orderPreview.Visible = show;
-            if (!show) return;
+            if (show)
+            {
+                GetRoute(selected, hovered, out Vector2 from, out Vector2 to);
+                orderPreview.Tint = Palette.Hdr(Palette.Accent, 1.55f, 0.95f);
+                orderPreview.Set(from, to);
+            }
 
-            GetRoute(selected, hovered, out Vector2 from, out Vector2 to);
-            orderPreview.Tint = Palette.Hdr(Palette.Accent, 1.8f, 0.9f);
-            orderPreview.Set(from, to);
+            // An idle lane under an animated dash would fill its gaps.
+            System.Array.Clear(activeLanes, 0, activeLanes.Length);
+            if (show) MarkActiveLane(selected, hovered);
+            foreach (Fleet fleet in match.Fleets)
+                MarkActiveLane(fleet.SourceId, fleet.TargetId);
+
+            for (int a = 0; a < worlds.Length; a++)
+                for (int b = a + 1; b < worlds.Length; b++)
+                    idleLanes[a, b].Visible = !activeLanes[a, b];
+        }
+
+        void MarkActiveLane(int source, int target)
+        {
+            activeLanes[Mathf.Min(source, target), Mathf.Max(source, target)] = true;
         }
 
         // ------------------------------------------------------------------ match events
