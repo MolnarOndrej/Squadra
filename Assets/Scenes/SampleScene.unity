@@ -1624,6 +1624,7 @@ MonoBehaviour:
   - {fileID: 1672357760}
   fleets: {fileID: 969120634}
   effects: {fileID: 2098112618}
+  sounds: {fileID: 1842564382}
   hud: {fileID: 1301648370}
   rig: {fileID: 1742157273}
   lineMaterial: {fileID: 2100000, guid: b2fc229337e07af4693cf440e0a19f47, type: 2}
@@ -5236,6 +5237,102 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1784348910}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1842564381
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1842564383}
+  - component: {fileID: 1842564382}
+  m_Layer: 0
+  m_Name: Sounds
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1842564382
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842564381}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d8baa666f561254b88870cef4337b17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Squadra.SoundLayer
+  rig: {fileID: 1742157273}
+  volume: 0.85
+  panWidth: 0.6
+  voiceCount: 20
+  departure:
+    clips:
+    - {fileID: 8300000, guid: 5512cb97c1be7ee41a85b82fc435f4db, type: 3}
+    - {fileID: 8300000, guid: b3ff53a6862d89648b40a512cd8276ac, type: 3}
+    - {fileID: 8300000, guid: 86b44a954746fcf4f963264f2243b3bc, type: 3}
+    volume: 0.55
+    pitchJitter: 0.04
+  arrival:
+    clips:
+    - {fileID: 8300000, guid: ada7a29e95ee7304a80b895021932a3a, type: 3}
+    - {fileID: 8300000, guid: a4455f6a5e7d99642a90cb9a99f27836, type: 3}
+    - {fileID: 8300000, guid: f4d36bacfe5c8004eaba143c5ea630fe, type: 3}
+    volume: 0.5
+    pitchJitter: 0.03
+  battleStart:
+    clips:
+    - {fileID: 8300000, guid: 8f896815de896174f8813f8c63085cdc, type: 3}
+    - {fileID: 8300000, guid: 29126dff0ada0fd4c87fbc880e0683fd, type: 3}
+    - {fileID: 8300000, guid: 1d6c3d367f5ee4f4aa38b6275f144700, type: 3}
+    volume: 0.65
+    pitchJitter: 0.03
+  shot:
+    clips:
+    - {fileID: 8300000, guid: 28aab58d4b3939d45b49a46180c67d55, type: 3}
+    - {fileID: 8300000, guid: 7568917c8c1fc0e46a782b278421869b, type: 3}
+    - {fileID: 8300000, guid: 213d14e7486197a489185b4faa34977d, type: 3}
+    - {fileID: 8300000, guid: a5c7a03a1c9885d408bb1e1a73ad586a, type: 3}
+    - {fileID: 8300000, guid: 5832f7548ab44044d9be61d44fe280d3, type: 3}
+    volume: 0.3
+    pitchJitter: 0.1
+  shipDestroyed:
+    clips:
+    - {fileID: 8300000, guid: 28dc4940f8ec9ec42a41794a26fb317c, type: 3}
+    - {fileID: 8300000, guid: 4288c81a3c717d643a4ceaa1ab9379ab, type: 3}
+    - {fileID: 8300000, guid: b12c138bc9b5f304a98ee15497c68555, type: 3}
+    - {fileID: 8300000, guid: 6045cb8fbf9b73648a389018791c6016, type: 3}
+    - {fileID: 8300000, guid: d8e2996a9044f184496d047616670997, type: 3}
+    volume: 0.55
+    pitchJitter: 0.08
+  capture:
+    clips:
+    - {fileID: 8300000, guid: 1b6d1672049a6524b9939b1ba72d7c63, type: 3}
+    volume: 0.7
+    pitchJitter: 0
+  victory: {fileID: 8300000, guid: fb1e459d9007a5041845a059b21a9456, type: 3}
+  defeat: {fileID: 8300000, guid: 4bba3cb3c6700f24885f39a776b1f0e2, type: 3}
+  resultVolume: 0.9
+  resultDelay: 0.25
+--- !u!4 &1842564383
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842564381}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1897929297
 GameObject:
   m_ObjectHideFlags: 0
@@ -5599,6 +5696,55 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2048767810}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2088567162
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2088567164}
+  - component: {fileID: 2088567163}
+  m_Layer: 0
+  m_Name: Music
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2088567163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088567162}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35f6b35b39a38f64893e7d1a7f041059, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Squadra.MusicPlayer
+  track: {fileID: 8300000, guid: b39718bc856bdb049bcb03619c540faa, type: 3}
+  volume: 0.3
+  fadeInSeconds: 3
+  duckedLevel: 0.3
+  duckSeconds: 0.5
+--- !u!4 &2088567164
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088567162}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2098112617
 GameObject:
   m_ObjectHideFlags: 0
@@ -5905,4 +6051,6 @@ SceneRoots:
   - {fileID: 969120635}
   - {fileID: 2098112619}
   - {fileID: 1301648371}
+  - {fileID: 1842564383}
+  - {fileID: 2088567164}
   - {fileID: 491904131}

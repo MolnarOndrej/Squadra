@@ -25,6 +25,7 @@ namespace Squadra
         [SerializeField] WorldView[] worlds;
         [SerializeField] FleetLayer fleets;
         [SerializeField] EffectsLayer effects;
+        [SerializeField] SoundLayer sounds;
         [SerializeField] HudView hud;
         [SerializeField] CameraRig rig;
         [SerializeField] Material lineMaterial;
@@ -52,6 +53,7 @@ namespace Squadra
             match.FleetArrived += OnFleetArrived;
             match.ShipProduced += OnShipProduced;
             match.CaptureCompleted += OnCaptureCompleted;
+            match.StatusChanged += OnStatusChanged;
 
             fleets.Bind(match, worlds, lineMaterial);
             BuildLanes();
@@ -289,6 +291,7 @@ namespace Squadra
             WorldView source = worlds[fleet.SourceId];
             effects.Shockwave(source.Position, Palette.Of(fleet.Faction), source.OrbitRadius * 0.85f,
                 source.OrbitRadius * 1.3f, 0.45f, 1.6f);
+            sounds.FleetDeparted(source.Position);
         }
 
         void OnShipProduced(Node node)
@@ -307,6 +310,12 @@ namespace Squadra
             fleets.Burst(world.Position, world.OrbitRadius, color, 28, 2.6f, 0.8f);
             effects.FloatText(world.Position + Vector2.up * (world.OrbitRadius + 0.3f), "CAPTURED",
                 Palette.Bright(color, 0.3f), 3.2f, 0f, 1.5f);
+            sounds.WorldCaptured(world.Position);
+        }
+
+        void OnStatusChanged(MatchStatus status)
+        {
+            if (status != MatchStatus.InProgress) sounds.MatchEnded(status == MatchStatus.BlueVictory);
         }
 
         void OnFleetArrived(ArrivalReport report)
@@ -327,6 +336,7 @@ namespace Squadra
                 if (landing) fleets.Burst(world.Position, world.OrbitRadius, arriving, 12, 1.2f);
                 effects.FloatText(above, landing ? "LANDING" : "+" + report.ArrivingShips,
                     Palette.Bright(arriving, 0.3f), landing ? 2.6f : 3.6f);
+                sounds.FleetArrived(world.Position);
                 return;
             }
 
@@ -341,6 +351,11 @@ namespace Squadra
                 0.75f, 2.2f);
             world.Flash(0.6f);
             rig.Shake(Mathf.Min(0.24f, 0.06f + report.LossesPerSide * 0.004f));
+
+            // Combat resolves in an instant, so the fight is heard as a short burst sized to the losses.
+            sounds.BattleStarted(world.Position);
+            sounds.Skirmish(world.Position, report.LossesPerSide,
+                Mathf.Lerp(0.8f, 1.5f, Mathf.Clamp01(report.LossesPerSide / 30f)));
 
             effects.FloatText(above + Vector2.up * 0.42f, "-" + report.LossesPerSide, Palette.Text, 4.2f);
             effects.FloatText(above, OutcomeTag(report.Outcome), Palette.Bright(OutcomeColor(report), 0.3f), 2.4f,
