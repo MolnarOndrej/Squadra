@@ -79,11 +79,14 @@ namespace Squadra.EditorTools
             FleetLayer fleets = BuildFleets(materials);
             EffectsLayer effects = BuildEffects(materials);
             HudView hud = BuildHud(materials, rig);
+            SoundLayer sounds = BuildSounds(rig);
+            BuildMusic();
 
             var game = new GameObject("Game").AddComponent<GameController>();
             Wire(game, "worlds", new Object[] { thalassa, ember, lune });
             Wire(game, "fleets", fleets);
             Wire(game, "effects", effects);
+            Wire(game, "sounds", sounds);
             Wire(game, "hud", hud);
             Wire(game, "rig", rig);
             Wire(game, "lineMaterial", materials.Line);
@@ -91,6 +94,35 @@ namespace Squadra.EditorTools
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("Squadra: rebuilt " + ScenePath);
+        }
+
+        /// <summary>
+        /// Re-reads the sound takes and the music track from the audio folders into the open scene, adding
+        /// the Sounds and Music objects if they are missing. Use it after adding or removing takes; unlike a
+        /// full rebuild it leaves the rest of the scene, and the volumes set in the Inspector, alone.
+        /// </summary>
+        [MenuItem("Squadra/Rewire Sounds In Open Scene")]
+        public static void RewireSounds()
+        {
+            GameController game = Object.FindAnyObjectByType<GameController>();
+            CameraRig rig = Object.FindAnyObjectByType<CameraRig>();
+            if (game == null || rig == null)
+            {
+                Debug.LogError("Squadra: open the playable scene first.");
+                return;
+            }
+
+            SoundLayer sounds = Object.FindAnyObjectByType<SoundLayer>();
+            if (sounds == null) sounds = BuildSounds(rig);
+            else WireSounds(sounds, rig);
+
+            MusicPlayer music = Object.FindAnyObjectByType<MusicPlayer>();
+            if (music == null) BuildMusic();
+            else WireMusic(music);
+
+            Wire(game, "sounds", sounds);
+            EditorSceneManager.MarkSceneDirty(game.gameObject.scene);
+            Debug.Log("Squadra: rewired sounds in " + game.gameObject.scene.name + " (save the scene to keep them)");
         }
 
         // ------------------------------------------------------------------ assets
@@ -447,6 +479,56 @@ namespace Squadra.EditorTools
             Wire(hud, "resultPrompt", resultPrompt);
             Relayout(hud);
             return hud;
+        }
+
+        static SoundLayer BuildSounds(CameraRig rig)
+        {
+            var sounds = new GameObject("Sounds").AddComponent<SoundLayer>();
+            WireSounds(sounds, rig);
+            return sounds;
+        }
+
+        // Volumes and pitch variation are defaults on SoundLayer; only the clips come from the folders.
+        static void WireSounds(SoundLayer sounds, CameraRig rig)
+        {
+            if (!SquadraSoundBuilder.HasSounds) SquadraSoundBuilder.Build();
+
+            Wire(sounds, "rig", rig);
+            WireTakes(sounds, "departure", SquadraSoundBuilder.Departure);
+            WireTakes(sounds, "arrival", SquadraSoundBuilder.Arrival);
+            WireTakes(sounds, "battleStart", SquadraSoundBuilder.BattleStart);
+            WireTakes(sounds, "shot", SquadraSoundBuilder.Shot);
+            WireTakes(sounds, "shipDestroyed", SquadraSoundBuilder.ShipDestroyed);
+            WireTakes(sounds, "capture", SquadraSoundBuilder.Capture);
+            Wire(sounds, "victory", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.Victory));
+            Wire(sounds, "defeat", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.Defeat));
+        }
+
+        static MusicPlayer BuildMusic()
+        {
+            var music = new GameObject("Music").AddComponent<MusicPlayer>();
+            WireMusic(music);
+            return music;
+        }
+
+        static void WireMusic(MusicPlayer music)
+        {
+            AudioClip track = SquadraSoundBuilder.LoadMusic();
+            if (track == null) Debug.LogWarning("Squadra: no music track in " + SquadraSoundBuilder.MusicFolder);
+            Wire(music, "track", track);
+        }
+
+        static void WireTakes(Object target, string field, string sound)
+        {
+            AudioClip[] takes = SquadraSoundBuilder.LoadTakes(sound);
+            if (takes.Length == 0) Debug.LogWarning("Squadra: no takes found for the " + sound + " sound");
+
+            var serialized = new SerializedObject(target);
+            SerializedProperty clips = Property(serialized, field).FindPropertyRelative("clips");
+            clips.arraySize = takes.Length;
+            for (int i = 0; i < takes.Length; i++)
+                clips.GetArrayElementAtIndex(i).objectReferenceValue = takes[i];
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ------------------------------------------------------------------ helpers

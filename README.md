@@ -19,5 +19,17 @@ Open `Assets/Scenes/SampleScene.unity` in Unity 6 and press Play.
 - `Assets/Squadra/Scripts/Presentation` holds the scene components that send orders to the match and draw its state.
 - `Assets/Squadra/Shaders` holds the procedural shaders for the planets, space backdrop, rings and fleet dots.
 - `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets.
+- `Assets/Squadra/Audio` holds the sound effects (`Sfx`) and the background track (`Music`).
 - `Assets/Squadra/Tests/EditMode` holds the rule tests. Run them from **Window > General > Test Runner** (EditMode).
 - The specification is in `specifications/node-rts-first-playable-spec.md`.
+
+## Sound
+
+`SoundLayer` plays an effect when a fleet departs, arrives peacefully, or starts a battle, for the weapon fire and ship explosions of the battle, when a world is captured, and when the match is won or lost. The fleet and battle effects have several takes named `Name_1.wav`, `Name_2.wav`, and so on; one is picked at random each time, with a small random change in pitch and level. A capture and the two match results always sound the same. `MusicPlayer` loops the background track and keeps it playing across restarts.
+
+Most effects are generated from code. `Assets/Squadra/Editor/SoundRecipes.cs` describes each one, and **Squadra > Rebuild Sound Effects** renders them to WAV files in `Assets/Squadra/Audio/Sfx`, overwriting the previous render. Battle starts, weapon fire, captures and the match results are synthesized; departures and arrivals are shaped from the recordings in `Assets/Squadra/Audio/Sources`. The ship explosions are recordings used as they are (`ShipDestroyed_N.ogg`). To add a take of your own, drop a file with the next number into the `Sfx` folder and run **Squadra > Rewire Sounds In Open Scene**. Volumes are set on the `Sounds` and `Music` objects in the scene.
+
+## Credits
+
+- Music: "Observing The Star" by yd, from [OpenGameArt](https://opengameart.org/content/another-space-background-track), released under CC0.
+- Engine, force-field and explosion recordings: "Sci-Fi Sounds" by [Kenney](https://www.kenney.nl), released under CC0.
