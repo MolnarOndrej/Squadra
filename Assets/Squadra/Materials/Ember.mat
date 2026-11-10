@@ -22,7 +22,11 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _SurfaceMap:
+        m_Texture: {fileID: 2800000, guid: 2a9d87cdb87593242a3b5423e2261935, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _Ambient: 0.035
@@ -45,6 +49,8 @@ Material:
     - _Seed: 8.2
     - _Specular: 0
     - _SpinSpeed: 0.035
+    - _SurfaceLongitude: -0.3
+    - _SurfaceMapStrength: 0.98
     - _Tilt: -0.25
     - _Warp: 0.9
     m_Colors:

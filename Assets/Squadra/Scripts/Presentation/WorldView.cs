@@ -168,19 +168,19 @@ namespace Squadra
             // Ownership ring: a solid glowing band when owned, a faint dashed circle when neutral.
             owner.Radius = OrbitRadius;
             owner.Thickness = Mathf.Lerp(0.018f, 0.03f, ownedAmount);
-            owner.Softness = Mathf.Lerp(0.05f, 0.12f, ownedAmount);
-            owner.Glow = Mathf.Lerp(0.1f, 0.42f, ownedAmount);
+            owner.Softness = Mathf.Lerp(0.05f, 0.075f, ownedAmount);
+            owner.Glow = Mathf.Lerp(0.1f, 0.25f, ownedAmount);
             owner.Dashes = owned ? 0f : 44f;
             owner.DashFill = 0.5f;
             owner.Spin = 0.01f;
             owner.Additive = 0.7f;
-            owner.Tint = Palette.Hdr(shownColor, Mathf.Lerp(0.9f, 1.9f, ownedAmount) + flash * 2f,
+            owner.Tint = Palette.Hdr(shownColor, Mathf.Lerp(0.9f, 1.65f, ownedAmount) + flash * 2f,
                 Mathf.Lerp(0.55f, 1f, ownedAmount));
             owner.Apply();
 
             if (aura != null)
             {
-                float alpha = Mathf.Lerp(0.03f, 0.2f, ownedAmount) + flash * 0.5f + selectAmount * 0.08f;
+                float alpha = Mathf.Lerp(0.03f, 0.11f, ownedAmount) + flash * 0.5f + selectAmount * 0.08f;
                 auraBlock.SetVector(TintId, Palette.Hdr(shownColor, 1f, alpha));
                 aura.SetPropertyBlock(auraBlock);
             }

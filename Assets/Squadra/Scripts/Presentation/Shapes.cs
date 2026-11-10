@@ -117,6 +117,8 @@ namespace Squadra
         public float Scroll;
         public float EndFade = 0.3f;
 
+        bool hasLength;
+
         public LineStyle(MeshRenderer renderer)
         {
             this.renderer = renderer;
@@ -127,6 +129,7 @@ namespace Squadra
             get => renderer.enabled;
             set
             {
+                value = value && hasLength;
                 if (renderer.enabled != value) renderer.enabled = value;
             }
         }
@@ -135,10 +138,14 @@ namespace Squadra
         {
             Vector2 delta = to - from;
             float length = delta.magnitude;
+            hasLength = length >= 0.01f;
+            Visible = true;
+            if (!hasLength) return;
+
             Transform t = renderer.transform;
             t.position = (Vector3)((from + to) * 0.5f);
             t.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
-            t.localScale = new Vector3(Mathf.Max(length, 0.001f), Width, 1f);
+            t.localScale = new Vector3(length, Width, 1f);
 
             block.SetVector(TintId, Tint);
             block.SetFloat(LengthId, length);
