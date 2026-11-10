@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Space
+  m_Shader: {fileID: 4800000, guid: b1f20eece9ea1cd45af0633a1442f36a, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Drift: 0.012
+    - _NebulaScale: 0.11
+    - _NebulaStrength: 1.05
+    - _StarBrightness: 1.3
+    - _StarDensity: 0.5
+    - _SunStrength: 0.7
+    m_Colors:
+    - _NebulaA: {r: 0.13725491, g: 0.16470589, b: 0.41960785, a: 1}
+    - _NebulaB: {r: 0.2901961, g: 0.13725491, b: 0.4392157, a: 1}
+    - _NebulaC: {r: 0.07058824, g: 0.34901962, b: 0.41960785, a: 1}
+    - _StarColor: {r: 0.8627451, g: 0.9019608, b: 1, a: 1}
+    - _StarWarm: {r: 1, g: 0.8666667, b: 0.6901961, a: 1}
+    - _SunColor: {r: 1, g: 0.8666667, b: 0.6901961, a: 1}
+    - _SunPosition: {r: -12, g: 7.5, b: 0, a: 0}
+    - _VoidColor: {r: 0.019607844, g: 0.023529412, b: 0.05882353, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
