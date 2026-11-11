@@ -1,5 +1,4 @@
 using System;
-using Squadra.Campaign;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -79,7 +78,7 @@ namespace Squadra
 
         /// <summary>
         /// Loads the menu straight onto the mission map. This is the entry point for other scenes, such
-        /// as a results screen's Continue button.
+        /// as the results screen's Back to Menu button.
         /// </summary>
         public static void OpenCampaignMap()
         {
@@ -135,16 +134,13 @@ namespace Squadra
         /// </summary>
         public void Launch(int missionIndex)
         {
-            MissionCatalog catalog = map.Catalog;
-            if (loading || dialogOpen || catalog == null || missionIndex < 0 || missionIndex >= catalog.Count) return;
-            if (!CampaignRules.CanLaunch(catalog.ToSlots(), CampaignSession.Progress, missionIndex)) return;
+            if (loading || dialogOpen) return;
+            if (!CampaignSession.TryBeginMission(map.Catalog, missionIndex, out string scenePath)) return;
 
             loading = true;
             sounds.Select();
-            CampaignSession.BeginMission(catalog.IdAt(missionIndex));
 
             // Fade out under the selection cue; the cover also keeps the pointer off the menu.
-            string scenePath = catalog.ScenePathAt(missionIndex);
             fade.pickingMode = PickingMode.Position;
             fade.AddToClassList(FadeClass);
             root.schedule.Execute(() => SceneManager.LoadSceneAsync(scenePath)).StartingIn(LaunchFadeMilliseconds);

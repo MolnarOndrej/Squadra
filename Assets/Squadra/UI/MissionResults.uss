@@ -1,0 +1,246 @@
+/*
+ * Squadra mission results. Laid out for a 1920 x 1080 panel, like the menu, and drawn over the faded
+ * battlefield. It is used together with MainMenu.uss, which supplies the colors, the buttons and their
+ * pointer and keyboard highlighting.
+ */
+
+.results-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ------------------------------------------------------------------ panel */
+
+.results {
+    width: 1120px;
+    padding: 36px 56px 44px 56px;
+    align-items: center;
+    background-color: rgba(8, 11, 28, 0.96);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 14px;
+    opacity: 0;
+    translate: 0 28px;
+    transition-property: opacity, translate;
+    transition-duration: 0.45s;
+    transition-timing-function: ease-out-cubic;
+}
+
+.results--shown {
+    opacity: 1;
+    translate: 0 0;
+}
+
+.results__heading {
+    margin: 0;
+    padding: 0 0 0 30px;
+    font-size: 104px;
+    letter-spacing: 30px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: var(--accent);
+    text-shadow: 0 0 26px rgba(255, 209, 102, 0.45);
+}
+
+.results__rule {
+    width: 460px;
+    height: 2px;
+    background-color: var(--accent);
+    opacity: 0.8;
+}
+
+.results__message {
+    margin: 18px 0 0 0;
+    font-size: 30px;
+    letter-spacing: 1px;
+    -unity-text-align: middle-center;
+    color: var(--text);
+}
+
+.results--defeat .results__heading {
+    color: #FF7482;
+    text-shadow: 0 0 26px rgba(255, 77, 94, 0.5);
+}
+
+.results--defeat .results__rule {
+    background-color: #FF4D5E;
+}
+
+/* Campaign complete: a longer heading in brighter gold, a gold frame and the celebration behind it all. */
+
+.results--complete {
+    border-color: var(--accent);
+}
+
+.results--complete .results__heading {
+    padding-left: 10px;
+    font-size: 64px;
+    letter-spacing: 10px;
+    color: #FFE6A3;
+    text-shadow: 0 0 32px rgba(255, 209, 102, 0.85);
+}
+
+.results--complete .results__rule {
+    width: 760px;
+    margin-top: 8px;
+}
+
+.results__celebration {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ------------------------------------------------------------------ mission time */
+
+.results__time {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.results__time-caption {
+    margin: 0 18px 0 0;
+    font-size: 22px;
+    letter-spacing: 5px;
+    color: var(--text-dim);
+}
+
+.results__time-value {
+    margin: 0;
+    font-size: 40px;
+    -unity-font-style: bold;
+    color: var(--text);
+}
+
+/* ------------------------------------------------------------------ player table */
+
+.results__table {
+    align-self: stretch;
+    margin-top: 18px;
+}
+
+.results__row {
+    flex-direction: row;
+    align-items: center;
+    height: 54px;
+    padding: 0 20px;
+    border-bottom-width: 1px;
+    border-color: var(--line-faint);
+}
+
+.results__row--header {
+    height: 46px;
+    border-bottom-width: 2px;
+    border-color: var(--line);
+}
+
+.results__row--human {
+    background-color: rgba(230, 236, 255, 0.03);
+}
+
+.results__cell {
+    margin: 0;
+    padding: 0;
+    font-size: 20px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+}
+
+.results__cell--player {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+.results__cell--number {
+    width: 290px;
+    -unity-text-align: middle-right;
+}
+
+.results__swatch {
+    width: 22px;
+    height: 22px;
+    margin-right: 16px;
+    border-radius: 11px;
+}
+
+.results__name {
+    margin: 0;
+    padding: 0;
+    font-size: 30px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+}
+
+.results__you {
+    margin: 4px 0 0 16px;
+    padding: 2px 10px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    border-width: 1px;
+    border-color: var(--line);
+    border-radius: 4px;
+}
+
+.results__value {
+    font-size: 32px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    color: var(--text);
+}
+
+/* ------------------------------------------------------------------ actions */
+
+.results__actions {
+    flex-direction: row;
+    justify-content: center;
+    margin-top: 34px;
+}
+
+.results__button {
+    width: 310px;
+    height: 76px;
+    margin: 0 12px;
+    font-size: 26px;
+    letter-spacing: 4px;
+}
+
+/*
+ * A disabled action stays still under the pointer; its tooltip says why it is disabled. The tooltip
+ * hangs below the button, over the panel's lower edge, so it never covers the table or another action.
+ */
+.menu-root .results__button:disabled {
+    scale: 1;
+}
+
+.results__tooltip {
+    position: absolute;
+    left: -30px;
+    right: -30px;
+    top: 88px;
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 22px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: var(--text);
+    background-color: var(--panel-solid);
+    border-width: 1px;
+    border-color: var(--accent);
+    border-radius: 6px;
+    opacity: 0;
+    transition-duration: 0.14s;
+}
+
+.results__next:hover > .results__tooltip--on {
+    opacity: 1;
+}

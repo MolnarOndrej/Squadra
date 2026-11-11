@@ -6,14 +6,16 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UIElements;
 
 namespace Squadra.EditorTools
 {
     /// <summary>
     /// Assembles the first playable scene from code: materials, post-processing profile, backdrop, the two
-    /// planets and the moon, fleet and effect layers, HUD and the game controller. Run it again from
-    /// <c>Squadra &gt; Rebuild First Playable Scene</c> to regenerate everything; it overwrites the scene and
-    /// the generated materials, so tweak values here rather than in the generated assets if they must survive.
+    /// planets and the moon, fleet and effect layers, HUD, results screen and the game controller. Run it
+    /// again from <c>Squadra &gt; Rebuild First Playable Scene</c> to regenerate everything; it overwrites the
+    /// scene and the generated materials, so tweak values here rather than in the generated assets if they
+    /// must survive. The results screen's layout and look live in <c>Assets/Squadra/UI</c> and are left alone.
     /// </summary>
     public static class SquadraSceneBuilder
     {
@@ -21,6 +23,7 @@ namespace Squadra.EditorTools
         internal const string MaterialFolder = Root + "/Materials";
         internal const string SettingsFolder = Root + "/Settings";
         internal const string ScenePath = "Assets/Scenes/SampleScene.unity";
+        const string ResultsLayoutPath = Root + "/UI/MissionResults.uxml";
 
         // Sorting orders, back to front.
         const int OrderBackdrop = -100;
@@ -33,7 +36,6 @@ namespace Squadra.EditorTools
         const int OrderWaves = 15;
         const int OrderText = 20;
         const int OrderScrim = 50;
-        const int OrderResult = 60;
 
         // The sun sits just outside the top-left of the frame; planets are lit from there.
         static readonly Vector2 SunPosition = new Vector2(-12f, 7.5f);
@@ -59,6 +61,7 @@ namespace Squadra.EditorTools
 
             Materials materials = BuildMaterials();
             VolumeProfile profile = BuildVolumeProfile();
+            SquadraMenuBuilder.EnsurePanel(); // before the new scene: opening it drops assets created just now
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -79,6 +82,7 @@ namespace Squadra.EditorTools
             FleetLayer fleets = BuildFleets(materials);
             EffectsLayer effects = BuildEffects(materials);
             HudView hud = BuildHud(materials, rig);
+            ResultsScreen results = BuildResults();
             SoundLayer sounds = BuildSounds(rig);
             BuildMusic();
 
@@ -88,12 +92,50 @@ namespace Squadra.EditorTools
             Wire(game, "effects", effects);
             Wire(game, "sounds", sounds);
             Wire(game, "hud", hud);
+            Wire(game, "results", results);
             Wire(game, "rig", rig);
             Wire(game, "lineMaterial", materials.Line);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
+
+            // The catalog's first mission is this scene, so a missing catalog can only be created now.
+            Wire(game, "catalog", SquadraMenuBuilder.EnsureCatalog());
+            EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("Squadra: rebuilt " + ScenePath);
+        }
+
+        /// <summary>
+        /// Gives the open scene the results screen: adds the Results object if it is missing, removes the
+        /// result texts of the old click-to-play-again overlay, and connects the game controller to the
+        /// screen and to the mission catalog. Use it on a mission scene made before the results screen
+        /// existed; unlike a full rebuild it leaves the rest of the scene alone.
+        /// </summary>
+        [MenuItem("Squadra/Rewire Results Screen In Open Scene")]
+        public static void RewireResults()
+        {
+            GameController game = Object.FindAnyObjectByType<GameController>();
+            HudView hud = Object.FindAnyObjectByType<HudView>();
+            if (game == null || hud == null)
+            {
+                Debug.LogError("Squadra: open the playable scene first.");
+                return;
+            }
+
+            foreach (string obsolete in new[] { "Result Title", "Result Subtitle", "Result Prompt" })
+            {
+                Transform text = hud.transform.Find("Result/" + obsolete);
+                if (text != null) Object.DestroyImmediate(text.gameObject);
+            }
+
+            ResultsScreen results = Object.FindAnyObjectByType<ResultsScreen>();
+            if (results == null) results = BuildResults();
+
+            Wire(game, "results", results);
+            Wire(game, "catalog", SquadraMenuBuilder.EnsureCatalog());
+            EditorSceneManager.MarkSceneDirty(game.gameObject.scene);
+            Debug.Log("Squadra: rewired the results screen in " + game.gameObject.scene.name
+                + " (save the scene to keep it)");
         }
 
         /// <summary>
@@ -447,19 +489,11 @@ namespace Squadra.EditorTools
                 Palette.Bright(Palette.TextDim, 0.35f), TextAlignmentOptions.Bottom, new Vector2(0.5f, 0f),
                 new Vector2(16f, 0.5f), OrderText, FontStyles.Normal, 6f);
 
+            // The scrim fades the battlefield when the match ends; the results panel is drawn over it.
             var result = new GameObject("Result");
             result.transform.SetParent(root, false);
             MeshRenderer scrim = Shapes.CreateQuad("Scrim", result.transform, materials.Scrim, OrderScrim);
             scrim.transform.localScale = new Vector3(22f, 14f, 1f);
-            var center = new Vector2(0.5f, 0.5f);
-            TextMeshPro resultTitle = Text("Result Title", result.transform, "VICTORY", 15f, Palette.Accent,
-                TextAlignmentOptions.Center, center, new Vector2(16f, 2f), OrderResult, FontStyles.Bold, 30f);
-            TextMeshPro resultSubtitle = Text("Result Subtitle", result.transform, "Both planets secured", 2.8f,
-                Palette.Text, TextAlignmentOptions.Center, center, new Vector2(16f, 0.6f), OrderResult,
-                FontStyles.Normal, 6f);
-            TextMeshPro resultPrompt = Text("Result Prompt", result.transform, "CLICK TO PLAY AGAIN", 1.9f,
-                Palette.TextDim, TextAlignmentOptions.Center, center, new Vector2(16f, 0.5f), OrderResult,
-                FontStyles.Normal, 26f);
             result.SetActive(false);
 
             var hud = root.gameObject.AddComponent<HudView>();
@@ -474,11 +508,34 @@ namespace Squadra.EditorTools
             Wire(hud, "hint", hint);
             Wire(hud, "resultRoot", result);
             Wire(hud, "scrim", scrim);
-            Wire(hud, "resultTitle", resultTitle);
-            Wire(hud, "resultSubtitle", resultSubtitle);
-            Wire(hud, "resultPrompt", resultPrompt);
             Relayout(hud);
             return hud;
+        }
+
+        // The results panel is a UI document over the scene, like the menu, and borrows the menu's
+        // panel settings and interface cues.
+        static ResultsScreen BuildResults()
+        {
+            var layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(ResultsLayoutPath);
+            PanelSettings panel = SquadraMenuBuilder.EnsurePanel();
+            if (layout == null || panel == null)
+                Debug.LogError("Squadra: the results layout or the menu theme is missing from " + Root + "/UI");
+            if (!SquadraSoundBuilder.HasMenuSounds) SquadraSoundBuilder.Build();
+
+            var go = new GameObject("Results");
+            var document = go.AddComponent<UIDocument>();
+            document.panelSettings = panel;
+            document.visualTreeAsset = layout;
+
+            var cues = go.AddComponent<MenuAudio>();
+            Wire(cues, "hover", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuHover));
+            Wire(cues, "select", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuSelect));
+            Wire(cues, "back", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuBack));
+
+            var results = go.AddComponent<ResultsScreen>();
+            Wire(results, "document", document);
+            Wire(results, "sounds", cues);
+            return results;
         }
 
         static SoundLayer BuildSounds(CameraRig rig)

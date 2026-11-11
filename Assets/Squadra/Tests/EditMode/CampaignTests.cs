@@ -4,8 +4,9 @@ using Squadra.Campaign;
 namespace Squadra.Tests
 {
     /// <summary>
-    /// Exercises the campaign boundary the mission map uses: victories in, mission states, pending
-    /// unlock reveals and page contents out.
+    /// Exercises the campaign boundary the mission map and the results screen use: victories and
+    /// defeats in; mission states, pending unlock reveals, page contents and what the results screen
+    /// offers next out.
     /// </summary>
     public class CampaignTests
     {
@@ -191,6 +192,240 @@ namespace Squadra.Tests
             MissionSlot[] missions = SevenReady();
 
             Assert.IsFalse(CampaignRules.NeedsReveal(missions, new CampaignProgress(), 0));
+        }
+
+        // ------------------------------------------------------------ mission results
+
+        [Test]
+        public void Winning_with_a_ready_next_mission_offers_it_and_focuses_it()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.AreEqual(ResultsHeading.Victory, plan.Heading);
+            Assert.AreEqual(NextMissionState.Enabled, plan.NextMission);
+            Assert.IsTrue(plan.ShowsNextMission);
+            Assert.IsTrue(plan.CanStartNextMission);
+            Assert.IsNull(plan.NextMissionReason);
+            Assert.AreEqual(1, plan.NextMissionIndex);
+            Assert.AreEqual(ResultsAction.NextMission, plan.InitialFocus);
+            Assert.IsFalse(plan.Celebrates);
+        }
+
+        [Test]
+        public void The_victory_is_recorded_before_the_next_mission_is_judged()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+            Assert.IsFalse(CampaignRules.CanLaunch(missions, progress, 1), "locked until Mission 1 is won");
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.IsTrue(progress.IsCompleted("mission-1"));
+            Assert.IsTrue(plan.CanStartNextMission);
+            Assert.IsTrue(CampaignRules.CanLaunch(missions, progress, plan.NextMissionIndex));
+            Assert.AreEqual(1, CampaignRules.FirstPendingReveal(missions, progress),
+                "the map still shows the unlock when the player returns to it");
+        }
+
+        [Test]
+        public void Winning_Mission_1_of_the_shipped_catalog_is_a_plain_victory_with_the_next_mission_coming_soon()
+        {
+            MissionSlot[] missions = Shipped();
+            var progress = new CampaignProgress();
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.AreEqual(ResultsHeading.Victory, plan.Heading);
+            Assert.IsFalse(plan.Celebrates, "Missions 2-5 exist, so the campaign is not complete");
+            Assert.AreEqual(NextMissionState.ComingSoon, plan.NextMission);
+            Assert.IsTrue(plan.ShowsNextMission);
+            Assert.IsFalse(plan.CanStartNextMission);
+            Assert.AreEqual("Next mission coming soon", plan.NextMissionReason);
+            Assert.AreEqual(ResultsAction.Restart, plan.InitialFocus);
+        }
+
+        [Test]
+        public void Next_mission_never_skips_ahead_to_a_later_ready_mission()
+        {
+            MissionSlot[] missions = Catalog(true, false, true);
+            var progress = new CampaignProgress();
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.AreEqual(NextMissionState.ComingSoon, plan.NextMission);
+            Assert.AreEqual(1, plan.NextMissionIndex);
+            Assert.IsFalse(plan.CanStartNextMission);
+        }
+
+        [Test]
+        public void Losing_with_a_locked_next_mission_shows_it_disabled_and_grants_nothing()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", false);
+
+            Assert.AreEqual(ResultsHeading.Defeat, plan.Heading);
+            Assert.AreEqual(NextMissionState.WinRequired, plan.NextMission);
+            Assert.IsTrue(plan.ShowsNextMission);
+            Assert.IsFalse(plan.CanStartNextMission);
+            Assert.AreEqual("Win this mission to continue", plan.NextMissionReason);
+            Assert.AreEqual(ResultsAction.Restart, plan.InitialFocus);
+            Assert.AreEqual(0, progress.CompletedCount);
+            Assert.IsFalse(CampaignRules.CanLaunch(missions, progress, 1));
+        }
+
+        [Test]
+        public void Losing_a_replay_keeps_next_mission_disabled_and_the_earlier_victory()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+            CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+            progress.MarkRevealed("mission-2");
+
+            // Mission 2 is open on the map, but this attempt at Mission 1 was lost.
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", false);
+
+            Assert.AreEqual(ResultsHeading.Defeat, plan.Heading);
+            Assert.AreEqual(NextMissionState.WinRequired, plan.NextMission);
+            Assert.IsFalse(plan.CanStartNextMission);
+            Assert.AreEqual("Win this mission to continue", plan.NextMissionReason);
+            Assert.IsTrue(progress.IsCompleted("mission-1"), "a defeat does not revoke a completion");
+            Assert.IsTrue(CampaignRules.CanLaunch(missions, progress, 1), "the map still offers Mission 2");
+            Assert.AreEqual(-1, CampaignRules.FirstPendingReveal(missions, progress));
+        }
+
+        [Test]
+        public void Losing_with_a_preview_as_next_mission_asks_for_a_win_first()
+        {
+            ResultsPlan plan = CampaignRules.ConcludeMission(Shipped(), new CampaignProgress(), "mission-1", false);
+
+            Assert.AreEqual(NextMissionState.WinRequired, plan.NextMission);
+            Assert.AreEqual("Win this mission to continue", plan.NextMissionReason);
+        }
+
+        [Test]
+        public void Winning_the_last_catalog_mission_completes_the_campaign()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+            for (int i = 0; i < 6; i++) progress.Complete(missions[i].Id);
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-7", true);
+
+            Assert.AreEqual(ResultsHeading.CampaignComplete, plan.Heading);
+            Assert.IsTrue(plan.Celebrates);
+            Assert.AreEqual(NextMissionState.Hidden, plan.NextMission);
+            Assert.IsFalse(plan.ShowsNextMission);
+            Assert.IsNull(plan.NextMissionReason);
+            Assert.AreEqual(-1, plan.NextMissionIndex);
+            Assert.AreEqual(ResultsAction.BackToMenu, plan.InitialFocus);
+            Assert.AreEqual(7, progress.CompletedCount);
+        }
+
+        [Test]
+        public void Losing_the_last_catalog_mission_is_a_plain_defeat_without_next_mission()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+            for (int i = 0; i < 6; i++) progress.Complete(missions[i].Id);
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-7", false);
+
+            Assert.AreEqual(ResultsHeading.Defeat, plan.Heading);
+            Assert.IsFalse(plan.Celebrates);
+            Assert.IsFalse(plan.ShowsNextMission);
+            Assert.IsNull(plan.NextMissionReason);
+            Assert.AreEqual(ResultsAction.Restart, plan.InitialFocus);
+            Assert.IsFalse(progress.IsCompleted("mission-7"));
+        }
+
+        [Test]
+        public void The_last_mission_is_the_end_of_the_catalog_not_the_last_ready_mission()
+        {
+            // Mission 2 is the last one with a scenario, but Mission 3 is still to come.
+            MissionSlot[] missions = Catalog(true, true, false);
+            var progress = new CampaignProgress();
+            progress.Complete("mission-1");
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-2", true);
+
+            Assert.AreEqual(ResultsHeading.Victory, plan.Heading);
+            Assert.AreEqual(NextMissionState.ComingSoon, plan.NextMission);
+        }
+
+        [Test]
+        public void A_single_mission_catalog_treats_its_mission_as_the_last()
+        {
+            MissionSlot[] missions = Catalog(true);
+
+            ResultsPlan won = CampaignRules.ConcludeMission(missions, new CampaignProgress(), "mission-1", true);
+            Assert.AreEqual(ResultsHeading.CampaignComplete, won.Heading);
+            Assert.IsFalse(won.ShowsNextMission);
+            Assert.AreEqual(ResultsAction.BackToMenu, won.InitialFocus);
+
+            ResultsPlan lost = CampaignRules.ConcludeMission(missions, new CampaignProgress(), "mission-1", false);
+            Assert.AreEqual(ResultsHeading.Defeat, lost.Heading);
+            Assert.IsFalse(lost.ShowsNextMission);
+            Assert.AreEqual(ResultsAction.Restart, lost.InitialFocus);
+        }
+
+        [Test]
+        public void A_match_outside_the_campaign_gets_a_plain_result_without_next_mission()
+        {
+            MissionSlot[] missions = Catalog(true);
+            var progress = new CampaignProgress();
+
+            // A scene opened on its own has no active mission; an id the catalog does not know is the same.
+            foreach (string missionId in new[] { null, "", "elsewhere" })
+            {
+                ResultsPlan won = CampaignRules.ConcludeMission(missions, progress, missionId, true);
+                Assert.AreEqual(ResultsHeading.Victory, won.Heading, "no campaign completion for '" + missionId + "'");
+                Assert.IsFalse(won.ShowsNextMission);
+                Assert.AreEqual(ResultsAction.Restart, won.InitialFocus);
+
+                ResultsPlan lost = CampaignRules.ConcludeMission(missions, progress, missionId, false);
+                Assert.AreEqual(ResultsHeading.Defeat, lost.Heading);
+                Assert.IsFalse(lost.ShowsNextMission);
+                Assert.AreEqual(ResultsAction.Restart, lost.InitialFocus);
+            }
+
+            Assert.IsFalse(progress.IsCompleted("mission-1"));
+        }
+
+        [Test]
+        public void Restarting_and_replaying_never_takes_progress_away()
+        {
+            MissionSlot[] missions = SevenReady();
+            var progress = new CampaignProgress();
+            CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+            CampaignRules.ConcludeMission(missions, progress, "mission-2", true);
+
+            // Back to Mission 1: lose it, then win it again.
+            CampaignRules.ConcludeMission(missions, progress, "mission-1", false);
+            ResultsPlan again = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.AreEqual(2, progress.CompletedCount);
+            Assert.AreEqual(MissionState.Completed, CampaignRules.StateOf(missions, progress, 0));
+            Assert.AreEqual(MissionState.Completed, CampaignRules.StateOf(missions, progress, 1));
+            Assert.AreEqual(MissionState.Available, CampaignRules.StateOf(missions, progress, 2));
+            Assert.IsTrue(again.CanStartNextMission);
+            Assert.AreEqual(1, again.NextMissionIndex, "Next Mission follows the mission just played");
+        }
+
+        [Test]
+        public void A_fresh_launch_starts_the_campaign_over()
+        {
+            MissionSlot[] missions = SevenReady();
+            CampaignRules.ConcludeMission(missions, new CampaignProgress(), "mission-1", true);
+
+            var relaunched = new CampaignProgress();
+
+            Assert.AreEqual(0, relaunched.CompletedCount);
+            Assert.IsFalse(CampaignRules.CanLaunch(missions, relaunched, 1));
         }
 
         // ------------------------------------------------------------ pages

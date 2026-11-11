@@ -15,34 +15,47 @@ In the menu:
 - **Quit** asks for confirmation.
 - Esc goes back, or cancels a dialog. On the mission map, A/D or the left/right arrow keys turn pages when there is more than one.
 
-Campaign progress lasts for one session: winning a mission marks it completed until the game is closed. There is no way back to the menu from inside a mission yet, so stop and relaunch to return.
+Campaign progress lasts for one session: winning a mission marks it completed until the game is closed. A mission returns to the mission map from its results screen; there is no way back to the menu while a match is still running.
 
 In a mission (`Assets/Scenes/SampleScene.unity` also runs on its own):
 
 - Click a Blue world to select it, then click another world to send every ship stationed there.
 - Click the selected world again, right-click, or press Esc to cancel.
 - A fleet that lands on an empty or beaten world needs five seconds to capture it.
-- After the match ends, click (or press R) to play again.
+
+When the match ends, the results panel appears over the faded battlefield:
+
+- It shows Victory or Defeat, the mission time (time actually played, as minutes:seconds) and one row per player with **Ships destroyed** and **Ships lost**. Your row is first. Ships lost counts every ship a player lost in battle, attacking or defending; ships destroyed counts the enemy and neutral guard ships its fleets destroyed.
+- **Next Mission** launches the mission that follows in the campaign. It is disabled after a defeat ("Win this mission to continue") and while the following mission has no scenario yet ("Next mission coming soon"); hover it to see why. It is not shown when no mission follows.
+- **Restart** starts a fresh attempt at the same mission. **Back to Menu** opens the mission map.
+- Winning the last mission of the catalog shows **Campaign Complete!** instead, with Restart and Back to Menu.
+- Use the mouse, or the arrow keys or Tab with Enter or Space. Clicking beside the panel does nothing, and Esc is not used here.
 
 ## Project layout
 
-- `Assets/Squadra/Scripts/Simulation` holds the rules: one `Match` class owns orders, time, combat, capture, production and the result. It has no Unity dependencies.
-- `Assets/Squadra/Scripts/Presentation` holds the scene components that send orders to the match and draw its state.
-- `Assets/Squadra/Scripts/Campaign` holds the campaign rules: which missions are completed, available, locked or previews, when an unlock is shown, and how missions are grouped into map pages. It has no Unity dependencies.
+- `Assets/Squadra/Scripts/Simulation` holds the rules: one `Match` class owns orders, time, combat, capture, production, each player's combat totals and the result. It has no Unity dependencies.
+- `Assets/Squadra/Scripts/Presentation` holds the scene components that send orders to the match and draw its state, and the results screen shown when it ends.
+- `Assets/Squadra/Scripts/Campaign` holds the campaign rules: which missions are completed, available, locked or previews, when an unlock is shown, how missions are grouped into map pages, and what the results screen offers after a mission. It has no Unity dependencies.
 - `Assets/Squadra/Scripts/Menu` holds the menu scene's components: the main menu and its screens, the mission map, the settings, and the menu's sounds.
-- `Assets/Squadra/UI` holds the menu's layout (`MainMenu.uxml`), look (`MainMenu.uss`) and panel settings. The menu is built with UI Toolkit.
+- `Assets/Squadra/UI` holds the menu's layout (`MainMenu.uxml`), look (`MainMenu.uss`) and panel settings, and the results panel's layout and look (`MissionResults.uxml`, `MissionResults.uss`). Both are built with UI Toolkit and share the panel settings and the button styles.
 - `Assets/Squadra/Campaign/Missions.asset` is the mission catalog: the ordered missions, each with a stable id and an optional gameplay scene. A mission needs its scene in the build to be playable.
 - `Assets/Squadra/Shaders` holds the procedural shaders for the planets, space backdrop, rings and fleet dots.
-- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog.
+- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog. **Squadra > Rewire Results Screen In Open Scene** adds the results screen to a mission scene that does not have it yet and leaves the rest of the scene alone.
 - `Assets/Squadra/Audio` holds the sound effects (`Sfx`), the mission track (`Music`) and the menu track (`MenuMusic`).
-- `Assets/Squadra/Tests/EditMode` holds the match and campaign rule tests. Run them from **Window > General > Test Runner** (EditMode).
+- `Assets/Squadra/Tests/EditMode` holds the match, match results and campaign rule tests. Run them from **Window > General > Test Runner** (EditMode).
 - The specifications are in `specifications/`.
 
 ## Mission map
 
 The number of missions on one map page is the **Missions per Page** property of the `Mission Map` object in the menu scene (1 to 10, default 5). With more missions than fit on a page, the map shows page arrows. To add a mission, add an entry to the mission catalog, give it an id that will never change, assign its scene, and add that scene to the build settings.
 
-Another scene can return to the menu on the mission map by calling `MainMenu.OpenCampaignMap()`.
+Another scene can return to the menu on the mission map by calling `MainMenu.OpenCampaignMap()`; the results screen's Back to Menu does.
+
+## Mission results
+
+A mission's players are the **Players** list of the `Game` object in its scene: two to six entries, each a faction and a display name. The results table lists the human player (Blue) first and the others in that order, including players that were eliminated or never fought. Neutral is never a player. Only Blue and Red are playable so far; the other four factions exist so that rosters and results can already hold six players.
+
+The `Game` object's **Catalog** tells the results screen where the mission sits in the campaign. The mission that follows is always the next catalog entry, and the last entry is the end of the campaign. A mission scene played on its own, without being launched from the map, shows a plain Victory or Defeat with Restart and Back to Menu.
 
 ## Sound
 

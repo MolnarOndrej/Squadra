@@ -89,5 +89,53 @@ namespace Squadra.Campaign
 
             return -1;
         }
+
+        /// <summary>The catalog index of a mission id, or -1 when the catalog has no such mission.</summary>
+        public static int IndexOf(IReadOnlyList<MissionSlot> missions, string missionId)
+        {
+            if (string.IsNullOrEmpty(missionId)) return -1;
+
+            for (int i = 0; i < missions.Count; i++)
+            {
+                if (missions[i].Id == missionId) return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// The match result boundary: call once when an attempt at a mission ends. A victory is recorded
+        /// first, so that it counts toward what the results screen then offers; a defeat changes nothing.
+        /// The mission that follows is always the very next catalog entry, never a later one that happens
+        /// to be ready. Winning the last catalog entry completes the campaign.
+        /// A match played outside the campaign (<paramref name="missionId"/> is null or not in the
+        /// catalog) gets a plain Victory or Defeat with no Next Mission.
+        /// </summary>
+        public static ResultsPlan ConcludeMission(IReadOnlyList<MissionSlot> missions, CampaignProgress progress,
+            string missionId, bool victory)
+        {
+            if (victory) progress.Complete(missionId);
+
+            ResultsHeading heading = victory ? ResultsHeading.Victory : ResultsHeading.Defeat;
+            int index = IndexOf(missions, missionId);
+            if (index < 0)
+                return new ResultsPlan(heading, NextMissionState.Hidden, -1, ResultsAction.Restart);
+
+            int next = index + 1;
+            if (next >= missions.Count)
+            {
+                return victory
+                    ? new ResultsPlan(ResultsHeading.CampaignComplete, NextMissionState.Hidden, -1,
+                        ResultsAction.BackToMenu)
+                    : new ResultsPlan(heading, NextMissionState.Hidden, -1, ResultsAction.Restart);
+            }
+
+            if (!victory)
+                return new ResultsPlan(heading, NextMissionState.WinRequired, next, ResultsAction.Restart);
+
+            return CanLaunch(missions, progress, next)
+                ? new ResultsPlan(heading, NextMissionState.Enabled, next, ResultsAction.NextMission)
+                : new ResultsPlan(heading, NextMissionState.ComingSoon, next, ResultsAction.Restart);
+        }
     }
 }

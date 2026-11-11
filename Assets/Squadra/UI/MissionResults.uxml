@@ -1,0 +1,38 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="MainMenu.uss" />
+    <ui:Style src="MissionResults.uss" />
+    <ui:VisualElement name="resultsRoot" class="menu-root menu-root--pointer results-root hidden">
+
+        <ui:VisualElement name="resultsPanel" class="results">
+            <Squadra.ResultsCelebration name="resultsCelebration" class="results__celebration hidden" />
+            <ui:Label name="resultsHeading" text="VICTORY" class="results__heading" />
+            <ui:VisualElement class="results__rule" />
+            <ui:Label name="resultsMessage" text="Thank you for playing Squadra!" class="results__message hidden" />
+
+            <ui:VisualElement class="results__time">
+                <ui:Label text="MISSION TIME" class="results__time-caption" />
+                <ui:Label name="resultsTime" text="00:00" class="results__time-value" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="results__table">
+                <ui:VisualElement class="results__row results__row--header">
+                    <ui:Label text="PLAYER" class="results__cell results__cell--player" />
+                    <ui:Label text="SHIPS DESTROYED" class="results__cell results__cell--number" />
+                    <ui:Label text="SHIPS LOST" class="results__cell results__cell--number" />
+                </ui:VisualElement>
+                <ui:VisualElement name="resultsRows" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="resultsActions" class="results__actions">
+                <ui:VisualElement name="nextMissionSlot" class="results__next">
+                    <ui:Button name="nextMissionButton" text="NEXT MISSION" class="menu-button results__button" />
+                    <ui:Label name="nextMissionTooltip" picking-mode="Ignore" class="results__tooltip" />
+                </ui:VisualElement>
+                <ui:Button name="restartButton" text="RESTART" class="menu-button results__button" />
+                <ui:Button name="backToMenuButton" text="BACK TO MENU" class="menu-button results__button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="resultsFade" picking-mode="Ignore" class="fade" />
+    </ui:VisualElement>
+</ui:UXML>

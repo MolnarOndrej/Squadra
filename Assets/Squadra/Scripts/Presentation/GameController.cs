@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Squadra.Campaign;
 using Squadra.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -8,17 +10,38 @@ namespace Squadra
 {
     /// <summary>
     /// Runs one match in the scene. Builds the <see cref="Match"/> from the worlds placed in the scene,
-    /// turns clicks into fleet orders for Blue, advances time and tells the views what to show.
+    /// turns clicks into fleet orders for Blue, advances time and tells the views what to show. When
+    /// the match ends it hands the results to the results screen and carries out the action picked there.
     /// All game rules live in the match; nothing here decides an outcome.
     /// </summary>
     public sealed class GameController : MonoBehaviour
     {
         const Faction Player = Faction.Blue;
 
+        /// <summary>One player of the mission, as listed on the results screen.</summary>
+        [Serializable]
+        public struct RosterEntry
+        {
+            public Faction faction;
+            [Tooltip("Shown on the results screen. Leave empty to use the faction's name.")]
+            public string displayName;
+        }
+
         [Header("Rules")]
         [Tooltip("Common fleet speed in world units per second.")]
         [SerializeField] float fleetSpeed = 2.4f;
         [SerializeField] float captureSeconds = 5f;
+
+        [Header("Mission")]
+        [Tooltip("Who takes part, two to six players. Results list the human player (Blue) first and "
+            + "the others in this order.")]
+        [SerializeField] RosterEntry[] players =
+        {
+            new RosterEntry { faction = Faction.Blue, displayName = "Blue" },
+            new RosterEntry { faction = Faction.Red, displayName = "Red" },
+        };
+        [Tooltip("The campaign this mission belongs to. It decides what Next Mission offers on the results screen.")]
+        [SerializeField] MissionCatalog catalog;
 
         [Header("Scene")]
         [Tooltip("Node ids follow this order.")]
@@ -27,6 +50,7 @@ namespace Squadra
         [SerializeField] EffectsLayer effects;
         [SerializeField] SoundLayer sounds;
         [SerializeField] HudView hud;
+        [SerializeField] ResultsScreen results;
         [SerializeField] CameraRig rig;
         [SerializeField] Material lineMaterial;
 
@@ -41,10 +65,13 @@ namespace Squadra
 
         public Match Match => match;
         public int SelectedWorld => selected;
+        public ResultsScreen Results => results;
 
         void Awake()
         {
-            var config = new MatchConfig { FleetSpeed = fleetSpeed, CaptureDuration = captureSeconds };
+            var config = new MatchConfig { FleetSpeed = fleetSpeed, CaptureDuration = captureSeconds, Human = Player };
+            foreach (RosterEntry entry in players)
+                config.Players.Add(new MatchPlayer(entry.faction, entry.displayName));
             foreach (WorldView world in worlds)
                 config.Nodes.Add(world.ToConfig());
 
@@ -71,10 +98,9 @@ namespace Squadra
             }
             else
             {
+                // The match no longer advances; the views below keep their idle animation running.
                 selected = -1;
                 hovered = -1;
-                hud.ShowResult(match.Status, match.Elapsed);
-                if (hud.ResultReady && RestartRequested()) Restart();
             }
 
             for (int i = 0; i < worlds.Length; i++)
@@ -196,19 +222,46 @@ namespace Squadra
                 + worlds[selected].DisplayName + " again to cancel";
         }
 
-        static bool RestartRequested()
-        {
-            Pointer pointer = Pointer.current;
-            Keyboard keyboard = Keyboard.current;
-            return (pointer != null && pointer.press.wasPressedThisFrame)
-                || (keyboard != null && (keyboard.rKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame
-                    || keyboard.spaceKey.wasPressedThisFrame));
-        }
+        // ------------------------------------------------------------------ after the match
 
+        /// <summary>Starts a fresh attempt at this mission. It stays the campaign's active mission.</summary>
         public void Restart()
         {
             Time.timeScale = 1f;
             SceneManager.LoadScene(gameObject.scene.name);
+        }
+
+        /// <summary>Launches the mission that follows this one in the campaign, if it can be played.</summary>
+        public void StartNextMission(int missionIndex)
+        {
+            Time.timeScale = 1f;
+            if (CampaignSession.TryBeginMission(catalog, missionIndex, out string scenePath))
+                SceneManager.LoadScene(scenePath);
+            else
+                BackToMenu(); // never offered when it cannot be launched; the map is the safe way out
+        }
+
+        /// <summary>Leaves the mission for the menu's mission map.</summary>
+        public void BackToMenu()
+        {
+            Time.timeScale = 1f;
+            MainMenu.OpenCampaignMap();
+        }
+
+        void OnResultsAction(ResultsAction action, int nextMissionIndex)
+        {
+            switch (action)
+            {
+                case ResultsAction.NextMission:
+                    StartNextMission(nextMissionIndex);
+                    break;
+                case ResultsAction.Restart:
+                    Restart();
+                    break;
+                default:
+                    BackToMenu();
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------ lanes and order preview
@@ -313,11 +366,18 @@ namespace Squadra
             sounds.WorldCaptured(world.Position);
         }
 
+        // The match has taken its final results by now, the deciding battle included.
         void OnStatusChanged(MatchStatus status)
         {
-            // A win completes the campaign mission this match was launched as, if any.
-            if (status == MatchStatus.BlueVictory) CampaignSession.ReportVictory();
-            if (status != MatchStatus.InProgress) sounds.MatchEnded(status == MatchStatus.BlueVictory);
+            if (status == MatchStatus.InProgress) return;
+
+            // A win completes the campaign mission this match was launched as, if any, before the
+            // campaign decides what the results screen offers.
+            bool victory = status == MatchStatus.BlueVictory;
+            ResultsPlan plan = CampaignSession.ConcludeMission(catalog, victory);
+            sounds.MatchEnded(victory);
+            hud.ShowResult();
+            results.Show(match.Results, plan, action => OnResultsAction(action, plan.NextMissionIndex));
         }
 
         void OnFleetArrived(ArrivalReport report)
