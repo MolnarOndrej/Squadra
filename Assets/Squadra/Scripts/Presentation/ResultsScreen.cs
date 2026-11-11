@@ -13,7 +13,9 @@ namespace Squadra
     /// mission time, one row of combat totals per player, and the Next Mission, Restart and Back to Menu
     /// actions. The campaign decides what is offered and the match supplies the numbers; this screen
     /// shows them, keeps keyboard focus on something sensible and reports the action the player picks.
-    /// It never acts on the background, on Escape, or before it has been on screen for a moment.
+    /// It never acts on the background, on Escape, or before it has been on screen for a moment. While
+    /// the pause menu is open over it the panel is put away, with nothing on it usable, and comes back
+    /// exactly as it was.
     /// </summary>
     public sealed class ResultsScreen : MonoBehaviour
     {
@@ -36,6 +38,12 @@ namespace Squadra
 
         /// <summary>Seconds the screen fades to black before the chosen action is carried out.</summary>
         public const float LeaveSeconds = 0.35f;
+
+        /// <summary>
+        /// Seconds the results ignore input after coming back from a pause, so that the click or key
+        /// press that resumed cannot also pick an action.
+        /// </summary>
+        public const float ResumeGuardSeconds = 0.25f;
 
         [SerializeField] UIDocument document;
         [Tooltip("Optional. Plays the menu's hover, select and back cues for the result actions.")]
@@ -64,6 +72,9 @@ namespace Squadra
         bool entered;
         bool ready;
         bool leaving;
+        bool suspended;
+        float guard;
+        ResultsAction? focusBeforeSuspend;
         bool keyboardMode;
         Vector3 lastPointer = new Vector3(float.NaN, float.NaN);
 
@@ -72,6 +83,12 @@ namespace Squadra
 
         /// <summary>True once the results accept input.</summary>
         public bool Ready => ready;
+
+        /// <summary>True while the panel is put away under the pause menu. The results themselves are kept.</summary>
+        public bool Suspended => suspended;
+
+        /// <summary>True when the panel can be seen: shown, and not put away under the pause menu.</summary>
+        public bool PanelShown => visible && !suspended && root != null && !root.ClassListContains(HiddenClass);
 
         /// <summary>True from the moment an action is picked until its scene replaces this one.</summary>
         public bool Leaving => leaving;
@@ -133,6 +150,8 @@ namespace Squadra
             entered = false;
             ready = false;
             leaving = false;
+            guard = 0f;
+            focusBeforeSuspend = null;
 
             for (int i = 0; i < HeadingClasses.Length; i++)
                 panel.EnableInClassList(HeadingClasses[i], i == (int)offered.Heading);
@@ -155,8 +174,47 @@ namespace Squadra
             fade.pickingMode = PickingMode.Ignore;
             fade.RemoveFromClassList(FadeClass);
             panel.RemoveFromClassList(ShownClass);
-            root.RemoveFromClassList(HiddenClass);
+            panel.SetEnabled(!suspended);
+            root.EnableInClassList(HiddenClass, suspended);
             SetKeyboardMode(false);
+        }
+
+        /// <summary>
+        /// Puts the panel away while the pause menu is open, or brings it back. Away, it is hidden, none
+        /// of its actions can be used and its timers stand still. Back, it shows the same result with
+        /// the same action focused, and ignores input for a moment. Nothing is restarted either way.
+        /// </summary>
+        public void SetSuspended(bool value)
+        {
+            if (value == suspended) return;
+
+            suspended = value;
+            if (!visible || root == null) return;
+
+            if (value)
+            {
+                focusBeforeSuspend = FocusedAction;
+                panel.SetEnabled(false);
+                root.AddToClassList(HiddenClass);
+                return;
+            }
+
+            guard = ResumeGuardSeconds;
+            panel.SetEnabled(true);
+            root.RemoveFromClassList(HiddenClass);
+            if (sounds != null) sounds.PointerActive = !keyboardMode;
+            if (!ready) return;
+
+            // Focus only takes once the panel is displayed again, a frame after its class changes.
+            ResultsAction? restore = focusBeforeSuspend;
+            root.schedule.Execute(() =>
+            {
+                if (suspended || !ready || leaving) return;
+
+                Button target = restore.HasValue ? ButtonOf(restore.Value) : null;
+                if (target != null && target.canGrabFocus) target.Focus();
+                else FocusDefault();
+            }).StartingIn(20);
         }
 
         static VisualElement BuildRow(PlayerResult player)
@@ -210,7 +268,7 @@ namespace Squadra
         /// </summary>
         public bool Activate(ResultsAction action)
         {
-            if (!ready || leaving || !IsEnabled(action)) return false;
+            if (!ready || leaving || suspended || guard > 0f || !IsEnabled(action)) return false;
 
             leaving = true;
             leavingFor = action;
@@ -277,7 +335,7 @@ namespace Squadra
         void OnPointerEnter(PointerEnterEvent pointer)
         {
             var button = (Button)pointer.currentTarget;
-            if (!ready || leaving || keyboardMode || !button.enabledInHierarchy) return;
+            if (!ready || leaving || suspended || keyboardMode || !button.enabledInHierarchy) return;
 
             if (sounds != null) sounds.Hover();
             button.Focus();
@@ -343,7 +401,9 @@ namespace Squadra
 
         void Update()
         {
-            if (!visible) return;
+            if (!visible || suspended) return;
+
+            if (guard > 0f) guard -= Time.unscaledDeltaTime;
 
             // The entrance starts a frame after the panel has been laid out transparent.
             if (!entered && age > 0f)

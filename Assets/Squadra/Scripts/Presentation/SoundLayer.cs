@@ -54,7 +54,8 @@ namespace Squadra
     /// <summary>
     /// Plays the match's sound effects: fleets leaving and arriving, battles, captures and the result.
     /// Sounds are panned by where they happen on the map. The game controller says what happened;
-    /// this layer picks the take and the timing.
+    /// this layer picks the take and the timing. While the mission is paused every effect holds where
+    /// it is and no new one starts.
     /// </summary>
     public sealed class SoundLayer : MonoBehaviour
     {
@@ -94,10 +95,29 @@ namespace Squadra
 
         readonly List<Pending> pending = new List<Pending>();
         AudioSource[] voices;
+        float[] voiceGains;
         AudioSource resultVoice;
         int nextVoice;
         float clock;
+        float resultIn = -1f;
         bool matchOver;
+        bool paused;
+
+        /// <summary>True while the effects are held by a pause.</summary>
+        public bool Paused => paused;
+
+        /// <summary>How many effects are sounding right now, the result included. Held effects do not count.</summary>
+        public int PlayingCount
+        {
+            get
+            {
+                int count = resultVoice != null && resultVoice.isPlaying ? 1 : 0;
+                if (voices == null) return count;
+                foreach (AudioSource voice in voices)
+                    if (voice.isPlaying) count++;
+                return count;
+            }
+        }
 
         // ------------------------------------------------------------------ events
 
@@ -148,9 +168,40 @@ namespace Squadra
             AudioClip clip = won ? victory : defeat;
             if (clip == null) return;
 
+            // The delay is counted here rather than scheduled, so that a pause can hold it.
             resultVoice.clip = clip;
             resultVoice.volume = volume * resultVolume * GameSettings.SfxVolume;
-            resultVoice.PlayDelayed(resultDelay);
+            resultIn = Mathf.Max(0f, resultDelay);
+        }
+
+        /// <summary>
+        /// Holds every effect where it is while the mission is paused, the result sound included, and
+        /// lets them carry on afterwards at the Sound Effects volume set by then. Nothing new starts
+        /// while paused.
+        /// </summary>
+        public void SetPaused(bool value)
+        {
+            if (value == paused) return;
+
+            paused = value;
+            if (value)
+            {
+                foreach (AudioSource voice in voices)
+                    voice.Pause();
+                resultVoice.Pause();
+                return;
+            }
+
+            // Effects fading out after the match keep fading from where they were.
+            float sfx = GameSettings.SfxVolume;
+            for (int i = 0; i < voices.Length; i++)
+            {
+                if (!matchOver) voices[i].volume = voiceGains[i] * sfx;
+                voices[i].UnPause();
+            }
+
+            resultVoice.volume = volume * resultVolume * sfx;
+            resultVoice.UnPause();
         }
 
         // ------------------------------------------------------------------ playback
@@ -158,6 +209,7 @@ namespace Squadra
         void Awake()
         {
             voices = new AudioSource[Mathf.Max(1, voiceCount)];
+            voiceGains = new float[voices.Length];
             for (int i = 0; i < voices.Length; i++)
                 voices[i] = CreateVoice();
             resultVoice = CreateVoice();
@@ -175,8 +227,20 @@ namespace Squadra
 
         void Update()
         {
+            if (paused) return;
+
             if (matchOver)
             {
+                if (resultIn >= 0f)
+                {
+                    resultIn -= Time.unscaledDeltaTime;
+                    if (resultIn <= 0f)
+                    {
+                        resultIn = -1f;
+                        resultVoice.Play();
+                    }
+                }
+
                 float fade = Mathf.Exp(-Time.unscaledDeltaTime / 0.1f);
                 foreach (AudioSource voice in voices)
                 {
@@ -206,23 +270,24 @@ namespace Squadra
 
         void Play(SoundCue cue, Vector2 position, float gain = 1f)
         {
-            if (matchOver) return;
+            if (matchOver || paused) return;
 
             AudioClip clip = cue.Next();
             if (clip == null) return;
 
-            AudioSource voice = TakeVoice();
+            AudioSource voice = TakeVoice(out int index);
+            voiceGains[index] = volume * cue.Volume * gain * Random.Range(0.9f, 1f);
             voice.clip = clip;
-            voice.volume = volume * cue.Volume * gain * Random.Range(0.9f, 1f) * GameSettings.SfxVolume;
+            voice.volume = voiceGains[index] * GameSettings.SfxVolume;
             voice.pitch = 1f + Random.Range(-cue.PitchJitter, cue.PitchJitter);
             voice.panStereo = Pan(position);
             voice.Play();
         }
 
         // A silent voice if there is one; otherwise the next in line is cut off and reused.
-        AudioSource TakeVoice()
+        AudioSource TakeVoice(out int index)
         {
-            int index = nextVoice;
+            index = nextVoice;
             for (int i = 0; i < voices.Length; i++)
             {
                 int candidate = (nextVoice + i) % voices.Length;

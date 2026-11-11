@@ -1,0 +1,43 @@
+/*
+ * Squadra pause menu. Laid out for a 1920 x 1080 panel, like the menu, and drawn over the mission. It
+ * is used together with MainMenu.uss, which supplies the colors, the buttons, Settings, the dialog and
+ * their pointer and keyboard highlighting.
+ *
+ * The battlefield behind is dimmed by the mission's own scrim, the one the results use. Nothing here
+ * adds a second dark layer: the pause root is transparent and so is the layer behind a dialog.
+ */
+
+.pause-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.pause-screen {
+    justify-content: center;
+}
+
+.pause__heading {
+    margin-top: 0;
+    padding-left: 30px;
+    font-size: 96px;
+    letter-spacing: 30px;
+}
+
+.pause__rule {
+    width: 480px;
+    margin-top: 8px;
+}
+
+.pause__buttons {
+    width: 540px;
+    margin-top: 44px;
+    margin-bottom: 40px;
+}
+
+/* A dialog takes the place of the screen it was opened from, so it needs no cover behind it. */
+.pause-root .modal {
+    background-color: rgba(0, 0, 0, 0);
+}

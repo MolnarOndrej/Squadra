@@ -8,11 +8,19 @@ namespace Squadra
     /// The heads-up display, drawn as world-space text pinned to the edges of the camera view:
     /// title, fleet totals, match clock and a contextual hint. When the match ends it fades the
     /// battlefield behind a scrim; the results panel is drawn over that by <see cref="ResultsScreen"/>.
+    /// The pause menu dims the mission with the same scrim, so a pause over a result never darkens the
+    /// view a second time.
     /// </summary>
     [ExecuteAlways]
     public sealed class HudView : MonoBehaviour
     {
         static readonly int TintId = Shader.PropertyToID("_Tint");
+
+        /// <summary>How much of the battlefield the scrim covers at its darkest, for a result and for a pause alike.</summary>
+        public const float DimOpacity = 0.72f;
+
+        const float ResultFadeSeconds = 0.6f;
+        const float PauseFadeSeconds = 0.2f;
 
         [SerializeField] CameraRig rig;
         [SerializeField] float margin = 0.45f;
@@ -39,9 +47,17 @@ namespace Squadra
         int shownRed = -1;
         int shownSeconds = -1;
         float resultAge = -1f;
+        float pauseDim;
+        bool dimmed;
 
         /// <summary>True once the battlefield has started to fade behind the results.</summary>
         public bool ResultVisible => resultAge >= 0f;
+
+        /// <summary>True while the battlefield is dimmed for the pause menu.</summary>
+        public bool Dimmed => dimmed;
+
+        /// <summary>How dark the scrim over the battlefield is right now, from 0 to <see cref="DimOpacity"/>.</summary>
+        public float ScrimOpacity => DimOpacity * Mathf.Max(ResultCover(), PauseCover());
 
         public void SetHint(string text)
         {
@@ -82,7 +98,21 @@ namespace Squadra
             resultAge = 0f;
             resultRoot.SetActive(true);
             SetHint(string.Empty);
-            AnimateResult();
+            ApplyScrim();
+        }
+
+        /// <summary>
+        /// Dims the battlefield for the pause menu, or lifts the dimming again. It is the same scrim the
+        /// results use and the darker of the two wins, so a result's dimming looks the same before,
+        /// during and after a pause.
+        /// </summary>
+        public void SetDimmed(bool value)
+        {
+            if (resultRoot == null || value == dimmed) return;
+
+            dimmed = value;
+            if (value) resultRoot.SetActive(true);
+            ApplyScrim();
         }
 
         void OnEnable()
@@ -116,22 +146,36 @@ namespace Squadra
                 scrim.transform.position = new Vector3(center.x, center.y, 0f);
                 scrim.transform.localScale = new Vector3(view.width + 3f, view.height + 3f, 1f);
 
-                if (Application.isPlaying && ResultVisible)
+                if (Application.isPlaying && (ResultVisible || dimmed || pauseDim > 0f))
                 {
-                    resultAge += Time.unscaledDeltaTime;
-                    AnimateResult();
+                    // Real time: the scrim keeps fading while the mission itself is paused.
+                    if (ResultVisible) resultAge += Time.unscaledDeltaTime;
+                    pauseDim = Mathf.MoveTowards(pauseDim, dimmed ? 1f : 0f,
+                        Time.unscaledDeltaTime / PauseFadeSeconds);
+                    ApplyScrim();
+                    if (!ResultVisible && !dimmed && pauseDim <= 0f) resultRoot.SetActive(false);
                 }
             }
         }
 
-        void AnimateResult()
+        float ResultCover()
         {
-            float t = Mathf.Clamp01(resultAge / 0.6f);
-            float eased = 1f - (1f - t) * (1f - t) * (1f - t);
+            if (!ResultVisible) return 0f;
 
+            float t = Mathf.Clamp01(resultAge / ResultFadeSeconds);
+            return 1f - (1f - t) * (1f - t) * (1f - t);
+        }
+
+        float PauseCover()
+        {
+            return Mathf.SmoothStep(0f, 1f, pauseDim);
+        }
+
+        void ApplyScrim()
+        {
             if (scrimBlock == null) scrimBlock = new MaterialPropertyBlock();
             Color cover = Palette.Void.linear;
-            scrimBlock.SetVector(TintId, new Vector4(cover.r, cover.g, cover.b, 0.72f * eased));
+            scrimBlock.SetVector(TintId, new Vector4(cover.r, cover.g, cover.b, ScrimOpacity));
             scrim.SetPropertyBlock(scrimBlock);
         }
 
