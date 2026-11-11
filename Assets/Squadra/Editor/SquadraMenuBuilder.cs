@@ -14,7 +14,8 @@ namespace Squadra.EditorTools
     /// <c>Squadra &gt; Rebuild Main Menu Scene</c>; it overwrites the scene and puts it first in the build.
     /// The layout and look live in <c>Assets/Squadra/UI</c> and the mission list in the catalog asset;
     /// those are created when missing and otherwise left alone. Materials and the post-processing
-    /// profile are shared with the first playable scene, so build that one first.
+    /// profile are shared with the first playable scene, so build that one first. The panel settings and
+    /// the catalog are shared the other way: the playable scene's results screen uses both.
     /// </summary>
     public static class SquadraMenuBuilder
     {
@@ -56,9 +57,8 @@ namespace Squadra.EditorTools
             }
 
             if (!SquadraSoundBuilder.HasMenuSounds) SquadraSoundBuilder.Build();
-            BuildPanel(theme);
-            BuildCatalog();
-            AssetDatabase.SaveAssets();
+            EnsurePanel();
+            EnsureCatalog();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -119,10 +119,16 @@ namespace Squadra.EditorTools
 
         // ------------------------------------------------------------------ assets
 
-        // Scales the 1920 x 1080 layout to the window, always fitting all of it.
-        static void BuildPanel(ThemeStyleSheet theme)
+        /// <summary>
+        /// The panel settings that scale the 1920 x 1080 interface to the window, always fitting all of
+        /// it. The menu and the results screen share them. Created when missing; null without the theme.
+        /// </summary>
+        internal static PanelSettings EnsurePanel()
         {
-            var panel = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelPath);
+            var theme = Load<ThemeStyleSheet>(ThemePath);
+            if (theme == null) return null;
+
+            var panel = Load<PanelSettings>(PanelPath);
             if (panel == null)
             {
                 panel = ScriptableObject.CreateInstance<PanelSettings>();
@@ -134,22 +140,31 @@ namespace Squadra.EditorTools
             panel.referenceResolution = new Vector2Int(1920, 1080);
             panel.screenMatchMode = PanelScreenMatchMode.Expand;
             EditorUtility.SetDirty(panel);
+            AssetDatabase.SaveAssets();
+            return panel;
         }
 
-        // Mission 1 is the first playable scenario; Missions 2-5 are previews until their scenes exist.
-        static void BuildCatalog()
+        /// <summary>
+        /// The mission catalog, created when missing: Mission 1 is the first playable scenario and
+        /// Missions 2-5 are previews until their scenes exist. Mission 1 only gets its scene when that
+        /// scene has been saved, so create the catalog after the first playable scene.
+        /// </summary>
+        internal static MissionCatalog EnsureCatalog()
         {
-            if (AssetDatabase.LoadAssetAtPath<MissionCatalog>(CatalogPath) != null) return;
+            var catalog = Load<MissionCatalog>(CatalogPath);
+            if (catalog != null) return catalog;
 
             Directory.CreateDirectory(CampaignFolder);
             AssetDatabase.Refresh();
-            MissionCatalog catalog = MissionCatalog.Create(
+            catalog = MissionCatalog.Create(
                 ("mission-01", SquadraSceneBuilder.ScenePath),
                 ("mission-02", null),
                 ("mission-03", null),
                 ("mission-04", null),
                 ("mission-05", null));
             AssetDatabase.CreateAsset(catalog, CatalogPath);
+            AssetDatabase.SaveAssets();
+            return catalog;
         }
 
         // The game opens on the menu, and a mission can only be launched when its scene is in the build.

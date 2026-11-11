@@ -33,12 +33,31 @@ namespace Squadra
         }
 
         /// <summary>
-        /// The match result boundary: call when the player wins the running match. Completes the active
-        /// campaign mission; a defeat, a restart or leaving the scene never reaches this.
+        /// The campaign launch flow: starts the mission at <paramref name="index"/> of the catalog if the
+        /// campaign allows it, and hands back the scene to load. The map and the results screen's Next
+        /// Mission both launch through here, so the same rules apply to both.
         /// </summary>
-        public static void ReportVictory()
+        public static bool TryBeginMission(MissionCatalog catalog, int index, out string scenePath)
         {
-            if (activeMissionId != null) Progress.Complete(activeMissionId);
+            scenePath = null;
+            if (catalog == null || index < 0 || index >= catalog.Count) return false;
+            if (!CampaignRules.CanLaunch(catalog.ToSlots(), Progress, index)) return false;
+
+            scenePath = catalog.ScenePathAt(index);
+            BeginMission(catalog.IdAt(index));
+            return true;
+        }
+
+        /// <summary>
+        /// The match result boundary: call once when the running match ends. A win completes the active
+        /// campaign mission; a defeat, a restart or leaving the scene never grants or takes away
+        /// progress. Returns what the results screen offers next. A scene opened on its own, with no
+        /// active mission, gets a plain result with no Next Mission.
+        /// </summary>
+        public static ResultsPlan ConcludeMission(MissionCatalog catalog, bool victory)
+        {
+            MissionSlot[] missions = catalog != null ? catalog.ToSlots() : System.Array.Empty<MissionSlot>();
+            return CampaignRules.ConcludeMission(missions, Progress, activeMissionId, victory);
         }
 
         /// <summary>Asks the menu to open on the mission map the next time its scene loads.</summary>

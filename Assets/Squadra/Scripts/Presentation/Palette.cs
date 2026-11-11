@@ -22,6 +22,10 @@ namespace Squadra
         // Factions
         public static readonly Color Blue = Hex(0x3FA9FF);
         public static readonly Color Red = Hex(0xFF4D5E);
+        public static readonly Color Green = Hex(0x4FD675);
+        public static readonly Color Yellow = Hex(0xF2E24A);
+        public static readonly Color Purple = Hex(0xB47CFF);
+        public static readonly Color Orange = Hex(0xFF9340);
         public static readonly Color Neutral = Hex(0x9AA3B5);
 
         // Interface
@@ -35,6 +39,10 @@ namespace Squadra
             {
                 case Faction.Blue: return Blue;
                 case Faction.Red: return Red;
+                case Faction.Green: return Green;
+                case Faction.Yellow: return Yellow;
+                case Faction.Purple: return Purple;
+                case Faction.Orange: return Orange;
                 default: return Neutral;
             }
         }
@@ -43,9 +51,8 @@ namespace Squadra
         {
             switch (faction)
             {
-                case Faction.Blue: return "BLUE";
-                case Faction.Red: return "RED";
-                default: return "NEUTRAL";
+                case Faction.Neutral: return "NEUTRAL";
+                default: return faction.ToString().ToUpperInvariant();
             }
         }
 

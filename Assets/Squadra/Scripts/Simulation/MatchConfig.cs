@@ -48,7 +48,20 @@ namespace Squadra.Simulation
     {
         public const int StartingShips = 30;
 
+        /// <summary>The most players one mission can have.</summary>
+        public const int MaxPlayers = 6;
+
         public readonly List<NodeConfig> Nodes = new List<NodeConfig>();
+
+        /// <summary>
+        /// The mission's roster, in the order results list the players. Leave it empty to take the
+        /// roster from the starting owners of the map objects, in object order. A starting owner that
+        /// is missing from the roster is added after the listed players.
+        /// </summary>
+        public readonly List<MatchPlayer> Players = new List<MatchPlayer>();
+
+        /// <summary>The player at the controls. Results list this player first.</summary>
+        public Faction Human = Faction.Blue;
 
         /// <summary>Common fleet speed in map units per second. Travel time is distance divided by this.</summary>
         public double FleetSpeed = 2.4;
@@ -63,6 +76,8 @@ namespace Squadra.Simulation
         public static MatchConfig FirstPlayable(MapPoint bluePlanet, MapPoint redPlanet, MapPoint moon)
         {
             var config = new MatchConfig();
+            config.Players.Add(new MatchPlayer(Faction.Blue));
+            config.Players.Add(new MatchPlayer(Faction.Red));
             config.Nodes.Add(NodeConfig.Planet("Blue Planet", bluePlanet, Faction.Blue, StartingShips));
             config.Nodes.Add(NodeConfig.Planet("Red Planet", redPlanet, Faction.Red, StartingShips));
             config.Nodes.Add(NodeConfig.Moon("Moon", moon));
