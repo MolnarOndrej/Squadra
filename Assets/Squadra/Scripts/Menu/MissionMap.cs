@@ -289,7 +289,7 @@ namespace Squadra
                     slot.Status.text = "COMPLETED";
                     break;
                 case MissionState.Available:
-                    slot.Status.text = "AVAILABLE";
+                    slot.Status.text = string.Empty; // the lit dot says it; only the other states are labeled
                     break;
                 case MissionState.Locked:
                     slot.Status.text = "LOCKED\nComplete " + MissionCatalog.LabelFor(index - 1);

@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <ui:Style src="MainMenu.uss" />
-    <ui:VisualElement name="menuRoot" class="menu-root">
+    <ui:VisualElement name="menuRoot" class="menu-root menu-root--pointer">
 
         <ui:VisualElement name="mainScreen" class="screen">
             <ui:Label name="title" text="SQUADRA" class="title" />

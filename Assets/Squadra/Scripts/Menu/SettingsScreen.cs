@@ -44,6 +44,8 @@ namespace Squadra
                 int index = i;
                 tabs[i].clicked += () =>
                 {
+                    if (index == tab) return; // already showing: nothing changes, so no cue
+
                     sounds.Select();
                     SelectTab(index);
                 };

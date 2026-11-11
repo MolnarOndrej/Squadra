@@ -23,6 +23,13 @@
     display: none;
 }
 
+/*
+ * Highlighting. The menu root carries menu-root--pointer while the mouse is in use and menu-root--keys
+ * while the keyboard is. A control is highlighted when the pointer is over it in pointer mode, or when
+ * it has the focus in keyboard mode, so a highlight never lingers after the pointer has left. For each
+ * control the first rule keeps the resting look in every state and the second adds the highlight.
+ */
+
 /* ------------------------------------------------------------------ screens */
 
 .screen {
@@ -99,20 +106,28 @@
     transition-duration: 0.14s;
 }
 
-.menu-button:hover,
-.menu-button:focus {
+.menu-root .menu-button:hover,
+.menu-root .menu-button:focus {
+    color: var(--text);
+    border-color: var(--line);
+    background-color: var(--panel);
+}
+
+.menu-root--pointer .menu-button:hover,
+.menu-root--keys .menu-button:focus {
     color: var(--accent);
     border-color: var(--accent);
     background-color: var(--accent-wash);
     scale: 1.03;
 }
 
-.menu-button:active {
+.menu-root--pointer .menu-button:active,
+.menu-root--keys .menu-button:active {
     scale: 0.98;
     background-color: rgba(255, 209, 102, 0.28);
 }
 
-.menu-button:disabled {
+.menu-root .menu-button:disabled {
     opacity: 1;
     color: rgba(135, 145, 176, 0.5);
     border-color: var(--line-faint);
@@ -149,8 +164,14 @@
     transition-duration: 0.14s;
 }
 
-.page-arrow:hover,
-.page-arrow:focus {
+.menu-root .page-arrow:hover,
+.menu-root .page-arrow:focus {
+    border-color: var(--line);
+    background-color: var(--panel);
+}
+
+.menu-root--pointer .page-arrow:hover,
+.menu-root--keys .page-arrow:focus {
     border-color: var(--accent);
     background-color: var(--accent-wash);
     scale: 1.06;
@@ -167,8 +188,8 @@
     --icon-color: #E6ECFF;
 }
 
-.page-arrow:hover > .page-arrow__icon,
-.page-arrow:focus > .page-arrow__icon {
+.menu-root--pointer .page-arrow:hover > .page-arrow__icon,
+.menu-root--keys .page-arrow:focus > .page-arrow__icon {
     --icon-color: #FFD166;
 }
 
@@ -194,6 +215,13 @@
     background-color: rgba(0, 0, 0, 0);
     border-width: 0;
     border-radius: 0;
+}
+
+.menu-root .mission:hover,
+.menu-root .mission:focus,
+.menu-root .mission:active {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
 }
 
 .mission:disabled {
@@ -294,10 +322,6 @@
     display: none;
 }
 
-.mission--available > .mission__status {
-    color: var(--accent);
-}
-
 .mission--completed > .mission__dot > .mission__icon {
     --icon-color: #6FC0FF;
 }
@@ -310,19 +334,19 @@
     color: var(--blue);
 }
 
-.mission:hover > .mission__dot,
-.mission:focus > .mission__dot {
+.menu-root--pointer .mission:hover > .mission__dot,
+.menu-root--keys .mission:focus > .mission__dot {
     scale: 1.12;
     border-color: #FFFFFF;
     background-color: #1A2040;
 }
 
-.mission:hover > .mission__name,
-.mission:focus > .mission__name {
+.menu-root--pointer .mission:hover > .mission__name,
+.menu-root--keys .mission:focus > .mission__name {
     color: var(--accent);
 }
 
-.mission--unlocking > .mission__dot {
+.menu-root .mission--unlocking > .mission__dot {
     scale: 1.4;
     border-color: #FFFFFF;
     background-color: #5A4A20;
@@ -400,15 +424,22 @@
     transition-duration: 0.14s;
 }
 
-.tab:hover,
-.tab:focus {
+.menu-root .tab:hover,
+.menu-root .tab:focus {
+    color: var(--text-dim);
+    background-color: rgba(0, 0, 0, 0);
+    border-color: rgba(0, 0, 0, 0);
+}
+
+.menu-root--pointer .tab:hover,
+.menu-root--keys .tab:focus {
     color: var(--text);
     background-color: rgba(255, 209, 102, 0.07);
 }
 
-.tab--selected,
-.tab--selected:hover,
-.tab--selected:focus {
+.menu-root .tab--selected,
+.menu-root .tab--selected:hover,
+.menu-root .tab--selected:focus {
     color: var(--accent);
     border-bottom-color: var(--accent);
 }
@@ -452,8 +483,14 @@
     transition-duration: 0.14s;
 }
 
-.setting-row__control:hover .unity-base-popup-field__input,
-.setting-row__control:focus .unity-base-popup-field__input {
+.menu-root .setting-row__control:hover .unity-base-popup-field__input,
+.menu-root .setting-row__control:focus .unity-base-popup-field__input {
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+}
+
+.menu-root--pointer .setting-row__control:hover .unity-base-popup-field__input,
+.menu-root--keys .setting-row__control:focus .unity-base-popup-field__input {
     border-color: var(--accent);
     background-color: #1A2040;
 }
@@ -501,8 +538,13 @@
     display: none;
 }
 
-.setting-row__control:hover .unity-base-slider__dragger,
-.setting-row__control:focus .unity-base-slider__dragger {
+.menu-root .setting-row__control:hover .unity-base-slider__dragger,
+.menu-root .setting-row__control:focus .unity-base-slider__dragger {
+    background-color: var(--text);
+}
+
+.menu-root--pointer .setting-row__control:hover .unity-base-slider__dragger,
+.menu-root--keys .setting-row__control:focus .unity-base-slider__dragger {
     background-color: var(--accent);
     scale: 1.15;
 }
@@ -524,8 +566,14 @@
     transition-duration: 0.14s;
 }
 
-.setting-row__toggle:hover .unity-toggle__checkmark,
-.setting-row__toggle:focus .unity-toggle__checkmark {
+.menu-root .setting-row__toggle:hover .unity-toggle__checkmark,
+.menu-root .setting-row__toggle:focus .unity-toggle__checkmark {
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+}
+
+.menu-root--pointer .setting-row__toggle:hover .unity-toggle__checkmark,
+.menu-root--keys .setting-row__toggle:focus .unity-toggle__checkmark {
     border-color: var(--accent);
     background-color: #1A2040;
 }

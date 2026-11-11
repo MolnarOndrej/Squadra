@@ -19,6 +19,12 @@ namespace Squadra
 
         AudioSource source;
 
+        /// <summary>
+        /// False while the player is using the keyboard and the mouse is resting. A button that appears
+        /// under a resting pointer has not been pointed at, so it stays silent and does not take the focus.
+        /// </summary>
+        public bool PointerActive { get; set; } = true;
+
         /// <summary>How many cues of each kind have played since the scene loaded. Read by play tests.</summary>
         public int HoverCount { get; private set; }
         public int SelectCount { get; private set; }
@@ -43,8 +49,8 @@ namespace Squadra
         }
 
         /// <summary>
-        /// Makes a button sound and take keyboard focus when the pointer enters it, so the mouse and the
-        /// keyboard always agree on which button is highlighted. Disabled buttons stay silent.
+        /// Makes a button sound and take keyboard focus when the pointer enters it, so switching from the
+        /// mouse to the keyboard carries on from the button under the pointer. Disabled buttons stay silent.
         /// </summary>
         public void AttachHover(Button button)
         {
@@ -54,7 +60,7 @@ namespace Squadra
         void OnPointerEnter(PointerEnterEvent pointer)
         {
             var element = (VisualElement)pointer.currentTarget;
-            if (!element.enabledInHierarchy) return;
+            if (!PointerActive || !element.enabledInHierarchy) return;
 
             Hover();
             element.Focus();

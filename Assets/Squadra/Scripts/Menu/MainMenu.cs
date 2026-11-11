@@ -21,6 +21,8 @@ namespace Squadra
         const string HiddenClass = "hidden";
         const string ActiveScreenClass = "screen--active";
         const string FadeClass = "fade--on";
+        const string PointerModeClass = "menu-root--pointer";
+        const string KeyboardModeClass = "menu-root--keys";
         const string PopupClass = "unity-base-dropdown";
         const long LaunchFadeMilliseconds = 350;
 
@@ -36,6 +38,7 @@ namespace Squadra
         [SerializeField] MenuAudio sounds;
 
         VisualElement root;
+        VisualElement menuRoot;
         VisualElement fade;
         VisualElement dialog;
         VisualElement[] screens;
@@ -51,6 +54,8 @@ namespace Squadra
         MenuScreen screen;
         bool loading;
         bool popupWasOpen;
+        bool keyboardMode;
+        Vector3 lastPointer = new Vector3(float.NaN, float.NaN);
 
         bool dialogOpen;
         Action dialogConfirmed;
@@ -61,6 +66,12 @@ namespace Squadra
         Focusable dialogReturnFocus;
 
         public MenuScreen CurrentScreen => screen;
+
+        /// <summary>
+        /// True while the keyboard is the input in use: the focused control is highlighted. False while
+        /// the mouse is: only the control under the pointer is, and it stops when the pointer leaves.
+        /// </summary>
+        public bool KeyboardMode => keyboardMode;
         public bool DialogOpen => dialogOpen;
 
         /// <summary>True from the moment a mission is launched until its scene replaces the menu.</summary>
@@ -253,6 +264,26 @@ namespace Squadra
             }).StartingIn(20);
         }
 
+        // ------------------------------------------------------------------ input in use
+
+        // The style sheet highlights hovered controls in pointer mode and the focused one in keyboard mode.
+        void SetKeyboardMode(bool keys)
+        {
+            keyboardMode = keys;
+            sounds.PointerActive = !keys;
+            menuRoot.EnableInClassList(KeyboardModeClass, keys);
+            menuRoot.EnableInClassList(PointerModeClass, !keys);
+        }
+
+        // The panel also reports the pointer when the layout changes under it; only real movement counts.
+        void OnPointerMoved(PointerMoveEvent moved)
+        {
+            if (moved.position == lastPointer) return;
+
+            lastPointer = moved.position;
+            if (keyboardMode) SetKeyboardMode(false);
+        }
+
         // ------------------------------------------------------------------ lifecycle
 
         void Awake()
@@ -264,6 +295,7 @@ namespace Squadra
         void Start()
         {
             root = document.rootVisualElement;
+            menuRoot = root.Q("menuRoot");
             fade = root.Q("fade");
             dialog = root.Q("dialog");
             dialogTitle = root.Q<Label>("dialogTitle");
@@ -302,6 +334,11 @@ namespace Squadra
             map.Bind(screens[(int)MenuScreen.Map], sounds, Launch);
             settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds);
 
+            SetKeyboardMode(false);
+            root.RegisterCallback<PointerMoveEvent>(OnPointerMoved, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerDownEvent>(_ => SetKeyboardMode(false), TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(_ => SetKeyboardMode(true), TrickleDown.TrickleDown);
+
             Show(CampaignSession.ConsumeMapRequest() ? MenuScreen.Map : MenuScreen.Main);
             root.schedule.Execute(() => fade.RemoveFromClassList(FadeClass)).StartingIn(50);
         }
@@ -313,6 +350,7 @@ namespace Squadra
             // Escape also closes an open dropdown list; that press must not leave the screen as well.
             bool popupOpen = root.panel != null && root.panel.visualTree.Q(className: PopupClass) != null;
             Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.anyKey.wasPressedThisFrame && !keyboardMode) SetKeyboardMode(true);
             if (keyboard != null && !loading)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame)
