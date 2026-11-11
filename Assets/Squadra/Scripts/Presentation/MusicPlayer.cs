@@ -5,8 +5,10 @@ using UnityEngine.SceneManagement;
 namespace Squadra
 {
     /// <summary>
-    /// Loops the background track. The first player to wake keeps playing across scene reloads, so
-    /// restarting a match does not restart the music; later copies remove themselves.
+    /// Loops the background track. The first player to wake keeps playing across scene loads. A later
+    /// copy with the same track removes itself, so restarting a match or moving around the menu does not
+    /// restart the music; a later copy with a different track hands its track over first, which is how
+    /// the menu music gives way to the mission music.
     /// </summary>
     [AutoStaticsCleanup]
     public sealed partial class MusicPlayer : MonoBehaviour
@@ -19,11 +21,17 @@ namespace Squadra
         [Tooltip("Music level while a match result is on screen, as a fraction of the normal volume.")]
         [Range(0f, 1f)] [SerializeField] float duckedLevel = 0.3f;
         [SerializeField] float duckSeconds = 0.5f;
+        [Tooltip("Seconds the playing track takes to fade out when another scene brings a different one.")]
+        [SerializeField] float switchSeconds = 0.6f;
 
         AudioSource source;
         float fadeIn;
         float level = 1f;
         bool ducked;
+        MusicPlayer next;
+
+        /// <summary>The track that is playing or about to play, or null when there is no music.</summary>
+        public static AudioClip CurrentTrack => current != null ? current.track : null;
 
         /// <summary>Lowers the music under something important, or brings it back.</summary>
         public static void Duck(bool ducked)
@@ -35,7 +43,8 @@ namespace Squadra
         {
             if (current != null)
             {
-                Destroy(gameObject);
+                if (track != null && track != current.track) current.SwitchTo(this);
+                else Destroy(gameObject);
                 return;
             }
 
@@ -67,15 +76,48 @@ namespace Squadra
             ducked = false;
         }
 
+        // Takes over another player's track and levels: fade out, swap, fade in. The other player only
+        // carries the settings and is removed once they are copied.
+        void SwitchTo(MusicPlayer other)
+        {
+            if (next != null) Destroy(next.gameObject);
+
+            next = other;
+            track = other.track;
+            other.enabled = false;
+            DontDestroyOnLoad(other.gameObject); // keep it until the fade-out is done
+        }
+
         void Update()
         {
             if (current != this) return; // a duplicate waiting to be destroyed
 
             float deltaTime = Time.unscaledDeltaTime;
-            fadeIn = fadeInSeconds > 0f ? Mathf.Clamp01(fadeIn + deltaTime / fadeInSeconds) : 1f;
+            if (next != null)
+            {
+                fadeIn = switchSeconds > 0f ? Mathf.MoveTowards(fadeIn, 0f, deltaTime / switchSeconds) : 0f;
+                if (fadeIn <= 0f)
+                {
+                    volume = next.volume;
+                    fadeInSeconds = next.fadeInSeconds;
+                    duckedLevel = next.duckedLevel;
+                    duckSeconds = next.duckSeconds;
+                    switchSeconds = next.switchSeconds;
+                    Destroy(next.gameObject);
+                    next = null;
+
+                    source.clip = track;
+                    source.Play();
+                }
+            }
+            else
+            {
+                fadeIn = fadeInSeconds > 0f ? Mathf.Clamp01(fadeIn + deltaTime / fadeInSeconds) : 1f;
+            }
+
             float target = ducked ? duckedLevel : 1f;
             level = duckSeconds > 0f ? Mathf.MoveTowards(level, target, deltaTime / duckSeconds) : target;
-            source.volume = volume * fadeIn * level;
+            source.volume = volume * fadeIn * level * GameSettings.MusicVolume;
         }
     }
 }

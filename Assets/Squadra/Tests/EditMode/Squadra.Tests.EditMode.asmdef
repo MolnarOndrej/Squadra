@@ -3,6 +3,7 @@
     "rootNamespace": "Squadra.Tests",
     "references": [
         "Squadra.Simulation",
+        "Squadra.Campaign",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

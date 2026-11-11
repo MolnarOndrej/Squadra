@@ -1,0 +1,643 @@
+/* Squadra menu. Laid out for a 1920 x 1080 panel; the panel settings scale it to the window. */
+
+:root {
+    --void: #05060F;
+    --panel: rgba(8, 11, 28, 0.84);
+    --panel-solid: #0A0E22;
+    --line: rgba(135, 145, 176, 0.4);
+    --line-faint: rgba(135, 145, 176, 0.22);
+    --text: #E6ECFF;
+    --text-dim: #8791B0;
+    --accent: #FFD166;
+    --accent-wash: rgba(255, 209, 102, 0.14);
+    --blue: #6FC0FF;
+}
+
+.menu-root {
+    flex-grow: 1;
+    color: var(--text);
+    font-size: 24px;
+}
+
+.hidden {
+    display: none;
+}
+
+/*
+ * Highlighting. The menu root carries menu-root--pointer while the mouse is in use and menu-root--keys
+ * while the keyboard is. A control is highlighted when the pointer is over it in pointer mode, or when
+ * it has the focus in keyboard mode, so a highlight never lingers after the pointer has left. For each
+ * control the first rule keeps the resting look in every state and the second adds the highlight.
+ */
+
+/* ------------------------------------------------------------------ screens */
+
+.screen {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    padding: 56px 80px;
+    opacity: 0;
+    transition-duration: 0.25s;
+}
+
+.screen--active {
+    opacity: 1;
+}
+
+.title {
+    margin-top: 64px;
+    padding-left: 44px;
+    font-size: 148px;
+    letter-spacing: 44px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    text-shadow: 0 0 28px rgba(63, 169, 255, 0.6);
+}
+
+.title-rule {
+    width: 560px;
+    height: 2px;
+    margin-top: 4px;
+    background-color: var(--accent);
+    opacity: 0.8;
+}
+
+.screen-title {
+    margin-top: 20px;
+    padding-left: 18px;
+    font-size: 60px;
+    letter-spacing: 18px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    text-shadow: 0 0 18px rgba(63, 169, 255, 0.5);
+}
+
+.screen-subtitle {
+    margin-top: 4px;
+    font-size: 24px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.main-buttons {
+    flex-grow: 1;
+    justify-content: center;
+    width: 540px;
+    padding-bottom: 60px;
+}
+
+.menu-button {
+    height: 84px;
+    margin: 12px 0;
+    padding: 0 24px;
+    font-size: 30px;
+    letter-spacing: 6px;
+    color: var(--text);
+    background-color: var(--panel);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 8px;
+    transition-duration: 0.14s;
+}
+
+.menu-root .menu-button:hover,
+.menu-root .menu-button:focus {
+    color: var(--text);
+    border-color: var(--line);
+    background-color: var(--panel);
+}
+
+.menu-root--pointer .menu-button:hover,
+.menu-root--keys .menu-button:focus {
+    color: var(--accent);
+    border-color: var(--accent);
+    background-color: var(--accent-wash);
+    scale: 1.03;
+}
+
+.menu-root--pointer .menu-button:active,
+.menu-root--keys .menu-button:active {
+    scale: 0.98;
+    background-color: rgba(255, 209, 102, 0.28);
+}
+
+.menu-root .menu-button:disabled {
+    opacity: 1;
+    color: rgba(135, 145, 176, 0.5);
+    border-color: var(--line-faint);
+    background-color: rgba(8, 11, 28, 0.45);
+}
+
+.back-button {
+    width: 300px;
+    height: 72px;
+    margin: 0;
+    font-size: 26px;
+}
+
+/* ------------------------------------------------------------------ mission map */
+
+.map-body {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+    align-self: stretch;
+}
+
+.page-arrow {
+    width: 92px;
+    height: 92px;
+    margin: 0 0 148px 0;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--panel);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 46px;
+    transition-duration: 0.14s;
+}
+
+.menu-root .page-arrow:hover,
+.menu-root .page-arrow:focus {
+    border-color: var(--line);
+    background-color: var(--panel);
+}
+
+.menu-root--pointer .page-arrow:hover,
+.menu-root--keys .page-arrow:focus {
+    border-color: var(--accent);
+    background-color: var(--accent-wash);
+    scale: 1.06;
+}
+
+.page-arrow:disabled {
+    opacity: 0.28;
+}
+
+/* An icon reads its color from --icon-color, which has to be set by a rule that matches the icon itself. */
+.page-arrow__icon {
+    width: 44px;
+    height: 44px;
+    --icon-color: #E6ECFF;
+}
+
+.menu-root--pointer .page-arrow:hover > .page-arrow__icon,
+.menu-root--keys .page-arrow:focus > .page-arrow__icon {
+    --icon-color: #FFD166;
+}
+
+/* A dark band behind the dots keeps their labels readable over the nebula and the scenery. */
+.mission-slots {
+    flex-grow: 1;
+    flex-direction: row;
+    margin: 0 28px;
+    background-color: rgba(8, 11, 28, 0.7);
+    border-width: 1px;
+    border-color: var(--line-faint);
+    border-radius: 12px;
+}
+
+.mission {
+    flex-grow: 1;
+    flex-basis: 0;
+    align-items: center;
+    justify-content: flex-start;
+    height: 300px;
+    margin: 0;
+    padding: 24px 0 0 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+}
+
+.menu-root .mission:hover,
+.menu-root .mission:focus,
+.menu-root .mission:active {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.mission:disabled {
+    opacity: 1;
+}
+
+.mission--empty {
+    visibility: hidden;
+}
+
+/* Runs from this dot's center to the next dot's center, underneath both. */
+.mission__connector {
+    position: absolute;
+    left: 50%;
+    top: 73px;
+    width: 100%;
+    height: 6px;
+    background-color: rgba(135, 145, 176, 0.3);
+}
+
+.mission__connector-fill {
+    width: 0;
+    height: 100%;
+    background-color: var(--accent);
+    transition-duration: 0.5s;
+}
+
+.mission__connector--lit > .mission__connector-fill {
+    width: 100%;
+}
+
+.mission__dot {
+    width: 104px;
+    height: 104px;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--panel-solid);
+    border-width: 4px;
+    border-color: var(--text-dim);
+    border-radius: 52px;
+    transition-duration: 0.18s;
+}
+
+.mission__core {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: var(--accent);
+}
+
+.mission__icon {
+    width: 52px;
+    height: 52px;
+    --icon-color: #8791B0;
+}
+
+.mission__name {
+    margin-top: 22px;
+    font-size: 26px;
+    letter-spacing: 4px;
+    -unity-font-style: bold;
+    -unity-text-align: upper-center;
+    color: var(--text);
+}
+
+.mission__status {
+    margin-top: 6px;
+    font-size: 18px;
+    letter-spacing: 2px;
+    white-space: normal;
+    -unity-text-align: upper-center;
+    color: var(--text-dim);
+}
+
+.mission--preview > .mission__dot {
+    border-color: rgba(135, 145, 176, 0.45);
+}
+
+.mission--preview > .mission__dot > .mission__icon {
+    --icon-color: rgba(135, 145, 176, 0.7);
+}
+
+.mission--preview > .mission__name,
+.mission--locked > .mission__name {
+    color: var(--text-dim);
+}
+
+.mission--available > .mission__dot {
+    border-color: var(--accent);
+}
+
+.mission--available > .mission__dot > .mission__core {
+    display: flex;
+}
+
+.mission--available > .mission__dot > .mission__icon {
+    display: none;
+}
+
+.mission--completed > .mission__dot > .mission__icon {
+    --icon-color: #6FC0FF;
+}
+
+.mission--completed > .mission__dot {
+    border-color: var(--blue);
+}
+
+.mission--completed > .mission__status {
+    color: var(--blue);
+}
+
+.menu-root--pointer .mission:hover > .mission__dot,
+.menu-root--keys .mission:focus > .mission__dot {
+    scale: 1.12;
+    border-color: #FFFFFF;
+    background-color: #1A2040;
+}
+
+.menu-root--pointer .mission:hover > .mission__name,
+.menu-root--keys .mission:focus > .mission__name {
+    color: var(--accent);
+}
+
+.menu-root .mission--unlocking > .mission__dot {
+    scale: 1.4;
+    border-color: #FFFFFF;
+    background-color: #5A4A20;
+}
+
+/* Seven or more dots on a page: smaller dots and labels so the narrow slots stay readable. */
+.mission-slots--dense {
+    margin: 0 12px;
+}
+
+.mission-slots--dense .mission__dot {
+    width: 76px;
+    height: 76px;
+    border-radius: 38px;
+}
+
+.mission-slots--dense .mission__connector {
+    top: 59px;
+}
+
+.mission-slots--dense .mission__core {
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+}
+
+.mission-slots--dense .mission__icon {
+    width: 38px;
+    height: 38px;
+}
+
+.mission-slots--dense .mission__name {
+    font-size: 20px;
+    letter-spacing: 1px;
+}
+
+.mission-slots--dense .mission__status {
+    font-size: 17px;
+    letter-spacing: 0;
+}
+
+/* ------------------------------------------------------------------ settings */
+
+.settings-panel {
+    flex-grow: 1;
+    width: 1040px;
+    margin: 32px 0 36px 0;
+    padding: 20px 48px 32px 48px;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--line);
+    border-radius: 12px;
+}
+
+.tabs {
+    flex-direction: row;
+    margin-bottom: 28px;
+    border-bottom-width: 2px;
+    border-color: var(--line-faint);
+}
+
+.tab {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 68px;
+    margin: 0;
+    padding: 0;
+    font-size: 26px;
+    letter-spacing: 5px;
+    color: var(--text-dim);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0 0 4px 0;
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    transition-duration: 0.14s;
+}
+
+.menu-root .tab:hover,
+.menu-root .tab:focus {
+    color: var(--text-dim);
+    background-color: rgba(0, 0, 0, 0);
+    border-color: rgba(0, 0, 0, 0);
+}
+
+.menu-root--pointer .tab:hover,
+.menu-root--keys .tab:focus {
+    color: var(--text);
+    background-color: rgba(255, 209, 102, 0.07);
+}
+
+.menu-root .tab--selected,
+.menu-root .tab--selected:hover,
+.menu-root .tab--selected:focus {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.setting-row {
+    flex-direction: row;
+    align-items: center;
+    height: 84px;
+    border-bottom-width: 1px;
+    border-color: var(--line-faint);
+}
+
+.setting-row__name {
+    width: 340px;
+    font-size: 26px;
+}
+
+.setting-row__control {
+    flex-grow: 1;
+    margin: 0;
+}
+
+.setting-row__value {
+    width: 96px;
+    font-size: 24px;
+    -unity-text-align: middle-right;
+    color: var(--text-dim);
+}
+
+/* Dropdowns */
+
+.setting-row__control .unity-base-popup-field__input {
+    height: 56px;
+    padding: 0 18px;
+    font-size: 24px;
+    color: var(--text);
+    background-color: var(--panel-solid);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 6px;
+    transition-duration: 0.14s;
+}
+
+.menu-root .setting-row__control:hover .unity-base-popup-field__input,
+.menu-root .setting-row__control:focus .unity-base-popup-field__input {
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+}
+
+.menu-root--pointer .setting-row__control:hover .unity-base-popup-field__input,
+.menu-root--keys .setting-row__control:focus .unity-base-popup-field__input {
+    border-color: var(--accent);
+    background-color: #1A2040;
+}
+
+.setting-row__control .unity-base-popup-field__text {
+    color: var(--text);
+}
+
+.setting-row__control .unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: #E6ECFF;
+}
+
+/* Volume sliders */
+
+.setting-row__control .unity-base-slider__input {
+    height: 56px;
+}
+
+.setting-row__control .unity-base-slider__drag-container {
+    height: 56px;
+}
+
+.setting-row__control .unity-base-slider__tracker {
+    top: 50%;
+    height: 8px;
+    margin-top: -4px;
+    background-color: rgba(135, 145, 176, 0.35);
+    border-width: 0;
+    border-radius: 4px;
+}
+
+.setting-row__control .unity-base-slider__dragger {
+    top: 50%;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    margin-left: -8px;
+    background-color: var(--text);
+    border-width: 0;
+    border-radius: 15px;
+    transition-duration: 0.14s;
+}
+
+.setting-row__control .unity-base-slider__dragger-border {
+    display: none;
+}
+
+.menu-root .setting-row__control:hover .unity-base-slider__dragger,
+.menu-root .setting-row__control:focus .unity-base-slider__dragger {
+    background-color: var(--text);
+}
+
+.menu-root--pointer .setting-row__control:hover .unity-base-slider__dragger,
+.menu-root--keys .setting-row__control:focus .unity-base-slider__dragger {
+    background-color: var(--accent);
+    scale: 1.15;
+}
+
+/* VSync checkbox */
+
+.setting-row__toggle {
+    margin: 0;
+}
+
+.setting-row__toggle .unity-toggle__checkmark {
+    width: 40px;
+    height: 40px;
+    background-color: var(--panel-solid);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 6px;
+    -unity-background-image-tint-color: #FFD166;
+    transition-duration: 0.14s;
+}
+
+.menu-root .setting-row__toggle:hover .unity-toggle__checkmark,
+.menu-root .setting-row__toggle:focus .unity-toggle__checkmark {
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+}
+
+.menu-root--pointer .setting-row__toggle:hover .unity-toggle__checkmark,
+.menu-root--keys .setting-row__toggle:focus .unity-toggle__checkmark {
+    border-color: var(--accent);
+    background-color: #1A2040;
+}
+
+/* ------------------------------------------------------------------ dialog and fade */
+
+.modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(5, 6, 15, 0.78);
+}
+
+.dialog {
+    width: 720px;
+    padding: 44px 48px 36px 48px;
+    align-items: center;
+    background-color: var(--panel-solid);
+    border-width: 2px;
+    border-color: var(--line);
+    border-radius: 12px;
+}
+
+.dialog__title {
+    font-size: 40px;
+    letter-spacing: 6px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.dialog__message {
+    margin: 18px 0 30px 0;
+    font-size: 24px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: var(--text-dim);
+}
+
+.dialog__buttons {
+    flex-direction: row;
+}
+
+.dialog__button {
+    width: 250px;
+    height: 72px;
+    margin: 0 14px;
+    font-size: 26px;
+}
+
+.fade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--void);
+    opacity: 0;
+    transition-duration: 0.35s;
+}
+
+.fade--on {
+    opacity: 1;
+}

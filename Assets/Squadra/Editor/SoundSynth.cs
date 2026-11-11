@@ -386,8 +386,22 @@ namespace Squadra.EditorTools
 
         // ------------------------------------------------------------------ output
 
+        /// <summary>
+        /// Halves the sample rate: low-passes below the new Nyquist frequency, then keeps every other
+        /// sample. Halves the size of long, soft material such as a music bed. Changes the input buffer.
+        /// </summary>
+        public static float[] Halve(float[] data)
+        {
+            Svf(data, Filter.Low, t => Rate * 0.2, 0.7);
+            Svf(data, Filter.Low, t => Rate * 0.2, 0.7);
+            var half = new float[data.Length / 2];
+            for (int i = 0; i < half.Length; i++)
+                half[i] = data[i * 2];
+            return half;
+        }
+
         /// <summary>Encodes equally long channels as a 16-bit PCM WAV file.</summary>
-        public static byte[] EncodeWav(float[][] channels)
+        public static byte[] EncodeWav(float[][] channels, int rate = Rate)
         {
             int channelCount = channels.Length;
             int frames = channels[0].Length;
@@ -403,8 +417,8 @@ namespace Squadra.EditorTools
                 writer.Write(16);
                 writer.Write((short)1); // PCM
                 writer.Write((short)channelCount);
-                writer.Write(Rate);
-                writer.Write(Rate * channelCount * 2);
+                writer.Write(rate);
+                writer.Write(rate * channelCount * 2);
                 writer.Write((short)(channelCount * 2));
                 writer.Write((short)16);
                 writer.Write(new[] { 'd', 'a', 't', 'a' });

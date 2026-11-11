@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9ee08a4acf5c394fbdd5857f4862793, type: 3}
+  m_Name: Missions
+  m_EditorClassIdentifier: Assembly-CSharp::Squadra.MissionCatalog
+  missions:
+  - id: mission-01
+    scene: {fileID: 102900000, guid: 8c9cfa26abfee488c85f1582747f6a02, type: 3}
+    scenePath: Assets/Scenes/SampleScene.unity
+  - id: mission-02
+    scene: {fileID: 0}
+    scenePath: 
+  - id: mission-03
+    scene: {fileID: 0}
+    scenePath: 
+  - id: mission-04
+    scene: {fileID: 0}
+    scenePath: 
+  - id: mission-05
+    scene: {fileID: 0}
+    scenePath: 
