@@ -6,7 +6,8 @@ namespace Squadra.EditorTools
     /// <summary>
     /// How the generated Squadra sound effects are made. Fleet and battle events have several takes that
     /// differ in pitch, length and character so repeated events do not sound identical. Departures and
-    /// arrivals are shaped from recordings (Kenney's CC0 "Sci-Fi Sounds"); the rest is synthesized.
+    /// arrivals are shaped from recordings (Kenney's CC0 "Sci-Fi Sounds"); the rest is synthesized,
+    /// including the menu's interface cues and its music.
     /// Tweak the numbers here and run <c>Squadra &gt; Rebuild Sound Effects</c>.
     /// </summary>
     static class SoundRecipes
@@ -316,6 +317,173 @@ namespace Squadra.EditorTools
             Mix(mix, thud, 0, 0.4);
 
             return Finish(OutputPeak, Reverb(mix, 2.4, 0.9, 0.5, 0.45), Reverb(mix, 2.4, 0.9, 0.5, 0.45, 23));
+        }
+
+        // ------------------------------------------------------------------ menu
+
+        /// <summary>The pointer enters a menu button: a tiny bright tick, quiet enough to hear often.</summary>
+        public static float[][] MenuHover()
+        {
+            float[] mix = Buffer(0.2);
+            Osc(mix, Wave.Sine, 0, 0.09, t => Sweep(1650, 2100, t / 0.05), t => 0.5 * Pluck(t, 0.002, 0.016));
+            Osc(mix, Wave.Sine, 0, 0.06, t => 3300, t => 0.12 * Pluck(t, 0.001, 0.009));
+
+            return Finish(0.5, Reverb(mix, 0.2, 0.5, 0.5, 0.08));
+        }
+
+        /// <summary>A menu button, tab or page arrow is activated: two chimes stepping up a fifth.</summary>
+        public static float[][] MenuSelect()
+        {
+            const double G5 = 783.99, D6 = 1174.66;
+
+            float[] mix = Buffer(0.7);
+            Bell(mix, 0, G5, 0.5, 0.13);
+            Bell(mix, 0.065, D6, 0.55, 0.2);
+            Osc(mix, Wave.Sine, 0, 0.2, t => G5 / 2, t => 0.25 * Pluck(t, 0.004, 0.07));
+
+            return Finish(OutputPeak, Reverb(mix, 0.5, 0.7, 0.4, 0.2), Reverb(mix, 0.5, 0.7, 0.4, 0.2, 23));
+        }
+
+        /// <summary>
+        /// Back, Cancel or Escape: two softer chimes stepping down a fifth over a falling thump, so
+        /// leaving sounds different from selecting.
+        /// </summary>
+        public static float[][] MenuBack()
+        {
+            const double D5 = 587.33, G4 = 392.00;
+
+            float[] mix = Buffer(0.7);
+            Bell(mix, 0, D5, 0.45, 0.11);
+            Bell(mix, 0.065, G4, 0.5, 0.18);
+            Osc(mix, Wave.Sine, 0, 0.3, t => Sweep(260, 130, t / 0.16), t => 0.4 * Pluck(t, 0.004, 0.08));
+            Svf(mix, Filter.Low, t => 3200, 0.8);
+
+            return Finish(OutputPeak, Reverb(mix, 0.5, 0.7, 0.5, 0.2), Reverb(mix, 0.5, 0.7, 0.5, 0.2, 23));
+        }
+
+        /// <summary>Sample rate of the menu theme. It is a soft bed, so half the usual rate loses nothing.</summary>
+        public const int MenuThemeRate = Rate / 2;
+
+        /// <summary>
+        /// The menu's music: a slow, seamless loop of four warm pad chords in D minor with a few far-off
+        /// chimes. Each chord swells in under the one before it; whatever rings past the end of the loop
+        /// (and the swell into its first chord) is folded back in, so it repeats without a seam.
+        /// </summary>
+        public static float[][] MenuTheme()
+        {
+            const double Bar = 12;     // seconds per chord
+            const double LeadIn = 4;   // a chord starts swelling this long before its bar
+            const double Release = 6;  // and rings this long after it
+            const double Tail = 8;     // reverb tail
+            const double A1 = 55.00, Bb1 = 58.27, D2 = 73.42, F2 = 87.31, A2 = 110.00, C3 = 130.81;
+            const double D3 = 146.83, E3 = 164.81, F3 = 174.61, G3 = 196.00, A3 = 220.00, C4 = 261.63;
+            const double D4 = 293.66, E4 = 329.63, G4 = 392.00;
+
+            // Root first, then the voicing from low to high.
+            double[][] chords =
+            {
+                new[] { D2, A2, F3, C4, E4 },  // D minor 9
+                new[] { Bb1, F2, D3, A3, C4 }, // B flat major 9
+                new[] { F2, C3, A3, E4, G4 },  // F major 9
+                new[] { A1, E3, G3, C4, D4 },  // A minor 7 add 11
+            };
+
+            double loop = Bar * chords.Length;
+            double voiceLength = LeadIn + Bar + Release;
+            float[] left = Buffer(LeadIn + loop + Release);
+            float[] right = Buffer(LeadIn + loop + Release);
+            var rng = new Random(2100);
+
+            for (int c = 0; c < chords.Length; c++)
+            {
+                double[] chord = chords[c];
+                double start = c * Bar; // the bar itself begins LeadIn seconds after this
+                double Swell(double t) => Hold(t, LeadIn + 2, LeadIn + Bar - 1, Release);
+
+                for (int side = 0; side < 2; side++)
+                {
+                    // Pad: two detuned saws per note, tuned slightly apart on each side for width.
+                    float[] pad = Buffer(voiceLength);
+                    double[] detunes = side == 0 ? new[] { 0.9972, 1.0021 } : new[] { 0.9979, 1.0028 };
+                    for (int n = 1; n < chord.Length; n++)
+                    {
+                        double pitch = chord[n];
+                        foreach (double detune in detunes)
+                            Osc(pad, Wave.Saw, 0, voiceLength, t => pitch * detune, t => 1, rng.NextDouble());
+                    }
+
+                    // The filter opens and closes once over the chord, like a slow breath.
+                    double drift = side == 0 ? 0 : 0.9;
+                    Svf(pad, Filter.Low, t => 420 + 520 * Smooth(Math.Sin(Math.PI * t / voiceLength + drift)), 0.8);
+                    Normalize(pad, 1);
+                    Shape(pad, Swell);
+
+                    float[] channel = side == 0 ? left : right;
+                    Mix(channel, pad, start, 0.5);
+
+                    // A sine on the root under the voicing, and a faint one two octaves above its top note.
+                    double root = chord[0];
+                    double air = chord[chord.Length - 1] * 4;
+                    double wobble = side == 0 ? 0.11 : 0.13;
+                    Osc(channel, Wave.Sine, start, voiceLength, t => root, t => 0.3 * Swell(t));
+                    Osc(channel, Wave.Sine, start, voiceLength, t => air,
+                        t => 0.025 * Swell(t) * (0.6 + 0.4 * Math.Sin(2 * Math.PI * wobble * t)));
+                }
+
+                // Chimes picked from the chord, placed left or right.
+                foreach (double time in new[] { 1.6, 4.3, 7.4, 9.9 })
+                {
+                    double pitch = chord[2 + rng.Next(3)] * (rng.Next(3) == 0 ? 4 : 2);
+                    double at = LeadIn + start + time + rng.NextDouble() * 0.8;
+                    double pan = 0.25 + 0.5 * rng.NextDouble();
+                    double level = 0.05 + 0.04 * rng.NextDouble();
+                    Bell(left, at, pitch, level * (1 - pan), 1.1);
+                    Bell(right, at, pitch, level * pan, 1.1);
+                }
+            }
+
+            float[] loopLeft = Fold(Reverb(left, Tail, 0.93, 0.35, 0.5), LeadIn, loop);
+            float[] loopRight = Fold(Reverb(right, Tail, 0.93, 0.35, 0.5, 23), LeadIn, loop);
+
+            float gain = 0.6f / Math.Max(1e-6f, Math.Max(Peak(loopLeft), Peak(loopRight)));
+            for (int i = 0; i < loopLeft.Length; i++)
+            {
+                loopLeft[i] *= gain;
+                loopRight[i] *= gain;
+            }
+
+            return new[] { HalveLoop(loopLeft), HalveLoop(loopRight) };
+        }
+
+        // Halves the sample rate of a loop. The filter is run in over the end of the loop first, so it
+        // reaches the loop's first sample in the state it will be in on every later pass.
+        static float[] HalveLoop(float[] loop)
+        {
+            const int RunIn = 4096;
+            var extended = new float[RunIn + loop.Length];
+            Array.Copy(loop, loop.Length - RunIn, extended, 0, RunIn);
+            Array.Copy(loop, 0, extended, RunIn, loop.Length);
+
+            float[] halved = Halve(extended);
+            var result = new float[loop.Length / 2];
+            Array.Copy(halved, RunIn / 2, result, 0, result.Length);
+            return result;
+        }
+
+        // Wraps everything outside the loop back into it, as if the loop had been playing forever.
+        static float[] Fold(float[] data, double loopStart, double loopLength)
+        {
+            int start = (int)Math.Round(loopStart * Rate);
+            int length = (int)Math.Round(loopLength * Rate);
+            var folded = new float[length];
+            for (int i = 0; i < data.Length; i++)
+            {
+                int index = (i - start) % length;
+                if (index < 0) index += length;
+                folded[index] += data[i];
+            }
+
+            return folded;
         }
 
         // ------------------------------------------------------------------ voices

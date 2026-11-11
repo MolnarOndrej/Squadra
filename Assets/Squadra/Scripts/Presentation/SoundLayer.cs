@@ -149,7 +149,7 @@ namespace Squadra
             if (clip == null) return;
 
             resultVoice.clip = clip;
-            resultVoice.volume = volume * resultVolume;
+            resultVoice.volume = volume * resultVolume * GameSettings.SfxVolume;
             resultVoice.PlayDelayed(resultDelay);
         }
 
@@ -213,7 +213,7 @@ namespace Squadra
 
             AudioSource voice = TakeVoice();
             voice.clip = clip;
-            voice.volume = volume * cue.Volume * gain * Random.Range(0.9f, 1f);
+            voice.volume = volume * cue.Volume * gain * Random.Range(0.9f, 1f) * GameSettings.SfxVolume;
             voice.pitch = 1f + Random.Range(-cue.PitchJitter, cue.PitchJitter);
             voice.panStereo = Pan(position);
             voice.Play();

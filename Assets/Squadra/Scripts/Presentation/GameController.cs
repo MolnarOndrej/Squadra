@@ -315,6 +315,8 @@ namespace Squadra
 
         void OnStatusChanged(MatchStatus status)
         {
+            // A win completes the campaign mission this match was launched as, if any.
+            if (status == MatchStatus.BlueVictory) CampaignSession.ReportVictory();
             if (status != MatchStatus.InProgress) sounds.MatchEnded(status == MatchStatus.BlueVictory);
         }
 

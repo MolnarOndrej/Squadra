@@ -10,11 +10,15 @@ namespace Squadra.EditorTools
     /// settings for them and for the music. Run it from <c>Squadra &gt; Rebuild Sound Effects</c>.
     /// It overwrites the WAV files it generates and nothing else: the ship explosions are recordings kept
     /// in the same folder as <c>ShipDestroyed_N.ogg</c>, and any take you add yourself is left alone.
+    /// The menu's cues land in the same folder; its music is rendered into <see cref="MenuMusicFolder"/>.
     /// </summary>
     public static class SquadraSoundBuilder
     {
         public const string SfxFolder = "Assets/Squadra/Audio/Sfx";
         public const string MusicFolder = "Assets/Squadra/Audio/Music";
+
+        /// <summary>The menu's own music. Kept apart from <see cref="MusicFolder"/>, which holds mission music.</summary>
+        public const string MenuMusicFolder = "Assets/Squadra/Audio/MenuMusic";
 
         /// <summary>Recordings the recipes use as raw material. Nothing in the scene plays them directly.</summary>
         public const string SourceFolder = "Assets/Squadra/Audio/Sources";
@@ -27,8 +31,18 @@ namespace Squadra.EditorTools
         public const string Capture = "Capture";
         public const string Victory = "Victory";
         public const string Defeat = "Defeat";
+        public const string MenuHover = "MenuHover";
+        public const string MenuSelect = "MenuSelect";
+        public const string MenuBack = "MenuBack";
+
+        /// <summary>The generated menu track. A different track dropped into the folder is used instead.</summary>
+        public const string MenuTheme = "MenuTheme";
 
         public static bool HasSounds => File.Exists(ClipPath(Victory));
+
+        public static bool HasMenuSounds => File.Exists(ClipPath(MenuBack)) && File.Exists(MenuThemePath);
+
+        static string MenuThemePath => MenuMusicFolder + "/" + MenuTheme + ".wav";
 
         [MenuItem("Squadra/Rebuild Sound Effects")]
         public static void Build()
@@ -57,14 +71,21 @@ namespace Squadra.EditorTools
             written += Write(TakeName(Capture, 0), SoundRecipes.Capture()); // a single take by design
             written += Write(Victory, SoundRecipes.Victory());
             written += Write(Defeat, SoundRecipes.Defeat());
+            written += Write(MenuHover, SoundRecipes.MenuHover());
+            written += Write(MenuSelect, SoundRecipes.MenuSelect());
+            written += Write(MenuBack, SoundRecipes.MenuBack());
+
+            Directory.CreateDirectory(MenuMusicFolder);
+            written += Write(MenuThemePath, SoundSynth.EncodeWav(SoundRecipes.MenuTheme(), SoundRecipes.MenuThemeRate));
 
             AssetDatabase.Refresh();
 
             foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { SfxFolder }))
                 Configure(AssetDatabase.GUIDToAssetPath(guid), AudioClipLoadType.DecompressOnLoad, 0.8f);
-            if (AssetDatabase.IsValidFolder(MusicFolder))
+            foreach (string folder in new[] { MusicFolder, MenuMusicFolder })
             {
-                foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { MusicFolder }))
+                if (!AssetDatabase.IsValidFolder(folder)) continue;
+                foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { folder }))
                     Configure(AssetDatabase.GUIDToAssetPath(guid), AudioClipLoadType.Streaming, 0.6f);
             }
 
@@ -96,14 +117,31 @@ namespace Squadra.EditorTools
         /// <summary>The first track in the music folder, or null when there is none.</summary>
         public static AudioClip LoadMusic()
         {
-            if (!AssetDatabase.IsValidFolder(MusicFolder)) return null;
+            return FirstTrack(MusicFolder, null);
+        }
 
-            string[] guids = AssetDatabase.FindAssets("t:AudioClip", new[] { MusicFolder });
-            if (guids.Length == 0) return null;
+        /// <summary>
+        /// The menu's track: the first one in the menu music folder that is not the generated theme, so
+        /// a track of your own takes over by being there; otherwise the generated theme.
+        /// </summary>
+        public static AudioClip LoadMenuMusic()
+        {
+            return FirstTrack(MenuMusicFolder, MenuThemePath) ?? AssetDatabase.LoadAssetAtPath<AudioClip>(MenuThemePath);
+        }
+
+        static AudioClip FirstTrack(string folder, string except)
+        {
+            if (!AssetDatabase.IsValidFolder(folder)) return null;
 
             var paths = new List<string>();
-            foreach (string guid in guids)
-                paths.Add(AssetDatabase.GUIDToAssetPath(guid));
+            foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path != except) paths.Add(path);
+            }
+
+            if (paths.Count == 0) return null;
+
             paths.Sort(System.StringComparer.Ordinal);
             return AssetDatabase.LoadAssetAtPath<AudioClip>(paths[0]);
         }
@@ -151,11 +189,14 @@ namespace Squadra.EditorTools
             return SfxFolder + "/" + name + ".wav";
         }
 
-        // Returns 1 when the file changed. Unchanged sounds are left alone so they are not re-imported.
         static int Write(string name, float[][] channels)
         {
-            string path = ClipPath(name);
-            byte[] wav = SoundSynth.EncodeWav(channels);
+            return Write(ClipPath(name), SoundSynth.EncodeWav(channels));
+        }
+
+        // Returns 1 when the file changed. Unchanged sounds are left alone so they are not re-imported.
+        static int Write(string path, byte[] wav)
+        {
             if (File.Exists(path) && Same(File.ReadAllBytes(path), wav)) return 0;
 
             try

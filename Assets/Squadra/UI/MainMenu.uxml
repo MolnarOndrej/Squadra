@@ -1,0 +1,96 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="MainMenu.uss" />
+    <ui:VisualElement name="menuRoot" class="menu-root">
+
+        <ui:VisualElement name="mainScreen" class="screen">
+            <ui:Label name="title" text="SQUADRA" class="title" />
+            <ui:VisualElement class="title-rule" />
+            <ui:VisualElement class="main-buttons">
+                <ui:Button name="singlePlayerButton" text="SINGLE PLAYER" class="menu-button" />
+                <ui:Button name="multiPlayerButton" text="MULTI PLAYER" enabled="false" class="menu-button" />
+                <ui:Button name="settingsButton" text="SETTINGS" class="menu-button" />
+                <ui:Button name="quitButton" text="QUIT" class="menu-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="mapScreen" class="screen hidden">
+            <ui:Label text="CAMPAIGN" class="screen-title" />
+            <ui:Label text="Choose a mission" class="screen-subtitle" />
+            <ui:VisualElement class="map-body">
+                <ui:Button name="previousPageButton" class="page-arrow">
+                    <Squadra.MenuIcon kind="Previous" class="page-arrow__icon" />
+                </ui:Button>
+                <ui:VisualElement name="missionSlots" class="mission-slots" />
+                <ui:Button name="nextPageButton" class="page-arrow">
+                    <Squadra.MenuIcon kind="Next" class="page-arrow__icon" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:Button name="mapBackButton" text="BACK" class="menu-button back-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="settingsScreen" class="screen hidden">
+            <ui:Label text="SETTINGS" class="screen-title" />
+            <ui:VisualElement class="settings-panel">
+                <ui:VisualElement class="tabs">
+                    <ui:Button name="generalTab" text="GENERAL" class="tab" />
+                    <ui:Button name="graphicsTab" text="GRAPHICS" class="tab" />
+                    <ui:Button name="soundTab" text="SOUND" class="tab" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="generalPanel" class="settings-page">
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Language" class="setting-row__name" />
+                        <ui:DropdownField name="languageField" class="setting-row__control" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="graphicsPanel" class="settings-page hidden">
+                    <ui:VisualElement name="displayModeRow" class="setting-row">
+                        <ui:Label text="Display Mode" class="setting-row__name" />
+                        <ui:DropdownField name="displayModeField" class="setting-row__control" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="resolutionRow" class="setting-row">
+                        <ui:Label text="Resolution" class="setting-row__name" />
+                        <ui:DropdownField name="resolutionField" class="setting-row__control" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="vsyncRow" class="setting-row">
+                        <ui:Label text="VSync" class="setting-row__name" />
+                        <ui:Toggle name="vsyncToggle" class="setting-row__toggle" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="soundPanel" class="settings-page hidden">
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Master Volume" class="setting-row__name" />
+                        <ui:Slider name="masterSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                        <ui:Label name="masterValue" text="100%" class="setting-row__value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Music" class="setting-row__name" />
+                        <ui:Slider name="musicSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                        <ui:Label name="musicValue" text="100%" class="setting-row__value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Sound Effects" class="setting-row__name" />
+                        <ui:Slider name="sfxSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                        <ui:Label name="sfxValue" text="100%" class="setting-row__value" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Button name="settingsBackButton" text="BACK" class="menu-button back-button" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="dialog" class="modal hidden">
+            <ui:VisualElement class="dialog">
+                <ui:Label name="dialogTitle" text="QUIT SQUADRA?" class="dialog__title" />
+                <ui:Label name="dialogMessage" class="dialog__message" />
+                <ui:VisualElement class="dialog__buttons">
+                    <ui:Button name="dialogCancelButton" text="CANCEL" class="menu-button dialog__button" />
+                    <ui:Button name="dialogConfirmButton" text="CONFIRM" class="menu-button dialog__button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="fade" picking-mode="Ignore" class="fade fade--on" />
+    </ui:VisualElement>
+</ui:UXML>

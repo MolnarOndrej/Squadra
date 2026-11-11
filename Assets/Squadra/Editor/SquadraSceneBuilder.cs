@@ -17,10 +17,10 @@ namespace Squadra.EditorTools
     /// </summary>
     public static class SquadraSceneBuilder
     {
-        const string Root = "Assets/Squadra";
-        const string MaterialFolder = Root + "/Materials";
-        const string SettingsFolder = Root + "/Settings";
-        const string ScenePath = "Assets/Scenes/SampleScene.unity";
+        internal const string Root = "Assets/Squadra";
+        internal const string MaterialFolder = Root + "/Materials";
+        internal const string SettingsFolder = Root + "/Settings";
+        internal const string ScenePath = "Assets/Scenes/SampleScene.unity";
 
         // Sorting orders, back to front.
         const int OrderBackdrop = -100;
@@ -303,7 +303,7 @@ namespace Squadra.EditorTools
 
         // ------------------------------------------------------------------ scene objects
 
-        static CameraRig BuildCamera()
+        internal static CameraRig BuildCamera()
         {
             var go = new GameObject("Main Camera") { tag = "MainCamera" };
             go.transform.position = new Vector3(0f, 0f, -10f);
@@ -327,7 +327,7 @@ namespace Squadra.EditorTools
             return rig;
         }
 
-        static void BuildVolume(VolumeProfile profile)
+        internal static void BuildVolume(VolumeProfile profile)
         {
             var volume = new GameObject("Post Processing").AddComponent<Volume>();
             volume.isGlobal = true;
@@ -556,7 +556,7 @@ namespace Squadra.EditorTools
         }
 
         /// <summary>Re-runs OnEnable now that the references are wired, so the edit-time layout is applied.</summary>
-        static void Relayout(Behaviour behaviour)
+        internal static void Relayout(Behaviour behaviour)
         {
             behaviour.enabled = false;
             behaviour.enabled = true;
@@ -575,7 +575,7 @@ namespace Squadra.EditorTools
             return property;
         }
 
-        static void Wire(Object target, string field, Object value)
+        internal static void Wire(Object target, string field, Object value)
         {
             var serialized = new SerializedObject(target);
             Property(serialized, field).objectReferenceValue = value;
