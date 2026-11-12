@@ -55,7 +55,8 @@ namespace Squadra
     /// Plays the match's sound effects: fleets leaving and arriving, battles, captures and the result.
     /// Sounds are panned by where they happen on the map. The game controller says what happened;
     /// this layer picks the take and the timing. While the mission is paused every effect holds where
-    /// it is and no new one starts.
+    /// it is and no new one starts. An effect's level is its own gain, the fade after the match and
+    /// the Sound Effects setting, multiplied afresh every frame, so none of them hides another.
     /// </summary>
     public sealed class SoundLayer : MonoBehaviour
     {
@@ -85,6 +86,10 @@ namespace Squadra
         [Tooltip("Seconds between the match ending and its result sound, while the other effects fade.")]
         [SerializeField] float resultDelay = 0.25f;
 
+        // After the match the remaining effects fade with this time constant and stop below the floor.
+        const float MatchFadeSeconds = 0.1f;
+        const float MatchFadeFloor = 0.004f;
+
         struct Pending
         {
             public float At;
@@ -100,11 +105,32 @@ namespace Squadra
         int nextVoice;
         float clock;
         float resultIn = -1f;
+        float matchFade = 1f;
         bool matchOver;
         bool paused;
 
         /// <summary>True while the effects are held by a pause.</summary>
         public bool Paused => paused;
+
+        /// <summary>
+        /// The loudest gameplay effect right now, the result sound aside, or 0 when none is sounding or
+        /// held. Read by play tests to compare the mix.
+        /// </summary>
+        public float LoudestEffect
+        {
+            get
+            {
+                float loudest = 0f;
+                if (voices == null) return loudest;
+                for (int i = 0; i < voices.Length; i++)
+                    if (voices[i].clip != null && (voices[i].isPlaying || voices[i].time > 0f))
+                        loudest = Mathf.Max(loudest, voices[i].volume);
+                return loudest;
+            }
+        }
+
+        /// <summary>The level of the result sound, whether or not it has started.</summary>
+        public float ResultLevel => resultVoice != null ? resultVoice.volume : 0f;
 
         /// <summary>How many effects are sounding right now, the result included. Held effects do not count.</summary>
         public int PlayingCount
@@ -170,8 +196,8 @@ namespace Squadra
 
             // The delay is counted here rather than scheduled, so that a pause can hold it.
             resultVoice.clip = clip;
-            resultVoice.volume = volume * resultVolume * GameSettings.SfxVolume;
             resultIn = Mathf.Max(0f, resultDelay);
+            ApplyLevels();
         }
 
         /// <summary>
@@ -192,15 +218,11 @@ namespace Squadra
                 return;
             }
 
-            // Effects fading out after the match keep fading from where they were.
-            float sfx = GameSettings.SfxVolume;
-            for (int i = 0; i < voices.Length; i++)
-            {
-                if (!matchOver) voices[i].volume = voiceGains[i] * sfx;
-                voices[i].UnPause();
-            }
-
-            resultVoice.volume = volume * resultVolume * sfx;
+            // The setting may have changed in the meantime. A fade after the match carries on from
+            // where it was.
+            ApplyLevels();
+            foreach (AudioSource voice in voices)
+                voice.UnPause();
             resultVoice.UnPause();
         }
 
@@ -241,14 +263,19 @@ namespace Squadra
                     }
                 }
 
-                float fade = Mathf.Exp(-Time.unscaledDeltaTime / 0.1f);
-                foreach (AudioSource voice in voices)
+                // Whatever was still sounding when the match ended fades out together.
+                if (matchFade > 0f)
                 {
-                    if (!voice.isPlaying) continue;
-                    voice.volume *= fade;
-                    if (voice.volume < 0.002f) voice.Stop();
+                    matchFade *= Mathf.Exp(-Time.unscaledDeltaTime / MatchFadeSeconds);
+                    if (matchFade < MatchFadeFloor)
+                    {
+                        matchFade = 0f;
+                        foreach (AudioSource voice in voices)
+                            voice.Stop();
+                    }
                 }
 
+                ApplyLevels();
                 return;
             }
 
@@ -261,6 +288,18 @@ namespace Squadra
                 pending.RemoveAt(i);
                 Play(due.Cue, due.Position, due.Gain);
             }
+
+            ApplyLevels();
+        }
+
+        // Every level is worked out from its parts each frame: a change to the Sound Effects setting
+        // reaches effects that are already sounding, and the fade after the match never loses it.
+        void ApplyLevels()
+        {
+            float sfx = GameSettings.SfxVolume;
+            for (int i = 0; i < voices.Length; i++)
+                voices[i].volume = voiceGains[i] * matchFade * sfx;
+            resultVoice.volume = volume * resultVolume * sfx;
         }
 
         void Schedule(SoundCue cue, float delay, Vector2 position, float gain)
@@ -278,7 +317,7 @@ namespace Squadra
             AudioSource voice = TakeVoice(out int index);
             voiceGains[index] = volume * cue.Volume * gain * Random.Range(0.9f, 1f);
             voice.clip = clip;
-            voice.volume = voiceGains[index] * GameSettings.SfxVolume;
+            voice.volume = voiceGains[index] * matchFade * GameSettings.SfxVolume;
             voice.pitch = 1f + Random.Range(-cue.PitchJitter, cue.PitchJitter);
             voice.panStereo = Pan(position);
             voice.Play();
