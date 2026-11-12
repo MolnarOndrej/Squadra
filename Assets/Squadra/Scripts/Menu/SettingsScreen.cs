@@ -6,15 +6,17 @@ namespace Squadra
 {
     /// <summary>
     /// The Settings screen: General (language), Graphics (display mode, resolution, VSync) and Sound
-    /// (master, music and effects volume). Every control applies its change at once and saves it when the
-    /// player finishes with the control. A display change is only previewed until the player confirms it.
+    /// (master, music and effects volume, Mute in Background). Every control applies its change at once
+    /// and saves it when the player finishes with the control. A display change is only previewed until
+    /// the player confirms it. The main menu and the pause menu each show their own copy of the screen
+    /// over the same preferences; the host supplies the confirmation dialog and decides where Back leads.
     /// </summary>
     sealed class SettingsScreen
     {
         const string SelectedTabClass = "tab--selected";
         const float DisplayConfirmSeconds = 12f;
 
-        readonly MainMenu menu;
+        readonly IDialogHost host;
         readonly MenuAudio sounds;
         readonly Button[] tabs;
         readonly VisualElement[] panels;
@@ -24,14 +26,15 @@ namespace Squadra
         readonly Slider masterSlider;
         readonly Slider musicSlider;
         readonly Slider sfxSlider;
+        readonly Toggle muteToggle;
 
         List<DisplayMode> modes = new List<DisplayMode>();
         List<Vector2Int> sizes = new List<Vector2Int>();
         int tab;
 
-        public SettingsScreen(VisualElement screen, MainMenu menu, MenuAudio sounds)
+        public SettingsScreen(VisualElement screen, IDialogHost host, MenuAudio sounds)
         {
-            this.menu = menu;
+            this.host = host;
             this.sounds = sounds;
 
             tabs = new[]
@@ -42,13 +45,7 @@ namespace Squadra
             for (int i = 0; i < tabs.Length; i++)
             {
                 int index = i;
-                tabs[i].clicked += () =>
-                {
-                    if (index == tab) return; // already showing: nothing changes, so no cue
-
-                    sounds.Select();
-                    SelectTab(index);
-                };
+                tabs[i].clicked += () => ShowTab(index);
             }
 
             // General: English is the only language so far.
@@ -74,6 +71,13 @@ namespace Squadra
             musicSlider = BindVolume(screen, "music", value => GameSettings.MusicVolume = value);
             sfxSlider = BindVolume(screen, "sfx", value => GameSettings.SfxVolume = value);
 
+            muteToggle = screen.Q<Toggle>("muteInBackgroundToggle");
+            muteToggle.RegisterValueChangedCallback(change =>
+            {
+                GameSettings.MuteInBackground = change.newValue;
+                GameSettings.Save();
+            });
+
             SelectTab(0);
         }
 
@@ -88,6 +92,19 @@ namespace Squadra
             ShowVolume(masterSlider, GameSettings.MasterVolume);
             ShowVolume(musicSlider, GameSettings.MusicVolume);
             ShowVolume(sfxSlider, GameSettings.SfxVolume);
+            muteToggle.SetValueWithoutNotify(GameSettings.MuteInBackground);
+        }
+
+        /// <summary>The category that is showing: 0 General, 1 Graphics, 2 Sound.</summary>
+        public int Tab => tab;
+
+        /// <summary>What activating a category's tab does. The one already showing changes nothing: no cue.</summary>
+        public void ShowTab(int index)
+        {
+            if (index < 0 || index >= tabs.Length || index == tab) return;
+
+            sounds.Select();
+            SelectTab(index);
         }
 
         void SelectTab(int index)
@@ -144,7 +161,7 @@ namespace Squadra
 
             GameSettings.ApplyDisplay(mode, size);
             ShowDisplay();
-            menu.ShowDialog("KEEP THIS DISPLAY?",
+            host.ShowDialog("KEEP THIS DISPLAY?",
                 seconds => NameOf(mode) + ", " + NameOf(size) + "\nReverting in " + seconds
                     + (seconds == 1 ? " second" : " seconds"),
                 GameSettings.SaveDisplay,

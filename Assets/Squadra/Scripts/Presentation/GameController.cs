@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Squadra.Campaign;
+using Squadra.Pause;
 using Squadra.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -12,7 +13,9 @@ namespace Squadra
     /// Runs one match in the scene. Builds the <see cref="Match"/> from the worlds placed in the scene,
     /// turns clicks into fleet orders for Blue, advances time and tells the views what to show. When
     /// the match ends it hands the results to the results screen and carries out the action picked there.
-    /// All game rules live in the match; nothing here decides an outcome.
+    /// All game rules live in the match; nothing here decides an outcome. It also owns the pause: while
+    /// paused the match gets no time and no orders, the scene's animation and effects stand still, and
+    /// the match, the selection and any result are kept exactly as they were.
     /// </summary>
     public sealed class GameController : MonoBehaviour
     {
@@ -62,10 +65,38 @@ namespace Squadra
         bool[,] activeLanes;
         float noticeUntil;
         string notice;
+        bool paused;
+        bool leaving;
+        int inputHeldFrame = -1;
 
         public Match Match => match;
         public int SelectedWorld => selected;
         public ResultsScreen Results => results;
+        public HudView Hud => hud;
+        public SoundLayer Sounds => sounds;
+
+        /// <summary>True while the mission is frozen under the pause menu.</summary>
+        public bool Paused => paused;
+
+        /// <summary>
+        /// False once the mission is on its way out, through a results action or a confirmed quit:
+        /// there is nothing left to pause.
+        /// </summary>
+        public bool CanPause => !leaving && (results == null || !results.Leaving);
+
+        /// <summary>How the mission stands, for a quit confirmation: still being played, won or lost.</summary>
+        public MissionStanding Standing
+        {
+            get
+            {
+                switch (match.Status)
+                {
+                    case MatchStatus.InProgress: return MissionStanding.Unfinished;
+                    case MatchStatus.BlueVictory: return MissionStanding.Won;
+                    default: return MissionStanding.Lost;
+                }
+            }
+        }
 
         void Awake()
         {
@@ -88,11 +119,17 @@ namespace Squadra
 
         void Update()
         {
-            float deltaTime = Time.deltaTime;
+            // Paused, game time stands still: the views below redraw the same moment every frame.
+            float deltaTime = paused ? 0f : Time.deltaTime;
 
-            if (match.Status == MatchStatus.InProgress)
+            if (paused)
             {
-                ReadInput();
+                // No orders and no time. The selection and the hovered world stay as they were.
+            }
+            else if (match.Status == MatchStatus.InProgress)
+            {
+                // The frame the pause menu closes still belongs to the menu: its input is not an order.
+                if (Time.frameCount != inputHeldFrame) ReadInput();
                 match.Advance(deltaTime);
                 if (selected >= 0 && !IsSelectable(selected)) selected = -1;
             }
@@ -115,6 +152,44 @@ namespace Squadra
             if (match.Status == MatchStatus.InProgress) hud.SetHint(CurrentHint());
         }
 
+        void OnDestroy()
+        {
+            // However the scene goes, the next one gets normal time and the music at its own level.
+            if (paused) ReleasePause();
+        }
+
+        // ------------------------------------------------------------------ pause
+
+        /// <summary>
+        /// Freezes the mission for the pause menu, or lets it carry on. Paused, the match is not
+        /// advanced and takes no orders, the scene's animation and gameplay effects stand still, the
+        /// battlefield is dimmed and the mission music drops to its paused level; a results panel is put
+        /// away until the pause ends. The time spent paused is never made up afterwards. Returns false
+        /// when nothing changed: already in that state, or the mission is on its way out.
+        /// </summary>
+        public bool SetPaused(bool value)
+        {
+            if (value == paused) return false;
+            if (value && !CanPause) return false;
+
+            paused = value;
+            Time.timeScale = value ? 0f : 1f;
+            MusicPlayer.SetPaused(value);
+            sounds.SetPaused(value);
+            hud.SetDimmed(value);
+            if (results != null) results.SetSuspended(value);
+            if (!value) inputHeldFrame = Time.frameCount;
+            return true;
+        }
+
+        // Leaving the scene ends the pause for whatever comes next, without showing the mission again.
+        void ReleasePause()
+        {
+            paused = false;
+            Time.timeScale = 1f;
+            MusicPlayer.SetPaused(false);
+        }
+
         // ------------------------------------------------------------------ input and orders
 
         void ReadInput()
@@ -131,11 +206,9 @@ namespace Squadra
             Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
             hovered = WorldAt(world);
 
+            // Escape belongs to the pause menu; a right-click, or a click on the selected world, cancels.
             Mouse mouse = Mouse.current;
-            Keyboard keyboard = Keyboard.current;
-            bool cancel = (mouse != null && mouse.rightButton.wasPressedThisFrame)
-                || (keyboard != null && keyboard.escapeKey.wasPressedThisFrame);
-            if (cancel) selected = -1;
+            if (mouse != null && mouse.rightButton.wasPressedThisFrame) selected = -1;
 
             if (pointer.press.wasPressedThisFrame) Click(hovered);
         }
@@ -169,7 +242,7 @@ namespace Squadra
         /// </summary>
         public void Click(int index)
         {
-            if (match.Status != MatchStatus.InProgress) return;
+            if (paused || match.Status != MatchStatus.InProgress) return;
 
             if (index < 0 || index >= worlds.Length)
             {
@@ -207,12 +280,12 @@ namespace Squadra
         void Notify(string text)
         {
             notice = text;
-            noticeUntil = Time.unscaledTime + 1.8f;
+            noticeUntil = Time.time + 1.8f; // game time: a notice does not run out under the pause menu
         }
 
         string CurrentHint()
         {
-            if (notice != null && Time.unscaledTime < noticeUntil) return notice;
+            if (notice != null && Time.time < noticeUntil) return notice;
 
             if (selected < 0) return "Click one of your worlds to select its fleet";
 
@@ -227,25 +300,36 @@ namespace Squadra
         /// <summary>Starts a fresh attempt at this mission. It stays the campaign's active mission.</summary>
         public void Restart()
         {
-            Time.timeScale = 1f;
+            ReleasePause();
             SceneManager.LoadScene(gameObject.scene.name);
         }
 
         /// <summary>Launches the mission that follows this one in the campaign, if it can be played.</summary>
         public void StartNextMission(int missionIndex)
         {
-            Time.timeScale = 1f;
+            ReleasePause();
             if (CampaignSession.TryBeginMission(catalog, missionIndex, out string scenePath))
                 SceneManager.LoadScene(scenePath);
             else
                 BackToMenu(); // never offered when it cannot be launched; the map is the safe way out
         }
 
-        /// <summary>Leaves the mission for the menu's mission map.</summary>
+        /// <summary>
+        /// Leaves the mission for the menu's mission map, paused or not. An unfinished match is simply
+        /// dropped: only a victory that was already recorded counts for the campaign.
+        /// </summary>
         public void BackToMenu()
         {
-            Time.timeScale = 1f;
+            leaving = true;
+            ReleasePause();
             MainMenu.OpenCampaignMap();
+        }
+
+        /// <summary>Closes the game from the mission. Settings are already saved; the campaign is not kept.</summary>
+        public void QuitToDesktop()
+        {
+            leaving = true;
+            MainMenu.QuitApplication();
         }
 
         void OnResultsAction(ResultsAction action, int nextMissionIndex)

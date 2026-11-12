@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Squadra.Pause;
 using Unity.Scripting.LifecycleManagement;
 using UnityEngine;
 
@@ -13,10 +14,11 @@ namespace Squadra
     }
 
     /// <summary>
-    /// The player's preferences: audio volumes, VSync and the display. Setting a value applies it at once;
-    /// <see cref="Save"/> writes everything to the local player preferences, and the saved values are
-    /// applied again at every launch before the first scene loads. Volumes default to 1, which is the mix
-    /// the scenes were balanced at.
+    /// The player's preferences: audio volumes, Mute in Background, VSync and the display. Setting a value
+    /// applies it at once; <see cref="Save"/> writes everything to the local player preferences, and the
+    /// saved values are applied again at every launch before the first scene loads. Volumes default to 1,
+    /// which is the mix the scenes were balanced at. The game keeps running while another application is
+    /// in front; Mute in Background only decides whether it can be heard then.
     /// </summary>
     [AutoStaticsCleanup]
     public static partial class GameSettings
@@ -24,6 +26,7 @@ namespace Squadra
         const string MasterKey = "settings.volume.master";
         const string MusicKey = "settings.volume.music";
         const string SfxKey = "settings.volume.sfx";
+        const string MuteInBackgroundKey = "settings.audio.muteInBackground";
         const string VSyncKey = "settings.vsync";
         const string DisplayModeKey = "settings.display.mode";
         const string DisplayWidthKey = "settings.display.width";
@@ -37,6 +40,8 @@ namespace Squadra
         static float master;
         static float music;
         static float sfx;
+        static bool muteInBackground;
+        static bool focused = true;
         static DisplayMode displayMode;
         static Vector2Int resolution;
         static bool displayChosen;
@@ -55,7 +60,7 @@ namespace Squadra
             {
                 EnsureLoaded();
                 master = Mathf.Clamp01(value);
-                AudioListener.volume = master;
+                ApplyOutput();
             }
         }
 
@@ -87,6 +92,62 @@ namespace Squadra
                 EnsureLoaded();
                 sfx = Mathf.Clamp01(value);
             }
+        }
+
+        /// <summary>
+        /// When set, nothing is heard while another application is in front: music, effects, result cues
+        /// and menu feedback alike. It only silences the output. Volumes, a pause and the music's place
+        /// in its track are left alone, so everything is as it should be when the player comes back.
+        /// </summary>
+        public static bool MuteInBackground
+        {
+            get
+            {
+                EnsureLoaded();
+                return muteInBackground;
+            }
+            set
+            {
+                EnsureLoaded();
+                muteInBackground = value;
+                ApplyOutput();
+            }
+        }
+
+        /// <summary>
+        /// Whether the game is the application in front. It follows the system: Alt-Tab and minimizing
+        /// both take the focus away. Play tests set it to stand in for switching applications.
+        /// </summary>
+        public static bool Focused
+        {
+            get => focused;
+            set
+            {
+                focused = value;
+                ApplyOutput();
+            }
+        }
+
+        /// <summary>The level everything is heard at right now: the master volume, or silence while muted in the background.</summary>
+        public static float OutputVolume
+        {
+            get
+            {
+                EnsureLoaded();
+                return AudioMix.Output(master, muteInBackground, focused);
+            }
+        }
+
+        // The master volume and the background mute share the listener, so both go through here and
+        // neither can overwrite the other.
+        static void ApplyOutput()
+        {
+            AudioListener.volume = OutputVolume;
+        }
+
+        static void OnFocusChanged(bool hasFocus)
+        {
+            Focused = hasFocus;
         }
 
         // ------------------------------------------------------------------ graphics
@@ -184,6 +245,7 @@ namespace Squadra
             PlayerPrefs.SetFloat(MasterKey, master);
             PlayerPrefs.SetFloat(MusicKey, music);
             PlayerPrefs.SetFloat(SfxKey, sfx);
+            PlayerPrefs.SetInt(MuteInBackgroundKey, muteInBackground ? 1 : 0);
             PlayerPrefs.SetInt(VSyncKey, VSync ? 1 : 0);
             if (displayChosen)
             {
@@ -208,7 +270,13 @@ namespace Squadra
         {
             loaded = false;
             EnsureLoaded();
-            AudioListener.volume = master;
+
+            // A mission is never paused by switching away, and a display confirmation keeps counting.
+            Application.runInBackground = true;
+            Application.focusChanged -= OnFocusChanged;
+            Application.focusChanged += OnFocusChanged;
+            focused = Application.isFocused;
+            ApplyOutput();
             if (VSyncSupported && PlayerPrefs.HasKey(VSyncKey)) VSync = PlayerPrefs.GetInt(VSyncKey) != 0;
 
             if (DisplaySupported && !Application.isEditor && displayChosen
@@ -225,6 +293,7 @@ namespace Squadra
             master = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterKey, 1f));
             music = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicKey, 1f));
             sfx = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxKey, 1f));
+            muteInBackground = PlayerPrefs.GetInt(MuteInBackgroundKey, 0) != 0;
 
             // Without a saved choice, describe the display as the player finds it.
             displayMode = ToDisplayMode(Screen.fullScreenMode);

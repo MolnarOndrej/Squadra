@@ -3,7 +3,8 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// Keeps the whole map on one screen at any aspect ratio, and adds a short shake on impacts.
+    /// Keeps the whole map on one screen at any aspect ratio, and adds a short shake on impacts. The
+    /// shake runs on game time, so it holds still while the mission is paused.
     /// </summary>
     [ExecuteAlways]
     [RequireComponent(typeof(Camera))]
@@ -59,9 +60,9 @@ namespace Squadra
             Vector2 offset = Vector2.zero;
             if (Application.isPlaying && shake > 0.0005f)
             {
-                float t = Time.unscaledTime * 38f;
+                float t = Time.time * 38f;
                 offset = new Vector2(Mathf.PerlinNoise(t, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, t) - 0.5f) * (2f * shake);
-                shake = Mathf.MoveTowards(shake, 0f, shakeDecay * shake * Time.unscaledDeltaTime + 0.02f * Time.unscaledDeltaTime);
+                shake = Mathf.MoveTowards(shake, 0f, shakeDecay * shake * Time.deltaTime + 0.02f * Time.deltaTime);
             }
 
             transform.position = new Vector3(center.x + offset.x, center.y + offset.y, -10f);

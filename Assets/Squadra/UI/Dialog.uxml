@@ -1,0 +1,15 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!--
+        The confirmation dialog, shared by the main menu and the pause menu. Each places it with
+        <ui:Instance template="Dialog" name="dialog" class="modal hidden" />, so the instance itself is
+        the layer that covers the screen. The look comes from MainMenu.uss in the document that uses it.
+    -->
+    <ui:VisualElement class="dialog">
+        <ui:Label name="dialogTitle" text="QUIT SQUADRA?" class="dialog__title" />
+        <ui:Label name="dialogMessage" class="dialog__message" />
+        <ui:VisualElement class="dialog__buttons">
+            <ui:Button name="dialogCancelButton" text="CANCEL" class="menu-button dialog__button" />
+            <ui:Button name="dialogConfirmButton" text="CONFIRM" class="menu-button dialog__button" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

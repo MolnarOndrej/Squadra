@@ -1,0 +1,25 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="Settings" src="Settings.uxml" />
+    <ui:Template name="Dialog" src="Dialog.uxml" />
+    <ui:Style src="MainMenu.uss" />
+    <ui:Style src="PauseMenu.uss" />
+    <ui:VisualElement name="pauseRoot" class="menu-root menu-root--pointer pause-root hidden">
+
+        <ui:VisualElement name="pauseScreen" class="screen pause-screen hidden">
+            <ui:Label name="pauseHeading" text="PAUSED" class="screen-title pause__heading" />
+            <ui:VisualElement class="title-rule pause__rule" />
+            <ui:VisualElement name="pauseButtons" class="pause__buttons">
+                <ui:Button name="resumeButton" text="RESUME" class="menu-button" />
+                <ui:Button name="pauseSettingsButton" text="SETTINGS" class="menu-button" />
+                <ui:Button name="quitToMenuButton" text="QUIT TO MENU" class="menu-button" />
+                <ui:Button name="quitToDesktopButton" text="QUIT TO DESKTOP" class="menu-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:Instance template="Settings" name="settingsScreen" class="screen hidden" />
+
+        <ui:Instance template="Dialog" name="dialog" class="modal hidden" />
+
+        <ui:VisualElement name="pauseFade" picking-mode="Ignore" class="fade" />
+    </ui:VisualElement>
+</ui:UXML>

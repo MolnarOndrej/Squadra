@@ -12,7 +12,7 @@ namespace Squadra
     /// page keys into the same actions as the on-screen buttons, and loads a mission when the map
     /// launches one.
     /// </summary>
-    public sealed class MainMenu : MonoBehaviour
+    public sealed class MainMenu : MonoBehaviour, IDialogHost
     {
         /// <summary>Name of the menu scene in the build.</summary>
         public const string SceneName = "MainMenu";
@@ -39,15 +39,12 @@ namespace Squadra
         VisualElement root;
         VisualElement menuRoot;
         VisualElement fade;
-        VisualElement dialog;
         VisualElement[] screens;
         Button singlePlayerButton;
         Button settingsButton;
         Button quitButton;
         Button mapBackButton;
-        Button dialogCancelButton;
-        Label dialogTitle;
-        Label dialogMessage;
+        MenuDialog dialog;
         SettingsScreen settings;
 
         MenuScreen screen;
@@ -56,14 +53,6 @@ namespace Squadra
         bool keyboardMode;
         Vector3 lastPointer = new Vector3(float.NaN, float.NaN);
 
-        bool dialogOpen;
-        Action dialogConfirmed;
-        Action dialogCancelled;
-        Func<int, string> dialogText;
-        float dialogDeadline;
-        int dialogSeconds;
-        Focusable dialogReturnFocus;
-
         public MenuScreen CurrentScreen => screen;
 
         /// <summary>
@@ -71,7 +60,7 @@ namespace Squadra
         /// the mouse is: only the control under the pointer is, and it stops when the pointer leaves.
         /// </summary>
         public bool KeyboardMode => keyboardMode;
-        public bool DialogOpen => dialogOpen;
+        public bool DialogOpen => dialog != null && dialog.IsOpen;
 
         /// <summary>True from the moment a mission is launched until its scene replaces the menu.</summary>
         public bool IsLoading => loading;
@@ -94,7 +83,8 @@ namespace Squadra
 
         public void AskToQuit()
         {
-            ShowDialog("QUIT SQUADRA?", _ => "Campaign progress is kept only while the game is running.", Quit, null);
+            ShowDialog("QUIT SQUADRA?", _ => "Campaign progress is kept only while the game is running.",
+                QuitApplication, null);
         }
 
         /// <summary>
@@ -105,9 +95,9 @@ namespace Squadra
         {
             if (loading) return;
 
-            if (dialogOpen)
+            if (DialogOpen)
             {
-                CancelDialog(true);
+                dialog.Cancel(true);
                 return;
             }
 
@@ -120,12 +110,7 @@ namespace Squadra
         /// <summary>What a dialog's Confirm button does.</summary>
         public void ConfirmDialog()
         {
-            if (!dialogOpen) return;
-
-            Action confirmed = dialogConfirmed;
-            sounds.Select();
-            CloseDialog();
-            confirmed?.Invoke();
+            if (DialogOpen) dialog.Confirm();
         }
 
         /// <summary>
@@ -134,7 +119,7 @@ namespace Squadra
         /// </summary>
         public void Launch(int missionIndex)
         {
-            if (loading || dialogOpen) return;
+            if (loading || DialogOpen) return;
             if (!CampaignSession.TryBeginMission(map.Catalog, missionIndex, out string scenePath)) return;
 
             loading = true;
@@ -153,52 +138,31 @@ namespace Squadra
         /// closes, and Cancel has the focus. <paramref name="message"/> gets the seconds left when
         /// <paramref name="timeout"/> is set; running out of time cancels.
         /// </summary>
-        internal void ShowDialog(string title, Func<int, string> message, Action onConfirm, Action onCancel,
+        public void ShowDialog(string title, Func<int, string> message, Action onConfirm, Action onCancel,
             float timeout = 0f)
         {
-            if (dialogOpen) CancelDialog(false);
+            dialog.Show(title, message, onConfirm, onCancel, timeout);
+        }
 
-            dialogOpen = true;
-            dialogConfirmed = onConfirm;
-            dialogCancelled = onCancel;
-            dialogText = message;
-            dialogDeadline = timeout > 0f ? Time.unscaledTime + timeout : 0f;
-            dialogSeconds = Mathf.CeilToInt(timeout);
-            dialogReturnFocus = root.focusController?.focusedElement;
-
-            dialogTitle.text = title;
-            dialogMessage.text = message(dialogSeconds);
+        void OnDialogOpened()
+        {
             screens[(int)screen].SetEnabled(false);
-            dialog.RemoveFromClassList(HiddenClass);
-            FocusSoon(dialogCancelButton);
+            FocusSoon(dialog.CancelButton);
         }
 
-        void CancelDialog(bool playCue)
+        void OnDialogClosed(Focusable returnTo)
         {
-            if (!dialogOpen) return;
-
-            Action cancelled = dialogCancelled;
-            if (playCue) sounds.Back();
-            CloseDialog();
-            cancelled?.Invoke();
-        }
-
-        void CloseDialog()
-        {
-            dialogOpen = false;
-            dialogConfirmed = null;
-            dialogCancelled = null;
-            dialog.AddToClassList(HiddenClass);
             screens[(int)screen].SetEnabled(true);
 
             // Back to whatever opened the dialog, unless that control is gone (a closed dropdown list).
-            var opener = dialogReturnFocus as VisualElement;
+            var opener = returnTo as VisualElement;
             FocusSoon(opener != null && opener.panel != null && screens[(int)screen].Contains(opener)
                 ? opener
                 : DefaultFocus(screen));
         }
 
-        static void Quit()
+        /// <summary>Closes the game. In the editor it stops play mode instead.</summary>
+        public static void QuitApplication()
         {
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
@@ -293,10 +257,6 @@ namespace Squadra
             root = document.rootVisualElement;
             menuRoot = root.Q("menuRoot");
             fade = root.Q("fade");
-            dialog = root.Q("dialog");
-            dialogTitle = root.Q<Label>("dialogTitle");
-            dialogMessage = root.Q<Label>("dialogMessage");
-            dialogCancelButton = root.Q<Button>("dialogCancelButton");
             screens = new[] { root.Q("mainScreen"), root.Q("mapScreen"), root.Q("settingsScreen") };
 
             singlePlayerButton = root.Q<Button>("singlePlayerButton");
@@ -322,8 +282,7 @@ namespace Squadra
             };
             mapBackButton.clicked += Back;
             root.Q<Button>("settingsBackButton").clicked += Back;
-            dialogCancelButton.clicked += Back;
-            root.Q<Button>("dialogConfirmButton").clicked += ConfirmDialog;
+            dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
 
             // The map adds the hover cue to its own dots as it builds them.
             root.Query<Button>().ForEach(sounds.AttachHover);
@@ -353,7 +312,7 @@ namespace Squadra
                 {
                     if (!popupOpen && !popupWasOpen) Back();
                 }
-                else if (screen == MenuScreen.Map && !dialogOpen)
+                else if (screen == MenuScreen.Map && !DialogOpen)
                 {
                     if (keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
                         map.PreviousPage();
@@ -363,20 +322,7 @@ namespace Squadra
             }
 
             popupWasOpen = popupOpen;
-
-            if (dialogOpen && dialogDeadline > 0f)
-            {
-                int seconds = Mathf.CeilToInt(dialogDeadline - Time.unscaledTime);
-                if (seconds <= 0)
-                {
-                    CancelDialog(false);
-                }
-                else if (seconds != dialogSeconds)
-                {
-                    dialogSeconds = seconds;
-                    dialogMessage.text = dialogText(seconds);
-                }
-            }
+            dialog.Tick();
         }
     }
 }

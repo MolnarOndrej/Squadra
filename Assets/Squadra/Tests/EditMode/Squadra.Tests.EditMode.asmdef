@@ -4,6 +4,7 @@
     "references": [
         "Squadra.Simulation",
         "Squadra.Campaign",
+        "Squadra.Pause",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

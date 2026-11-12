@@ -1,0 +1,60 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!--
+        The contents of the Settings screen, shared by the main menu and the pause menu. Each places it
+        with <ui:Instance template="Settings" name="settingsScreen" class="screen hidden" />, so the
+        instance itself is the screen. The look comes from MainMenu.uss in the document that uses it.
+    -->
+    <ui:Label text="SETTINGS" class="screen-title" />
+    <ui:VisualElement class="settings-panel">
+        <ui:VisualElement class="tabs">
+            <ui:Button name="generalTab" text="GENERAL" class="tab" />
+            <ui:Button name="graphicsTab" text="GRAPHICS" class="tab" />
+            <ui:Button name="soundTab" text="SOUND" class="tab" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="generalPanel" class="settings-page">
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="Language" class="setting-row__name" />
+                <ui:DropdownField name="languageField" class="setting-row__control" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="graphicsPanel" class="settings-page hidden">
+            <ui:VisualElement name="displayModeRow" class="setting-row">
+                <ui:Label text="Display Mode" class="setting-row__name" />
+                <ui:DropdownField name="displayModeField" class="setting-row__control" />
+            </ui:VisualElement>
+            <ui:VisualElement name="resolutionRow" class="setting-row">
+                <ui:Label text="Resolution" class="setting-row__name" />
+                <ui:DropdownField name="resolutionField" class="setting-row__control" />
+            </ui:VisualElement>
+            <ui:VisualElement name="vsyncRow" class="setting-row">
+                <ui:Label text="VSync" class="setting-row__name" />
+                <ui:Toggle name="vsyncToggle" class="setting-row__toggle" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="soundPanel" class="settings-page hidden">
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="Master Volume" class="setting-row__name" />
+                <ui:Slider name="masterSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                <ui:Label name="masterValue" text="100%" class="setting-row__value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="Music" class="setting-row__name" />
+                <ui:Slider name="musicSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                <ui:Label name="musicValue" text="100%" class="setting-row__value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="Sound Effects" class="setting-row__name" />
+                <ui:Slider name="sfxSlider" low-value="0" high-value="100" value="100" class="setting-row__control" />
+                <ui:Label name="sfxValue" text="100%" class="setting-row__value" />
+            </ui:VisualElement>
+            <ui:VisualElement class="setting-row">
+                <ui:Label name="muteInBackgroundLabel" text="Mute in Background" class="setting-row__name" />
+                <ui:Toggle name="muteInBackgroundToggle" class="setting-row__toggle" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:Button name="settingsBackButton" text="BACK" class="menu-button back-button" />
+</ui:UXML>

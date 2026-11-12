@@ -11,16 +11,17 @@ Open `Assets/Scenes/MainMenu.unity` in Unity 6 and press Play. A build starts th
 In the menu:
 
 - **Single Player** opens the mission map. Mission 1 is the first playable scenario; Missions 2–5 are locked previews until their scenarios exist.
-- **Settings** has General (language), Graphics (display mode, resolution, VSync) and Sound (master, music and effects volume). Settings are saved on this computer. A display change must be confirmed within 12 seconds or it is reverted.
+- **Settings** has General (language), Graphics (display mode, resolution, VSync) and Sound (master, music and effects volume, and **Mute in Background**). Settings are saved on this computer. A display change must be confirmed within 12 seconds or it is reverted.
 - **Quit** asks for confirmation.
 - Esc goes back, or cancels a dialog. On the mission map, A/D or the left/right arrow keys turn pages when there is more than one.
 
-Campaign progress lasts for one session: winning a mission marks it completed until the game is closed. A mission returns to the mission map from its results screen; there is no way back to the menu while a match is still running.
+Campaign progress lasts for one session: winning a mission marks it completed until the game is closed. A mission returns to the mission map from its results screen, or at any time from the pause menu's Quit to Menu.
 
 In a mission (`Assets/Scenes/SampleScene.unity` also runs on its own):
 
 - Click a Blue world to select it, then click another world to send every ship stationed there.
-- Click the selected world again, right-click, or press Esc to cancel.
+- Click the selected world again, or right-click, to cancel.
+- Press Esc to pause.
 - A fleet that lands on an empty or beaten world needs five seconds to capture it.
 
 When the match ends, the results panel appears over the faded battlefield:
@@ -29,20 +30,33 @@ When the match ends, the results panel appears over the faded battlefield:
 - **Next Mission** launches the mission that follows in the campaign. It is disabled after a defeat ("Win this mission to continue") and while the following mission has no scenario yet ("Next mission coming soon"); hover it to see why. It is not shown when no mission follows.
 - **Restart** starts a fresh attempt at the same mission. **Back to Menu** opens the mission map.
 - Winning the last mission of the catalog shows **Campaign Complete!** instead, with Restart and Back to Menu.
-- Use the mouse, or the arrow keys or Tab with Enter or Space. Clicking beside the panel does nothing, and Esc is not used here.
+- Use the mouse, or the arrow keys or Tab with Enter or Space. Clicking beside the panel does nothing. Esc opens the pause menu over the results; resuming brings the same results back.
+
+## Pausing
+
+Esc opens the pause menu at any point of a mission, a victory or defeat screen included. The mission is frozen for as long as the menu is open: no production, fleet movement, combat, capture or mission time, no orders, and the scene's animation and gameplay effects stand still. Resuming carries on from the same moment with the same world selected; nothing is caught up.
+
+- **Resume**, or Esc on the pause menu, returns to the mission or to its result.
+- **Settings** is the same Settings as in the main menu. Back or Esc returns to the pause menu. Esc first closes an open dropdown list, then cancels a display confirmation, and only then leaves Settings. The 12-second display confirmation keeps counting while the mission is paused.
+- **Quit to Menu** and **Quit to Desktop** ask for confirmation, with Cancel focused. Quit to Menu opens the mission map; an unfinished match is dropped, and a victory that was already on screen stays recorded. Quit to Desktop closes the game.
+- The battlefield is dimmed by the same scrim the results use, so pausing over a result does not darken it further; the results panel is put away while the pause menu is open.
+- The mission music keeps playing at half its level and the menu cues sound as usual. Volume changes made while paused apply on resume.
+
+The game keeps running while another application is in front; it is never paused by switching away. With **Mute in Background** checked (Settings > Sound, off by default) nothing is heard until the game is in front again. It only silences the output: volumes, a pause and the music's place in its track are untouched.
 
 ## Project layout
 
 - `Assets/Squadra/Scripts/Simulation` holds the rules: one `Match` class owns orders, time, combat, capture, production, each player's combat totals and the result. It has no Unity dependencies.
-- `Assets/Squadra/Scripts/Presentation` holds the scene components that send orders to the match and draw its state, and the results screen shown when it ends.
+- `Assets/Squadra/Scripts/Presentation` holds the scene components that send orders to the match and draw its state, the results screen shown when it ends, and the pause menu. `GameController` owns the pause itself.
 - `Assets/Squadra/Scripts/Campaign` holds the campaign rules: which missions are completed, available, locked or previews, when an unlock is shown, how missions are grouped into map pages, and what the results screen offers after a mission. It has no Unity dependencies.
-- `Assets/Squadra/Scripts/Menu` holds the menu scene's components: the main menu and its screens, the mission map, the settings, and the menu's sounds.
-- `Assets/Squadra/UI` holds the menu's layout (`MainMenu.uxml`), look (`MainMenu.uss`) and panel settings, and the results panel's layout and look (`MissionResults.uxml`, `MissionResults.uss`). Both are built with UI Toolkit and share the panel settings and the button styles.
+- `Assets/Squadra/Scripts/Pause` holds the pause rules: which pause screen is in front, what each press of Esc does, when a quit goes ahead, the text of the quit confirmations, and how pausing and background muting combine with the volume settings. It has no Unity dependencies.
+- `Assets/Squadra/Scripts/Menu` holds the menu scene's components: the main menu and its screens, the mission map, the settings, and the menu's sounds. The Settings screen and the confirmation dialog are shared with the pause menu.
+- `Assets/Squadra/UI` holds the menu's layout (`MainMenu.uxml`), look (`MainMenu.uss`) and panel settings, the results panel's layout and look (`MissionResults.uxml`, `MissionResults.uss`) and the pause menu's (`PauseMenu.uxml`, `PauseMenu.uss`). All are built with UI Toolkit and share the panel settings and the button styles. `Settings.uxml` and `Dialog.uxml` are the Settings screen and the confirmation dialog, used by both the main menu and the pause menu.
 - `Assets/Squadra/Campaign/Missions.asset` is the mission catalog: the ordered missions, each with a stable id and an optional gameplay scene. A mission needs its scene in the build to be playable.
 - `Assets/Squadra/Shaders` holds the procedural shaders for the planets, space backdrop, rings and fleet dots.
-- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog. **Squadra > Rewire Results Screen In Open Scene** adds the results screen to a mission scene that does not have it yet and leaves the rest of the scene alone.
+- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog. **Squadra > Rewire Results Screen In Open Scene** adds the results screen to a mission scene that does not have it yet and leaves the rest of the scene alone; **Squadra > Rewire Pause Menu In Open Scene** does the same for the pause menu.
 - `Assets/Squadra/Audio` holds the sound effects (`Sfx`), the mission track (`Music`) and the menu track (`MenuMusic`).
-- `Assets/Squadra/Tests/EditMode` holds the match, match results and campaign rule tests. Run them from **Window > General > Test Runner** (EditMode).
+- `Assets/Squadra/Tests/EditMode` holds the match, match results, campaign and pause rule tests. Run them from **Window > General > Test Runner** (EditMode).
 - The specifications are in `specifications/`.
 
 ## Mission map
@@ -61,7 +75,7 @@ The `Game` object's **Catalog** tells the results screen where the mission sits 
 
 `SoundLayer` plays an effect when a fleet departs, arrives peacefully, or starts a battle, for the weapon fire and ship explosions of the battle, when a world is captured, and when the match is won or lost. The fleet and battle effects have several takes named `Name_1.wav`, `Name_2.wav`, and so on; one is picked at random each time, with a small random change in pitch and level. A capture and the two match results always sound the same. `MusicPlayer` loops the background track and keeps it playing across restarts; when a scene brings a different track, as a mission does after the menu, it fades the old one out and the new one in.
 
-`MenuAudio` plays the menu's cues: one when the pointer enters a button, one when a button or tab is activated or the map page changes, and a different one for Back, Cancel and Esc. The three volume settings scale everything: Master all sound, Music both tracks, Sound Effects the menu cues and the gameplay effects.
+`MenuAudio` plays the menu's cues: one when the pointer enters a button, one when a button or tab is activated or the map page changes, and a different one for Back, Cancel and Esc. The three volume settings scale everything: Master all sound, Music both tracks, Sound Effects the menu cues and the gameplay effects. Pausing and Mute in Background are factors on top of these settings and never change them.
 
 Most effects are generated from code. `Assets/Squadra/Editor/SoundRecipes.cs` describes each one, and **Squadra > Rebuild Sound Effects** renders them to WAV files in `Assets/Squadra/Audio/Sfx`, overwriting the previous render. Battle starts, weapon fire, captures, the match results and the menu cues are synthesized; departures and arrivals are shaped from the recordings in `Assets/Squadra/Audio/Sources`. The menu track (`MenuMusic/MenuTheme.wav`) is synthesized too; put a track of your own in that folder and rebuild the menu scene to use it instead. The ship explosions are recordings used as they are (`ShipDestroyed_N.ogg`). To add a take of your own, drop a file with the next number into the `Sfx` folder and run **Squadra > Rewire Sounds In Open Scene**. Volumes are set on the `Sounds` and `Music` objects in the scene.
 

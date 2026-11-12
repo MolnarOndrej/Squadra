@@ -12,10 +12,11 @@ namespace Squadra.EditorTools
 {
     /// <summary>
     /// Assembles the first playable scene from code: materials, post-processing profile, backdrop, the two
-    /// planets and the moon, fleet and effect layers, HUD, results screen and the game controller. Run it
-    /// again from <c>Squadra &gt; Rebuild First Playable Scene</c> to regenerate everything; it overwrites the
-    /// scene and the generated materials, so tweak values here rather than in the generated assets if they
-    /// must survive. The results screen's layout and look live in <c>Assets/Squadra/UI</c> and are left alone.
+    /// planets and the moon, fleet and effect layers, HUD, results screen, pause menu and the game
+    /// controller. Run it again from <c>Squadra &gt; Rebuild First Playable Scene</c> to regenerate everything;
+    /// it overwrites the scene and the generated materials, so tweak values here rather than in the
+    /// generated assets if they must survive. The layout and look of the results screen and the pause menu
+    /// live in <c>Assets/Squadra/UI</c> and are left alone.
     /// </summary>
     public static class SquadraSceneBuilder
     {
@@ -24,6 +25,10 @@ namespace Squadra.EditorTools
         internal const string SettingsFolder = Root + "/Settings";
         internal const string ScenePath = "Assets/Scenes/SampleScene.unity";
         const string ResultsLayoutPath = Root + "/UI/MissionResults.uxml";
+        const string PauseLayoutPath = Root + "/UI/PauseMenu.uxml";
+
+        // The pause menu's document is drawn over the results document on the panel they share.
+        const float PauseDocumentOrder = 10f;
 
         // Sorting orders, back to front.
         const int OrderBackdrop = -100;
@@ -95,6 +100,7 @@ namespace Squadra.EditorTools
             Wire(game, "results", results);
             Wire(game, "rig", rig);
             Wire(game, "lineMaterial", materials.Line);
+            BuildPause(game);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
 
@@ -135,6 +141,30 @@ namespace Squadra.EditorTools
             Wire(game, "catalog", SquadraMenuBuilder.EnsureCatalog());
             EditorSceneManager.MarkSceneDirty(game.gameObject.scene);
             Debug.Log("Squadra: rewired the results screen in " + game.gameObject.scene.name
+                + " (save the scene to keep it)");
+        }
+
+        /// <summary>
+        /// Gives the open scene the pause menu: adds the Pause object if it is missing and connects it
+        /// to the game controller. Use it on a mission scene made before the pause menu existed; unlike
+        /// a full rebuild it leaves the rest of the scene alone.
+        /// </summary>
+        [MenuItem("Squadra/Rewire Pause Menu In Open Scene")]
+        public static void RewirePause()
+        {
+            GameController game = Object.FindAnyObjectByType<GameController>();
+            if (game == null)
+            {
+                Debug.LogError("Squadra: open the playable scene first.");
+                return;
+            }
+
+            PauseMenu pause = Object.FindAnyObjectByType<PauseMenu>();
+            if (pause == null) BuildPause(game);
+            else Wire(pause, "game", game);
+
+            EditorSceneManager.MarkSceneDirty(game.gameObject.scene);
+            Debug.Log("Squadra: rewired the pause menu in " + game.gameObject.scene.name
                 + " (save the scene to keep it)");
         }
 
@@ -536,6 +566,34 @@ namespace Squadra.EditorTools
             Wire(results, "document", document);
             Wire(results, "sounds", cues);
             return results;
+        }
+
+        // The pause menu is another UI document on the menu's panel, above the results, with its own
+        // copy of the interface cues.
+        static PauseMenu BuildPause(GameController game)
+        {
+            var layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(PauseLayoutPath);
+            PanelSettings panel = SquadraMenuBuilder.EnsurePanel();
+            if (layout == null || panel == null)
+                Debug.LogError("Squadra: the pause menu layout or the menu theme is missing from " + Root + "/UI");
+            if (!SquadraSoundBuilder.HasMenuSounds) SquadraSoundBuilder.Build();
+
+            var go = new GameObject("Pause");
+            var document = go.AddComponent<UIDocument>();
+            document.panelSettings = panel;
+            document.visualTreeAsset = layout;
+            document.sortingOrder = PauseDocumentOrder;
+
+            var cues = go.AddComponent<MenuAudio>();
+            Wire(cues, "hover", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuHover));
+            Wire(cues, "select", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuSelect));
+            Wire(cues, "back", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuBack));
+
+            var pause = go.AddComponent<PauseMenu>();
+            Wire(pause, "document", document);
+            Wire(pause, "sounds", cues);
+            Wire(pause, "game", game);
+            return pause;
         }
 
         static SoundLayer BuildSounds(CameraRig rig)
