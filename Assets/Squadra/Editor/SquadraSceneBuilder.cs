@@ -76,10 +76,10 @@ namespace Squadra.EditorTools
 
             var worldsRoot = new GameObject("Worlds").transform;
             WorldView thalassa = BuildWorld(worldsRoot, "Thalassa", NodeKind.Planet, Faction.Blue,
-                MatchConfig.StartingShips, NodeConfig.PlanetProductionInterval, new Vector2(-5.5f, -0.75f), 1.15f,
+                MatchConfig.StartingDarts, NodeConfig.PlanetProductionInterval, new Vector2(-5.5f, -0.75f), 1.15f,
                 materials.Thalassa, materials);
             WorldView ember = BuildWorld(worldsRoot, "Ember", NodeKind.Planet, Faction.Red,
-                MatchConfig.StartingShips, NodeConfig.PlanetProductionInterval, new Vector2(5.5f, 0.45f), 1.2f,
+                MatchConfig.StartingDarts, NodeConfig.PlanetProductionInterval, new Vector2(5.5f, 0.45f), 1.2f,
                 materials.Ember, materials);
             WorldView lune = BuildWorld(worldsRoot, "Lune", NodeKind.Moon, Faction.Neutral, 0,
                 NodeConfig.MoonProductionInterval, new Vector2(-1f, 1.6f), 0.55f, materials.Lune, materials);
@@ -415,7 +415,7 @@ namespace Squadra.EditorTools
             Relayout(backdrop);
         }
 
-        static WorldView BuildWorld(Transform parent, string name, NodeKind kind, Faction owner, int ships,
+        static WorldView BuildWorld(Transform parent, string name, NodeKind kind, Faction owner, int darts,
             double productionInterval, Vector2 position, float radius, Material surfaceMaterial, Materials materials)
         {
             var go = new GameObject(name);
@@ -428,7 +428,7 @@ namespace Squadra.EditorTools
             MeshRenderer captureRing = Shapes.CreateQuad("Capture Ring", go.transform, materials.Ring, OrderCaptureRing);
             MeshRenderer selectionRing = Shapes.CreateQuad("Selection Ring", go.transform, materials.Ring, OrderSelectionRing);
 
-            TextMeshPro count = Text("Fleet Count", go.transform, ships.ToString(), 5.4f, Palette.Text,
+            TextMeshPro count = Text("Fleet Count", go.transform, darts.ToString(), 5.4f, Palette.Text,
                 TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(4f, 1f), OrderText, FontStyles.Bold);
             TextMeshPro caption = Text("Caption", go.transform, name.ToUpperInvariant(), 1.75f, Palette.TextDim,
                 TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(6f, 0.5f), OrderText,
@@ -438,7 +438,7 @@ namespace Squadra.EditorTools
             Wire(view, "displayName", name);
             WireEnum(view, "kind", (int)kind);
             WireEnum(view, "startingOwner", (int)owner);
-            WireInt(view, "startingShips", ships);
+            WireInt(view, "startingDarts", darts);
             WireFloat(view, "productionInterval", (float)productionInterval);
             WireFloat(view, "bodyRadius", radius);
             Wire(view, "surface", surface);
@@ -613,7 +613,7 @@ namespace Squadra.EditorTools
             WireTakes(sounds, "arrival", SquadraSoundBuilder.Arrival);
             WireTakes(sounds, "battleStart", SquadraSoundBuilder.BattleStart);
             WireTakes(sounds, "shot", SquadraSoundBuilder.Shot);
-            WireTakes(sounds, "shipDestroyed", SquadraSoundBuilder.ShipDestroyed);
+            WireTakes(sounds, "dartDestroyed", SquadraSoundBuilder.DartDestroyed);
             WireTakes(sounds, "capture", SquadraSoundBuilder.Capture);
             Wire(sounds, "victory", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.Victory));
             Wire(sounds, "defeat", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.Defeat));

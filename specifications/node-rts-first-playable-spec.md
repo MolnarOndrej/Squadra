@@ -1,5 +1,7 @@
 # Build the first playable Node RTS space scene
 
+> **Superseded in part by [Darts and progressive fleet battles](dart-battle-spec.md).** The basic unit this document calls a ship is now a Dart. A hostile arrival at a defended object no longer resolves immediately: it starts a battle that removes one Dart from each side at a time over one to five seconds, can be reinforced, and pauses production and capture at that object. The survivor, tie, ownership and capture rules below still describe how a battle ends. Blue's victory also waits for a Red fleet that has arrived and is still fighting. The text below is kept as written.
+
 ## Problem Statement
 
 I want to build a 2D space strategy game in Unity 6 with Claude Code. The core is a Node RTS about moving fleets between planets, moons, and eventually space stations. The longer-term design also takes inspiration from *Swords & Souls: Neverseen*. Before deciding how that inspiration fits into progression, I want a playable scene that proves the basic strategy loop.

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Squadra.Simulation
 {
     /// <summary>
-    /// Who ships and map objects belong to. Neutral is nobody; every other value is the stable identity
+    /// Who Darts and map objects belong to. Neutral is nobody; every other value is the stable identity
     /// of one player, and a mission's roster names the ones that take part. Only Blue and Red are
     /// playable so far: the other identities exist so rosters and results can hold up to six players.
     /// </summary>
@@ -35,7 +35,7 @@ namespace Squadra.Simulation
     /// <summary>What happened when a fleet reached its destination.</summary>
     public enum ArrivalOutcome
     {
-        /// <summary>Allied arrival at an owned object: the ships joined the stationed fleet.</summary>
+        /// <summary>Allied arrival at an owned object: the Darts joined the stationed fleet.</summary>
         Merged,
 
         /// <summary>Arrival allied with the fleet that is capturing the object: joined it, timer untouched.</summary>
@@ -44,17 +44,11 @@ namespace Squadra.Simulation
         /// <summary>Nobody was stationed there: the whole fleet landed and began capturing.</summary>
         Landed,
 
-        /// <summary>The arriving fleet won the battle and its survivors began capturing.</summary>
-        AttackWon,
+        /// <summary>A hostile force was stationed there: the fleet began a battle with it.</summary>
+        BattleStarted,
 
-        /// <summary>The arriving fleet was destroyed; the stationed fleet keeps its survivors.</summary>
-        Repelled,
-
-        /// <summary>Both fleets were destroyed. Any capture in progress is cleared.</summary>
-        Tie,
-
-        /// <summary>The incumbent owner's fleet destroyed the capturing fleet and took control back at once.</summary>
-        ControlRestored,
+        /// <summary>A battle was already being fought there: the fleet joined its own side of it.</summary>
+        BattleJoined,
     }
 
     /// <summary>A position on the map, in map units.</summary>
@@ -88,35 +82,79 @@ namespace Squadra.Simulation
         public readonly int NodeId;
         public readonly int FleetId;
         public readonly Faction Arriving;
-        public readonly int ArrivingShips;
+        public readonly int ArrivingDarts;
 
         /// <summary>Faction of the fleet stationed at the object before the arrival.</summary>
         public readonly Faction Stationed;
-        public readonly int StationedShips;
+
+        /// <summary>Darts stationed at the object before the arrival.</summary>
+        public readonly int StationedDarts;
 
         public readonly ArrivalOutcome Outcome;
 
-        /// <summary>Ships destroyed on each side. Zero for peaceful arrivals.</summary>
-        public readonly int LossesPerSide;
-
-        /// <summary>Ships stationed at the object once the arrival was resolved.</summary>
-        public readonly int ShipsAfter;
-
-        public ArrivalReport(int nodeId, int fleetId, Faction arriving, int arrivingShips, Faction stationed,
-            int stationedShips, ArrivalOutcome outcome, int lossesPerSide, int shipsAfter)
+        public ArrivalReport(int nodeId, int fleetId, Faction arriving, int arrivingDarts, Faction stationed,
+            int stationedDarts, ArrivalOutcome outcome)
         {
             NodeId = nodeId;
             FleetId = fleetId;
             Arriving = arriving;
-            ArrivingShips = arrivingShips;
+            ArrivingDarts = arrivingDarts;
             Stationed = stationed;
-            StationedShips = stationedShips;
+            StationedDarts = stationedDarts;
             Outcome = outcome;
-            LossesPerSide = lossesPerSide;
-            ShipsAfter = shipsAfter;
         }
 
-        public bool WasBattle => LossesPerSide > 0;
+        /// <summary>True when the fleet went into a battle, a new one or one already under way.</summary>
+        public bool EnteredBattle =>
+            Outcome == ArrivalOutcome.BattleStarted || Outcome == ArrivalOutcome.BattleJoined;
+    }
+
+    /// <summary>The visible facts of one finished battle, for presentation and for tests.</summary>
+    public readonly struct BattleReport
+    {
+        public readonly int NodeId;
+        public readonly Faction Arriving;
+        public readonly Faction Stationed;
+        public readonly BattleOutcome Outcome;
+
+        /// <summary>Darts destroyed on each side over the whole battle.</summary>
+        public readonly int LossesPerSide;
+
+        /// <summary>Darts of the winning side left at the object. Zero after a tie.</summary>
+        public readonly int Survivors;
+
+        /// <summary>Seconds the battle lasted, reinforcements included.</summary>
+        public readonly double Duration;
+
+        public BattleReport(int nodeId, Faction arriving, Faction stationed, BattleOutcome outcome,
+            int lossesPerSide, int survivors, double duration)
+        {
+            NodeId = nodeId;
+            Arriving = arriving;
+            Stationed = stationed;
+            Outcome = outcome;
+            LossesPerSide = lossesPerSide;
+            Survivors = survivors;
+            Duration = duration;
+        }
+
+        /// <summary>The side with Darts left, or Neutral after a tie.</summary>
+        public Faction Winner
+        {
+            get
+            {
+                switch (Outcome)
+                {
+                    case BattleOutcome.AttackWon:
+                    case BattleOutcome.ControlRestored:
+                        return Arriving;
+                    case BattleOutcome.Repelled:
+                        return Stationed;
+                    default:
+                        return Faction.Neutral;
+                }
+            }
+        }
     }
 
     /// <summary>One participating player of a match, as its roster lists them.</summary>
@@ -142,19 +180,19 @@ namespace Squadra.Simulation
         public readonly string Name;
         public readonly bool IsHuman;
 
-        /// <summary>Individual enemy and neutral guard ships this player's fleets destroyed.</summary>
-        public readonly int ShipsDestroyed;
+        /// <summary>Individual enemy and neutral guard Darts this player's fleets destroyed.</summary>
+        public readonly int DartsDestroyed;
 
-        /// <summary>This player's ships destroyed in combat, attacking or defending.</summary>
-        public readonly int ShipsLost;
+        /// <summary>This player's Darts destroyed in combat, attacking or defending.</summary>
+        public readonly int DartsLost;
 
-        public PlayerResult(Faction faction, string name, bool isHuman, int shipsDestroyed, int shipsLost)
+        public PlayerResult(Faction faction, string name, bool isHuman, int dartsDestroyed, int dartsLost)
         {
             Faction = faction;
             Name = name;
             IsHuman = isHuman;
-            ShipsDestroyed = shipsDestroyed;
-            ShipsLost = shipsLost;
+            DartsDestroyed = dartsDestroyed;
+            DartsLost = dartsLost;
         }
     }
 

@@ -1,5 +1,7 @@
 # Squadra mission pause menu
 
+> **See also [Darts and progressive fleet battles](dart-battle-spec.md).** The basic unit this document calls a ship is now a Dart, and a pause also freezes battles: their casualties, formations, shots, explosions and sounds. The text below is kept as written.
+
 ## Problem Statement
 
 I want to interrupt a mission to take a break, adjust settings, or leave the mission safely. I need the game to stop while I use the menu, a clear indication that it is paused, and confirmation before I leave. I also want control over whether the game makes sound while I am using another application.

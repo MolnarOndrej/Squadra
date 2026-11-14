@@ -12,12 +12,12 @@ namespace Squadra.Simulation
         public NodeKind Kind = NodeKind.Planet;
         public MapPoint Position;
         public Faction Owner = Faction.Neutral;
-        public int Ships;
+        public int Darts;
 
-        /// <summary>Seconds per produced ship while owned and outside capture. Zero or less disables production.</summary>
+        /// <summary>Seconds per produced Dart while owned and outside capture. Zero or less disables production.</summary>
         public double ProductionInterval = PlanetProductionInterval;
 
-        public static NodeConfig Planet(string name, MapPoint position, Faction owner, int ships)
+        public static NodeConfig Planet(string name, MapPoint position, Faction owner, int darts)
         {
             return new NodeConfig
             {
@@ -25,12 +25,12 @@ namespace Squadra.Simulation
                 Kind = NodeKind.Planet,
                 Position = position,
                 Owner = owner,
-                Ships = ships,
+                Darts = darts,
                 ProductionInterval = PlanetProductionInterval,
             };
         }
 
-        public static NodeConfig Moon(string name, MapPoint position, Faction owner = Faction.Neutral, int ships = 0)
+        public static NodeConfig Moon(string name, MapPoint position, Faction owner = Faction.Neutral, int darts = 0)
         {
             return new NodeConfig
             {
@@ -38,7 +38,7 @@ namespace Squadra.Simulation
                 Kind = NodeKind.Moon,
                 Position = position,
                 Owner = owner,
-                Ships = ships,
+                Darts = darts,
                 ProductionInterval = MoonProductionInterval,
             };
         }
@@ -46,7 +46,7 @@ namespace Squadra.Simulation
 
     public sealed class MatchConfig
     {
-        public const int StartingShips = 30;
+        public const int StartingDarts = 30;
 
         /// <summary>The most players one mission can have.</summary>
         public const int MaxPlayers = 6;
@@ -69,8 +69,11 @@ namespace Squadra.Simulation
         /// <summary>Seconds a fleet must hold an object before ownership changes.</summary>
         public double CaptureDuration = 5.0;
 
+        /// <summary>How long battles last: one second when decisive, five between equal forces.</summary>
+        public BattleTiming BattleTiming = new BattleTiming();
+
         /// <summary>
-        /// The first playable map: Blue and Red each hold one planet with 30 ships, and a neutral, empty moon
+        /// The first playable map: Blue and Red each hold one planet with 30 Darts, and a neutral, empty moon
         /// sits between them. Node ids are 0 (Blue planet), 1 (Red planet), 2 (moon).
         /// </summary>
         public static MatchConfig FirstPlayable(MapPoint bluePlanet, MapPoint redPlanet, MapPoint moon)
@@ -78,8 +81,8 @@ namespace Squadra.Simulation
             var config = new MatchConfig();
             config.Players.Add(new MatchPlayer(Faction.Blue));
             config.Players.Add(new MatchPlayer(Faction.Red));
-            config.Nodes.Add(NodeConfig.Planet("Blue Planet", bluePlanet, Faction.Blue, StartingShips));
-            config.Nodes.Add(NodeConfig.Planet("Red Planet", redPlanet, Faction.Red, StartingShips));
+            config.Nodes.Add(NodeConfig.Planet("Blue Planet", bluePlanet, Faction.Blue, StartingDarts));
+            config.Nodes.Add(NodeConfig.Planet("Red Planet", redPlanet, Faction.Red, StartingDarts));
             config.Nodes.Add(NodeConfig.Moon("Moon", moon));
             return config;
         }

@@ -10,7 +10,7 @@ namespace Squadra.Simulation
             Kind = config.Kind;
             Position = config.Position;
             Owner = config.Owner;
-            Ships = config.Ships < 0 ? 0 : config.Ships;
+            Darts = config.Darts < 0 ? 0 : config.Darts;
             ProductionInterval = config.ProductionInterval;
             CaptureDuration = captureDuration;
         }
@@ -20,14 +20,17 @@ namespace Squadra.Simulation
         public NodeKind Kind { get; }
         public MapPoint Position { get; }
 
-        /// <summary>Seconds per produced ship. Exposed so upgrades can change it mid-match.</summary>
+        /// <summary>Seconds per produced Dart. Exposed so upgrades can change it mid-match.</summary>
         public double ProductionInterval { get; set; }
 
         /// <summary>Formal owner. Changes only when a capture completes.</summary>
         public Faction Owner { get; internal set; }
 
-        /// <summary>Ships stationed here. They belong to <see cref="Occupant"/>.</summary>
-        public int Ships { get; internal set; }
+        /// <summary>
+        /// Darts stationed here. They belong to <see cref="Occupant"/>. During a battle this is the
+        /// stationed side's live count; the arriving side's Darts are in <see cref="Battle"/>.
+        /// </summary>
+        public int Darts { get; internal set; }
 
         /// <summary>The faction currently claiming this object, or Neutral when no capture is running.</summary>
         public Faction Captor { get; internal set; }
@@ -35,9 +38,15 @@ namespace Squadra.Simulation
         public double CaptureDuration { get; }
         public double CaptureElapsed { get; internal set; }
 
+        /// <summary>The battle being fought here, or null. Production and capture wait while it lasts.</summary>
+        public Battle Battle { get; internal set; }
+
         internal double ProductionClock;
 
         public bool IsBeingCaptured => Captor != Faction.Neutral;
+
+        /// <summary>True while a battle is being fought here.</summary>
+        public bool IsContested => Battle != null;
 
         /// <summary>Faction the stationed fleet belongs to: the captor during a capture, otherwise the owner.</summary>
         public Faction Occupant => IsBeingCaptured ? Captor : Owner;
@@ -45,10 +54,15 @@ namespace Squadra.Simulation
         /// <summary>Intervals shorter than this count as "no production".</summary>
         public const double MinProductionInterval = 0.001;
 
+        /// <summary>True while the production clock runs: owned, outside capture and not fought over.</summary>
         public bool IsProducing =>
-            Owner != Faction.Neutral && !IsBeingCaptured && ProductionInterval >= MinProductionInterval;
+            Owner != Faction.Neutral && !IsBeingCaptured && !IsContested
+            && ProductionInterval >= MinProductionInterval;
 
-        /// <summary>Capture progress from 0 to 1. Zero when no capture is running.</summary>
+        /// <summary>
+        /// Capture progress from 0 to 1. Zero when no capture is running. It stands still, and is kept,
+        /// while the capturing force is in a battle.
+        /// </summary>
         public float CaptureProgress
         {
             get
@@ -61,7 +75,7 @@ namespace Squadra.Simulation
 
         public double CaptureRemaining => IsBeingCaptured ? System.Math.Max(0, CaptureDuration - CaptureElapsed) : 0;
 
-        /// <summary>Progress toward the next produced ship, from 0 to 1.</summary>
+        /// <summary>Progress toward the next produced Dart, from 0 to 1.</summary>
         public float ProductionProgress
         {
             get
@@ -73,14 +87,14 @@ namespace Squadra.Simulation
         }
     }
 
-    /// <summary>A fleet travelling between two objects.</summary>
+    /// <summary>A fleet, a group of Darts, travelling between two objects.</summary>
     public sealed class Fleet
     {
-        internal Fleet(int id, Faction faction, int ships, int sourceId, int targetId, double duration)
+        internal Fleet(int id, Faction faction, int darts, int sourceId, int targetId, double duration)
         {
             Id = id;
             Faction = faction;
-            Ships = ships;
+            Darts = darts;
             SourceId = sourceId;
             TargetId = targetId;
             Duration = duration;
@@ -88,7 +102,7 @@ namespace Squadra.Simulation
 
         public int Id { get; }
         public Faction Faction { get; }
-        public int Ships { get; }
+        public int Darts { get; }
         public int SourceId { get; }
         public int TargetId { get; }
 

@@ -6,7 +6,8 @@ namespace Squadra.Tests
 {
     /// <summary>
     /// Exercises what the results screen reads from the match boundary: fleet orders and time in, the
-    /// mission duration and each roster player's ships destroyed and ships lost out.
+    /// mission duration and each roster player's Darts destroyed and Darts lost out. Battles take time,
+    /// so casualties are counted as they happen and the tests fight a battle out before reading totals.
     /// </summary>
     public class MatchResultsTests
     {
@@ -18,32 +19,48 @@ namespace Squadra.Tests
         }
 
         /// <summary>A planet that never produces, so battles can be set up with exact counts.</summary>
-        static NodeConfig Idle(float x, Faction owner, int ships)
+        static NodeConfig Idle(float x, Faction owner, int darts)
         {
-            NodeConfig node = NodeConfig.Planet("Planet", new MapPoint(x, 0), owner, ships);
+            NodeConfig node = NodeConfig.Planet("Planet", new MapPoint(x, 0), owner, darts);
             node.ProductionInterval = 0;
             return node;
         }
 
         /// <summary>A moon that never produces. Moons do not count toward victory.</summary>
-        static NodeConfig IdleMoon(float x, Faction owner = Faction.Neutral, int ships = 0)
+        static NodeConfig IdleMoon(float x, Faction owner = Faction.Neutral, int darts = 0)
         {
-            NodeConfig node = NodeConfig.Moon("Moon", new MapPoint(x, 0), owner, ships);
+            NodeConfig node = NodeConfig.Moon("Moon", new MapPoint(x, 0), owner, darts);
             node.ProductionInterval = 0;
             return node;
         }
 
+        /// <summary>Seconds a battle between forces of these sizes lasts under the default timing.</summary>
+        static double BattleSeconds(int first, int second) => new BattleTiming().Duration(first, second);
+
+        /// <summary>Advances to the moment the last battle under way ends, and no further.</summary>
+        static void FinishBattles(Match match)
+        {
+            for (int guard = 0; match.Battles.Count > 0 && match.Status == MatchStatus.InProgress; guard++)
+            {
+                Assert.Less(guard, 1000, "the battles never ended");
+                double next = double.MaxValue;
+                foreach (Battle battle in match.Battles)
+                    next = Math.Min(next, battle.Remaining);
+                match.Advance(Math.Max(next, 1e-6));
+            }
+        }
+
         static void AssertTotals(Match match, Faction faction, int destroyed, int lost)
         {
-            Assert.AreEqual(destroyed, match.ShipsDestroyed(faction), faction + " ships destroyed");
-            Assert.AreEqual(lost, match.ShipsLost(faction), faction + " ships lost");
+            Assert.AreEqual(destroyed, match.DartsDestroyed(faction), faction + " Darts destroyed");
+            Assert.AreEqual(lost, match.DartsLost(faction), faction + " Darts lost");
         }
 
         static void AssertRow(PlayerResult row, Faction faction, int destroyed, int lost)
         {
             Assert.AreEqual(faction, row.Faction);
-            Assert.AreEqual(destroyed, row.ShipsDestroyed, faction + " ships destroyed");
-            Assert.AreEqual(lost, row.ShipsLost, faction + " ships lost");
+            Assert.AreEqual(destroyed, row.DartsDestroyed, faction + " Darts destroyed");
+            Assert.AreEqual(lost, row.DartsLost, faction + " Darts lost");
         }
 
         // ------------------------------------------------------------ combat accounting
@@ -68,8 +85,10 @@ namespace Squadra.Tests
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            AssertTotals(match, Faction.Blue, 0, 0); // the battle has only just begun
+            FinishBattles(match);
 
-            Assert.AreEqual(10, match.Nodes[1].Ships);
+            Assert.AreEqual(10, match.Nodes[1].Darts);
             AssertTotals(match, Faction.Blue, 20, 20);
             AssertTotals(match, Faction.Red, 20, 20);
         }
@@ -81,42 +100,93 @@ namespace Squadra.Tests
 
             match.TryLaunch(Faction.Blue, 0, 2);
             match.Advance(5);
+            FinishBattles(match);
 
-            Assert.AreEqual(10, match.Nodes[2].Ships);
+            Assert.AreEqual(10, match.Nodes[2].Darts);
             AssertTotals(match, Faction.Blue, 20, 20);
             AssertTotals(match, Faction.Red, 20, 20);
         }
 
         [Test]
-        public void A_tie_counts_every_ship_of_both_fleets()
+        public void A_tie_counts_every_Dart_of_both_fleets()
         {
             Match match = Custom(Idle(0, Faction.Blue, 20), Idle(10, Faction.Red, 20));
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            FinishBattles(match);
 
-            Assert.AreEqual(0, match.Nodes[1].Ships);
+            Assert.AreEqual(0, match.Nodes[1].Darts);
             AssertTotals(match, Faction.Blue, 20, 20);
             AssertTotals(match, Faction.Red, 20, 20);
         }
 
         [Test]
+        public void Casualties_are_counted_when_they_happen_and_once_each()
+        {
+            // Ten against ten fight for five seconds and lose a pair every half second.
+            Match match = Custom(Idle(0, Faction.Blue, 10), Idle(10, Faction.Red, 10));
+            int reported = 0;
+            match.BattleCasualties += (_, pairs) => reported += pairs;
+
+            match.TryLaunch(Faction.Blue, 0, 1);
+            match.Advance(5);
+            AssertTotals(match, Faction.Blue, 0, 0);
+
+            match.Advance(0.4);
+            AssertTotals(match, Faction.Blue, 0, 0);
+
+            match.Advance(0.1);
+            AssertTotals(match, Faction.Blue, 1, 1);
+            AssertTotals(match, Faction.Red, 1, 1);
+
+            match.Advance(2.25); // between two pairs
+            AssertTotals(match, Faction.Blue, 5, 5);
+            AssertTotals(match, Faction.Red, 5, 5);
+            Assert.AreEqual(5, reported);
+
+            match.Advance(10);
+            AssertTotals(match, Faction.Blue, 10, 10);
+            AssertTotals(match, Faction.Red, 10, 10);
+            Assert.AreEqual(10, reported);
+        }
+
+        [Test]
         public void Repeated_battles_add_up_and_each_is_counted_once()
         {
-            // Blue attacks twice from two planets; the second fleet arrives a second after the first.
+            // Blue attacks twice from two planets; the second fleet arrives after the first battle is over.
+            Match match = Custom(Idle(0, Faction.Blue, 4), Idle(-10, Faction.Blue, 7), Idle(10, Faction.Red, 30));
+
+            match.TryLaunch(Faction.Blue, 0, 2); // 5 s
+            match.TryLaunch(Faction.Blue, 1, 2); // 10 s
+            match.Advance(5);
+            FinishBattles(match);
+            AssertTotals(match, Faction.Blue, 4, 4);
+            AssertTotals(match, Faction.Red, 4, 4);
+
+            match.Advance(10 - match.Elapsed - 0.5); // nothing happens between the battles
+            AssertTotals(match, Faction.Blue, 4, 4);
+
+            match.Advance(0.5);
+            FinishBattles(match);
+            Assert.AreEqual(19, match.Nodes[2].Darts);
+            AssertTotals(match, Faction.Blue, 11, 11);
+            AssertTotals(match, Faction.Red, 11, 11);
+        }
+
+        [Test]
+        public void A_reinforced_battle_counts_every_casualty_of_both_fleets_once()
+        {
+            // The second Blue fleet joins a battle the first one is losing.
             Match match = Custom(Idle(0, Faction.Blue, 4), Idle(-2, Faction.Blue, 7), Idle(10, Faction.Red, 30));
 
             match.TryLaunch(Faction.Blue, 0, 2); // 5 s
             match.TryLaunch(Faction.Blue, 1, 2); // 6 s
-            match.Advance(5);
-            AssertTotals(match, Faction.Blue, 4, 4);
-            AssertTotals(match, Faction.Red, 4, 4);
+            match.Advance(6);
+            Assert.AreEqual(1, match.Battles.Count, "the first fleet is still fighting when the second arrives");
 
-            match.Advance(0.5); // nothing happens between the battles
-            AssertTotals(match, Faction.Blue, 4, 4);
-
-            match.Advance(0.5);
-            Assert.AreEqual(19, match.Nodes[2].Ships);
+            FinishBattles(match);
+            Assert.AreEqual(19, match.Nodes[2].Darts);
             AssertTotals(match, Faction.Blue, 11, 11);
             AssertTotals(match, Faction.Red, 11, 11);
         }
@@ -124,13 +194,14 @@ namespace Squadra.Tests
         [Test]
         public void Each_player_only_counts_the_battles_it_fought()
         {
-            // Blue meets Red (5 ships) and then Green (3 ships); Red and Green never meet each other.
+            // Blue meets Red (5 Darts) and then Green (3 Darts); Red and Green never meet each other.
             Match match = Custom(Idle(0, Faction.Blue, 20), Idle(4, Faction.Red, 5), Idle(-10, Faction.Blue, 9),
                 IdleMoon(-14, Faction.Green, 3));
 
             match.TryLaunch(Faction.Blue, 0, 1); // 2 s: 20 against Red's 5
             match.TryLaunch(Faction.Blue, 2, 3); // 2 s: 9 against Green's 3
             match.Advance(2);
+            FinishBattles(match);
 
             AssertTotals(match, Faction.Blue, 8, 8);
             AssertTotals(match, Faction.Red, 5, 5);
@@ -147,10 +218,11 @@ namespace Squadra.Tests
             match.TryLaunch(Faction.Blue, 0, 1); // lands unopposed at t=1 and starts capturing
             match.TryLaunch(Faction.Red, 2, 1);  // arrives at t=3
             match.Advance(3);
+            FinishBattles(match);
 
             Assert.AreEqual(Faction.Green, match.Nodes[1].Owner, "the capture is still running");
             Assert.AreEqual(Faction.Blue, match.Nodes[1].Captor);
-            Assert.AreEqual(6, match.Nodes[1].Ships);
+            Assert.AreEqual(6, match.Nodes[1].Darts);
             AssertTotals(match, Faction.Blue, 4, 4);
             AssertTotals(match, Faction.Red, 4, 4);
             AssertTotals(match, Faction.Green, 0, 0);
@@ -165,6 +237,7 @@ namespace Squadra.Tests
             match.TryLaunch(Faction.Blue, 0, 1); // t=1: 5 against 1
             match.TryLaunch(Faction.Red, 2, 1);  // t=3: 9 against the 4 captors
             match.Advance(3);
+            FinishBattles(match);
 
             Assert.AreEqual(Faction.Red, match.Nodes[1].Owner);
             Assert.IsFalse(match.Nodes[1].IsBeingCaptured);
@@ -184,9 +257,9 @@ namespace Squadra.Tests
             match.Advance(10);
             Assert.AreEqual(Faction.Blue, match.Nodes[2].Owner);
 
-            match.TryLaunch(Faction.Blue, 0, 2); // the planet's new ships join the moon's fleet
+            match.TryLaunch(Faction.Blue, 0, 2); // the planet's new Darts join the moon's fleet
             match.Advance(2);
-            Assert.Greater(match.Nodes[2].Ships, 30);
+            Assert.Greater(match.Nodes[2].Darts, 30);
 
             AssertTotals(match, Faction.Blue, 0, 0);
             AssertTotals(match, Faction.Red, 0, 0);
@@ -201,8 +274,9 @@ namespace Squadra.Tests
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(2);
+            FinishBattles(match);
 
-            Assert.AreEqual(3, match.Nodes[1].Ships);
+            Assert.AreEqual(3, match.Nodes[1].Darts);
             Assert.AreEqual(Faction.Blue, match.Nodes[1].Captor);
             AssertTotals(match, Faction.Blue, 5, 5);
             AssertTotals(match, Faction.Red, 0, 0);
@@ -210,15 +284,16 @@ namespace Squadra.Tests
         }
 
         [Test]
-        public void Ships_lost_to_neutral_guards_are_credited_to_no_player()
+        public void Darts_lost_to_neutral_guards_are_credited_to_no_player()
         {
             Match match = Custom(Idle(0, Faction.Blue, 3), Idle(-4, Faction.Blue, 1), IdleMoon(4, Faction.Neutral, 5),
                 Idle(100, Faction.Red, 1));
 
             match.TryLaunch(Faction.Blue, 0, 2);
             match.Advance(2);
+            FinishBattles(match);
 
-            Assert.AreEqual(2, match.Nodes[2].Ships, "two guards are left");
+            Assert.AreEqual(2, match.Nodes[2].Darts, "two guards are left");
             Assert.AreEqual(Faction.Neutral, match.Nodes[2].Owner);
             AssertTotals(match, Faction.Blue, 3, 3);
             AssertTotals(match, Faction.Red, 0, 0);
@@ -309,7 +384,7 @@ namespace Squadra.Tests
             Match match = Custom(Idle(0, Faction.Blue, 50), Idle(10, Faction.Red, 20));
 
             match.TryLaunch(Faction.Blue, 0, 1);
-            match.Advance(10);
+            match.Advance(15);
 
             MatchResults results = match.Results;
             Assert.AreEqual(MatchStatus.BlueVictory, results.Outcome);
@@ -341,9 +416,10 @@ namespace Squadra.Tests
             config.Nodes.Add(IdleMoon(50, Faction.Orange, 0)); // 5
             var match = new Match(config);
 
-            match.TryLaunch(Faction.Yellow, 3, 2); // t=2: 6 against Green's 2, captured at t=7
-            match.TryLaunch(Faction.Blue, 0, 1);   // t=5: 20 against Red's 4, captured at t=10
-            match.Advance(9.9);
+            match.TryLaunch(Faction.Yellow, 3, 2); // t=2: 6 against Green's 2, captured five seconds after the battle
+            match.TryLaunch(Faction.Blue, 0, 1);   // t=5: 20 against Red's 4, captured five seconds after the battle
+            double victory = 5 + BattleSeconds(20, 4) + 5;
+            match.Advance(victory - 0.1);
             Assert.AreEqual(MatchStatus.InProgress, match.Status);
             Assert.IsFalse(match.IsAlive(Faction.Green), "Green has lost everything");
 
@@ -366,7 +442,7 @@ namespace Squadra.Tests
                 Assert.AreEqual(i == 0, results.Players[i].IsHuman, results.Players[i].Name);
 
             Assert.IsTrue(results.TryGet(Faction.Green, out PlayerResult green), "an eliminated player keeps its row");
-            Assert.AreEqual(2, green.ShipsLost);
+            Assert.AreEqual(2, green.DartsLost);
         }
 
         // ------------------------------------------------------------ the final snapshot
@@ -374,8 +450,8 @@ namespace Squadra.Tests
         [Test]
         public void A_battle_that_wins_the_match_is_in_the_results_exactly_once()
         {
-            // Blue holds every planet from t=7, but a Red fleet is still flying. It dies at Blue's far
-            // planet at t=17, and that battle ends the match.
+            // Blue holds every planet from t=7, but a Red fleet is still flying. It reaches Blue's far
+            // planet at t=17 and dies there, and the end of that battle ends the match.
             Match match = Custom(Idle(0, Faction.Blue, 10), Idle(4, Faction.Red, 6), Idle(-30, Faction.Blue, 8));
 
             match.TryLaunch(Faction.Red, 1, 2);  // 17 s
@@ -386,10 +462,21 @@ namespace Squadra.Tests
             Assert.IsNull(match.Results);
 
             match.Advance(0.1);
+            Assert.IsFalse(match.HasFleetInTransit(Faction.Red));
+            Assert.IsTrue(match.Nodes[2].IsContested);
+            Assert.AreEqual(MatchStatus.InProgress, match.Status, "Red's fleet has arrived but is not beaten yet");
+            Assert.IsNull(match.Results);
+
+            double battle = BattleSeconds(6, 8);
+            match.Advance(battle - 0.05);
+            Assert.AreEqual(MatchStatus.InProgress, match.Status);
+            AssertTotals(match, Faction.Blue, 5, 5);
+
+            match.Advance(0.05);
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
             AssertRow(match.Results.Players[0], Faction.Blue, 6, 6);
             AssertRow(match.Results.Players[1], Faction.Red, 6, 6);
-            Assert.AreEqual(17.0, match.Results.Duration, 1e-6);
+            Assert.AreEqual(17.0 + battle, match.Results.Duration, 1e-6);
         }
 
         [Test]
@@ -403,12 +490,21 @@ namespace Squadra.Tests
             match.Advance(14.9);
             Assert.AreEqual(MatchStatus.InProgress, match.Status);
 
-            match.Advance(0.1);
+            // The fleet is Blue's last force. Fighting, it is no longer in transit, but Blue is not beaten.
+            double battle = BattleSeconds(5, 9);
+            match.Advance(0.1 + battle - 0.05);
+            Assert.IsFalse(match.HasFleetInTransit(Faction.Blue));
+            Assert.IsTrue(match.IsEngaged(Faction.Blue));
+            Assert.IsTrue(match.IsAlive(Faction.Blue));
+            Assert.AreEqual(1, match.TotalDarts(Faction.Blue));
+            Assert.AreEqual(MatchStatus.InProgress, match.Status);
+
+            match.Advance(0.05);
             Assert.AreEqual(MatchStatus.BlueDefeat, match.Status);
             Assert.IsFalse(match.Results.IsVictory);
             AssertRow(match.Results.Players[0], Faction.Blue, 5, 5);
             AssertRow(match.Results.Players[1], Faction.Red, 5, 5);
-            Assert.AreEqual(15.0, match.Results.Duration, 1e-6);
+            Assert.AreEqual(15.0 + battle, match.Results.Duration, 1e-6);
         }
 
         [Test]
@@ -417,7 +513,7 @@ namespace Squadra.Tests
             Match match = Custom(NodeConfig.Planet("Planet", new MapPoint(0, 0), Faction.Blue, 50),
                 Idle(10, Faction.Red, 20));
             match.TryLaunch(Faction.Blue, 0, 1);
-            match.Advance(10);
+            match.Advance(15);
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
 
             MatchResults results = match.Results;
@@ -444,11 +540,11 @@ namespace Squadra.Tests
             match.StatusChanged += _ => announced = match.Results;
 
             match.TryLaunch(Faction.Blue, 0, 1);
-            match.Advance(10);
+            match.Advance(15);
 
             Assert.IsNotNull(announced);
-            Assert.AreEqual(20, announced.Players[0].ShipsDestroyed);
-            Assert.AreEqual(10.0, announced.Duration, 1e-6);
+            Assert.AreEqual(20, announced.Players[0].DartsDestroyed);
+            Assert.AreEqual(5 + BattleSeconds(50, 20) + 5, announced.Duration, 1e-6);
         }
 
         // ------------------------------------------------------------ duration
@@ -465,9 +561,9 @@ namespace Squadra.Tests
             match.Advance(-5);
             Assert.AreEqual(3.0, match.Elapsed, 1e-9);
 
-            match.Advance(7); // arrival at t=5, captured at t=10
+            match.Advance(12); // arrival at t=5, the battle, then five seconds of capture
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
-            Assert.AreEqual(10.0, match.Results.Duration, 1e-6);
+            Assert.AreEqual(5 + BattleSeconds(50, 20) + 5, match.Results.Duration, 1e-6);
         }
 
         [Test]
@@ -478,8 +574,8 @@ namespace Squadra.Tests
 
             match.Advance(500);
 
-            Assert.AreEqual(10.0, match.Results.Duration, 1e-6);
-            Assert.AreEqual("00:10", MatchClock.Format(match.Results.Duration));
+            Assert.AreEqual(5 + BattleSeconds(50, 20) + 5, match.Results.Duration, 1e-6);
+            Assert.AreEqual("00:12", MatchClock.Format(match.Results.Duration));
         }
 
         [Test]
@@ -499,13 +595,14 @@ namespace Squadra.Tests
         [Test]
         public void Mission_time_shows_whole_seconds_after_many_small_frame_steps()
         {
-            Match match = Custom(Idle(0, Faction.Blue, 50), Idle(10, Faction.Red, 20));
+            // Ten to one: five seconds of travel, one of battle and five of capture.
+            Match match = Custom(Idle(0, Faction.Blue, 50), Idle(10, Faction.Red, 5));
             match.TryLaunch(Faction.Blue, 0, 1);
 
             for (int i = 0; i < 1200; i++) match.Advance(1f / 60f);
 
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
-            Assert.AreEqual("00:10", MatchClock.Format(match.Results.Duration));
+            Assert.AreEqual("00:11", MatchClock.Format(match.Results.Duration));
         }
     }
 }

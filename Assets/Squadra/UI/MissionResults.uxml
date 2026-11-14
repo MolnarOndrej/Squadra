@@ -17,8 +17,8 @@
             <ui:VisualElement class="results__table">
                 <ui:VisualElement class="results__row results__row--header">
                     <ui:Label text="PLAYER" class="results__cell results__cell--player" />
-                    <ui:Label text="SHIPS DESTROYED" class="results__cell results__cell--number" />
-                    <ui:Label text="SHIPS LOST" class="results__cell results__cell--number" />
+                    <ui:Label text="DARTS DESTROYED" class="results__cell results__cell--number" />
+                    <ui:Label text="DARTS LOST" class="results__cell results__cell--number" />
                 </ui:VisualElement>
                 <ui:VisualElement name="resultsRows" />
             </ui:VisualElement>

@@ -48,7 +48,7 @@ namespace Squadra.EditorTools
 
         /// <summary>
         /// A fleet settling into orbit: the engine hum winding down, then a recorded force-field pulse as
-        /// the ships take up station.
+        /// the Darts take up station.
         /// </summary>
         public static float[][] Arrival(int take, Recording engine, Recording pulse)
         {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Squadra.Simulation;
@@ -32,16 +33,16 @@ namespace Squadra.Tests
             return new Match(config);
         }
 
-        static NodeConfig Planet(float x, Faction owner, int ships) =>
-            NodeConfig.Planet("Planet", new MapPoint(x, 0), owner, ships);
+        static NodeConfig Planet(float x, Faction owner, int darts) =>
+            NodeConfig.Planet("Planet", new MapPoint(x, 0), owner, darts);
 
-        static NodeConfig MoonAt(float x, Faction owner = Faction.Neutral, int ships = 0) =>
-            NodeConfig.Moon("Moon", new MapPoint(x, 0), owner, ships);
+        static NodeConfig MoonAt(float x, Faction owner = Faction.Neutral, int darts = 0) =>
+            NodeConfig.Moon("Moon", new MapPoint(x, 0), owner, darts);
 
         /// <summary>A planet that never produces, so battles can be set up with exact counts.</summary>
-        static NodeConfig Idle(float x, Faction owner, int ships)
+        static NodeConfig Idle(float x, Faction owner, int darts)
         {
-            NodeConfig node = Planet(x, owner, ships);
+            NodeConfig node = Planet(x, owner, darts);
             node.ProductionInterval = 0;
             return node;
         }
@@ -49,37 +50,37 @@ namespace Squadra.Tests
         // ------------------------------------------------------------ initial state and production
 
         [Test]
-        public void Initial_map_has_two_planets_with_30_ships_and_an_empty_neutral_moon()
+        public void Initial_map_has_two_planets_with_30_Darts_and_an_empty_neutral_moon()
         {
             Match match = Standard();
 
             Assert.AreEqual(3, match.Nodes.Count);
             Assert.AreEqual(NodeKind.Planet, match.Nodes[Blue].Kind);
             Assert.AreEqual(Faction.Blue, match.Nodes[Blue].Owner);
-            Assert.AreEqual(30, match.Nodes[Blue].Ships);
+            Assert.AreEqual(30, match.Nodes[Blue].Darts);
             Assert.AreEqual(NodeKind.Planet, match.Nodes[Red].Kind);
             Assert.AreEqual(Faction.Red, match.Nodes[Red].Owner);
-            Assert.AreEqual(30, match.Nodes[Red].Ships);
+            Assert.AreEqual(30, match.Nodes[Red].Darts);
             Assert.AreEqual(NodeKind.Moon, match.Nodes[Moon].Kind);
             Assert.AreEqual(Faction.Neutral, match.Nodes[Moon].Owner);
-            Assert.AreEqual(0, match.Nodes[Moon].Ships);
+            Assert.AreEqual(0, match.Nodes[Moon].Darts);
             Assert.AreEqual(0, match.Fleets.Count);
             Assert.AreEqual(MatchStatus.InProgress, match.Status);
         }
 
         [Test]
-        public void Owned_planet_produces_one_whole_ship_each_second()
+        public void Owned_planet_produces_one_whole_Dart_each_second()
         {
             Match match = Standard();
 
             match.Advance(0.99);
-            Assert.AreEqual(30, match.Nodes[Blue].Ships);
+            Assert.AreEqual(30, match.Nodes[Blue].Darts);
 
             match.Advance(0.01);
-            Assert.AreEqual(31, match.Nodes[Blue].Ships);
+            Assert.AreEqual(31, match.Nodes[Blue].Darts);
 
             match.Advance(2.5);
-            Assert.AreEqual(33, match.Nodes[Blue].Ships);
+            Assert.AreEqual(33, match.Nodes[Blue].Darts);
         }
 
         [Test]
@@ -89,23 +90,23 @@ namespace Squadra.Tests
 
             for (int i = 0; i < 600; i++) match.Advance(1f / 60f);
 
-            Assert.AreEqual(40, match.Nodes[Blue].Ships);
-            Assert.AreEqual(40, match.Nodes[Red].Ships);
+            Assert.AreEqual(40, match.Nodes[Blue].Darts);
+            Assert.AreEqual(40, match.Nodes[Red].Darts);
         }
 
         [Test]
-        public void Owned_moon_produces_one_ship_every_two_seconds()
+        public void Owned_moon_produces_one_Dart_every_two_seconds()
         {
             Match match = Custom(Planet(0, Faction.Blue, 30), Planet(10, Faction.Red, 30), MoonAt(4, Faction.Blue));
 
             match.Advance(1.9);
-            Assert.AreEqual(0, match.Nodes[Moon].Ships);
+            Assert.AreEqual(0, match.Nodes[Moon].Darts);
 
             match.Advance(0.1);
-            Assert.AreEqual(1, match.Nodes[Moon].Ships);
+            Assert.AreEqual(1, match.Nodes[Moon].Darts);
 
             match.Advance(4);
-            Assert.AreEqual(3, match.Nodes[Moon].Ships);
+            Assert.AreEqual(3, match.Nodes[Moon].Darts);
         }
 
         [Test]
@@ -115,7 +116,7 @@ namespace Squadra.Tests
 
             match.Advance(20);
 
-            Assert.AreEqual(0, match.Nodes[Moon].Ships);
+            Assert.AreEqual(0, match.Nodes[Moon].Darts);
             Assert.AreEqual(Faction.Neutral, match.Nodes[Moon].Owner);
         }
 
@@ -127,11 +128,11 @@ namespace Squadra.Tests
             Match match = Custom(fast, Planet(10, Faction.Red, 30));
 
             match.Advance(2);
-            Assert.AreEqual(4, match.Nodes[0].Ships);
+            Assert.AreEqual(4, match.Nodes[0].Darts);
 
             match.Nodes[0].ProductionInterval = 0.25; // an upgrade mid-match
             match.Advance(1);
-            Assert.AreEqual(8, match.Nodes[0].Ships);
+            Assert.AreEqual(8, match.Nodes[0].Darts);
         }
 
         [Test]
@@ -143,25 +144,25 @@ namespace Squadra.Tests
 
             Assert.AreEqual(0, match.Fleets.Count);
             Assert.AreEqual(Faction.Red, match.Nodes[Red].Owner);
-            Assert.AreEqual(75, match.Nodes[Red].Ships);
+            Assert.AreEqual(75, match.Nodes[Red].Darts);
             Assert.AreEqual(Faction.Neutral, match.Nodes[Moon].Owner);
         }
 
         // ------------------------------------------------------------ orders and transit
 
         [Test]
-        public void Launch_sends_every_stationed_ship_and_the_source_stays_owned()
+        public void Launch_sends_every_stationed_Dart_and_the_source_stays_owned()
         {
             Match match = Standard();
-            match.Advance(3); // 33 ships
+            match.Advance(3); // 33 Darts
 
             Assert.IsTrue(match.TryLaunch(Faction.Blue, Blue, Moon, out Fleet fleet));
 
-            Assert.AreEqual(33, fleet.Ships);
+            Assert.AreEqual(33, fleet.Darts);
             Assert.AreEqual(Faction.Blue, fleet.Faction);
             Assert.AreEqual(Blue, fleet.SourceId);
             Assert.AreEqual(Moon, fleet.TargetId);
-            Assert.AreEqual(0, match.Nodes[Blue].Ships);
+            Assert.AreEqual(0, match.Nodes[Blue].Darts);
             Assert.AreEqual(Faction.Blue, match.Nodes[Blue].Owner);
             Assert.AreEqual(1, match.Fleets.Count);
         }
@@ -175,7 +176,7 @@ namespace Squadra.Tests
             match.Advance(1.5);
 
             Assert.AreEqual(Faction.Blue, match.Nodes[Blue].Owner);
-            Assert.AreEqual(1, match.Nodes[Blue].Ships);
+            Assert.AreEqual(1, match.Nodes[Blue].Darts);
         }
 
         [Test]
@@ -219,16 +220,17 @@ namespace Squadra.Tests
         public void Friendly_arrival_merges_with_the_stationed_fleet()
         {
             Match match = Custom(Idle(0, Faction.Blue, 12), Idle(4, Faction.Blue, 7), Idle(10, Faction.Red, 30));
-            var reports = Capture(match);
+            var reports = Arrivals(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(2);
 
-            Assert.AreEqual(19, match.Nodes[1].Ships);
+            Assert.AreEqual(19, match.Nodes[1].Darts);
             Assert.AreEqual(Faction.Blue, match.Nodes[1].Owner);
             Assert.IsFalse(match.Nodes[1].IsBeingCaptured);
             Assert.AreEqual(ArrivalOutcome.Merged, reports[0].Outcome);
-            Assert.IsFalse(reports[0].WasBattle);
+            Assert.IsFalse(reports[0].EnteredBattle);
+            Assert.IsFalse(match.Nodes[1].IsContested);
         }
 
         [Test]
@@ -241,8 +243,8 @@ namespace Squadra.Tests
             match.Advance(4.9);
 
             Assert.AreEqual(2, match.Fleets.Count);
-            Assert.AreEqual(10, match.Fleets[0].Ships);
-            Assert.AreEqual(10, match.Fleets[1].Ships);
+            Assert.AreEqual(10, match.Fleets[0].Darts);
+            Assert.AreEqual(10, match.Fleets[1].Darts);
         }
 
         // ------------------------------------------------------------ combat
@@ -251,67 +253,77 @@ namespace Squadra.Tests
         public void Thirty_attacking_twenty_leaves_ten_attackers_who_begin_capture()
         {
             Match match = Custom(Idle(0, Faction.Blue, 30), Idle(10, Faction.Red, 20));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            FinishBattles(match);
 
             Node target = match.Nodes[1];
-            Assert.AreEqual(10, target.Ships);
+            Assert.AreEqual(10, target.Darts);
             Assert.AreEqual(Faction.Blue, target.Captor);
             Assert.AreEqual(Faction.Blue, target.Occupant);
             Assert.AreEqual(Faction.Red, target.Owner, "ownership waits for the capture to finish");
-            Assert.AreEqual(ArrivalOutcome.AttackWon, reports[0].Outcome);
+            Assert.AreEqual(BattleOutcome.AttackWon, reports[0].Outcome);
             Assert.AreEqual(20, reports[0].LossesPerSide);
-            Assert.AreEqual(10, reports[0].ShipsAfter);
+            Assert.AreEqual(10, reports[0].Survivors);
         }
 
         [Test]
         public void Twenty_attacking_thirty_leaves_ten_defenders_in_control()
         {
             Match match = Custom(Idle(0, Faction.Blue, 20), Idle(10, Faction.Red, 30));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            FinishBattles(match);
 
             Node target = match.Nodes[1];
-            Assert.AreEqual(10, target.Ships);
+            Assert.AreEqual(10, target.Darts);
             Assert.AreEqual(Faction.Red, target.Owner);
             Assert.IsFalse(target.IsBeingCaptured);
-            Assert.AreEqual(ArrivalOutcome.Repelled, reports[0].Outcome);
+            Assert.AreEqual(BattleOutcome.Repelled, reports[0].Outcome);
         }
 
         [Test]
-        public void A_tie_leaves_the_incumbent_owner_with_zero_ships()
+        public void A_tie_leaves_the_incumbent_owner_with_zero_Darts()
         {
             Match match = Custom(Idle(0, Faction.Blue, 20), Idle(10, Faction.Red, 20));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            FinishBattles(match);
 
             Node target = match.Nodes[1];
-            Assert.AreEqual(0, target.Ships);
+            Assert.AreEqual(0, target.Darts);
             Assert.AreEqual(Faction.Red, target.Owner);
             Assert.IsFalse(target.IsBeingCaptured);
-            Assert.AreEqual(ArrivalOutcome.Tie, reports[0].Outcome);
+            Assert.AreEqual(BattleOutcome.Tie, reports[0].Outcome);
         }
 
         [Test]
-        public void Attack_on_an_empty_owned_object_wins_with_the_full_fleet()
+        public void Attack_on_an_empty_owned_object_lands_the_full_fleet_without_a_battle()
         {
             Match match = Custom(Idle(0, Faction.Blue, 9), Idle(10, Faction.Red, 0));
-            var reports = Capture(match);
+            var arrivals = Arrivals(match);
+            var battles = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
 
             Node target = match.Nodes[1];
-            Assert.AreEqual(9, target.Ships);
+            Assert.AreEqual(9, target.Darts);
             Assert.AreEqual(Faction.Blue, target.Captor);
             Assert.AreEqual(Faction.Red, target.Owner);
-            Assert.AreEqual(0, reports[0].LossesPerSide);
+            Assert.IsFalse(target.IsContested, "there is nobody to fight, so nothing delays the capture");
+            Assert.AreEqual(0.0, target.CaptureElapsed, 1e-9);
+            Assert.AreEqual(ArrivalOutcome.Landed, arrivals[0].Outcome);
+            Assert.AreEqual(0, battles.Count);
+
+            match.Advance(5);
+            Assert.AreEqual(Faction.Blue, target.Owner);
         }
 
         [Test]
@@ -319,13 +331,16 @@ namespace Squadra.Tests
         {
             Match match = Standard();
 
-            // 30 ships leave at t=0 and arrive at t=5, when Red has grown to 35.
+            // 30 Darts leave at t=0 and arrive at t=5, when Red has grown to 35.
             match.TryLaunch(Faction.Blue, Blue, Red);
             match.Advance(5);
+            Assert.AreEqual(35, match.Nodes[Red].Battle.StationedDarts);
+
+            FinishBattles(match);
 
             Assert.AreEqual(Faction.Red, match.Nodes[Red].Owner);
             Assert.IsFalse(match.Nodes[Red].IsBeingCaptured);
-            Assert.AreEqual(5, match.Nodes[Red].Ships);
+            Assert.AreEqual(5, match.Nodes[Red].Darts);
         }
 
         [Test]
@@ -336,6 +351,7 @@ namespace Squadra.Tests
             match.Advance(60);
             match.TryLaunch(Faction.Blue, Blue, Red);
             match.Advance(5);
+            FinishBattles(match);
 
             Assert.AreEqual(Faction.Red, match.Nodes[Red].Owner);
             Assert.IsFalse(match.Nodes[Red].IsBeingCaptured);
@@ -344,18 +360,19 @@ namespace Squadra.Tests
         // ------------------------------------------------------------ capture
 
         [Test]
-        public void Neutral_landing_costs_zero_ships_and_starts_a_five_second_capture()
+        public void Neutral_landing_costs_zero_Darts_and_starts_a_five_second_capture()
         {
             Match match = Standard();
-            var reports = Capture(match);
+            var reports = Arrivals(match);
 
             match.TryLaunch(Faction.Blue, Blue, Moon);
             match.Advance(2);
 
             Node moon = match.Nodes[Moon];
-            Assert.AreEqual(30, moon.Ships);
+            Assert.AreEqual(30, moon.Darts);
             Assert.AreEqual(Faction.Blue, moon.Captor);
             Assert.AreEqual(Faction.Neutral, moon.Owner);
+            Assert.IsFalse(moon.IsContested);
             Assert.AreEqual(0f, moon.CaptureProgress, 1e-5f);
             Assert.AreEqual(5.0, moon.CaptureRemaining, 1e-6);
             Assert.AreEqual(ArrivalOutcome.Landed, reports[0].Outcome);
@@ -370,7 +387,7 @@ namespace Squadra.Tests
             match.Advance(0.1);
             Assert.AreEqual(Faction.Blue, moon.Owner);
             Assert.IsFalse(moon.IsBeingCaptured);
-            Assert.AreEqual(30, moon.Ships);
+            Assert.AreEqual(30, moon.Darts);
         }
 
         [Test]
@@ -380,13 +397,13 @@ namespace Squadra.Tests
 
             match.TryLaunch(Faction.Blue, Blue, Moon);
             match.Advance(2 + 5); // landed at 2 s, captured at 7 s
-            Assert.AreEqual(30, match.Nodes[Moon].Ships, "nothing is produced during the countdown");
+            Assert.AreEqual(30, match.Nodes[Moon].Darts, "nothing is produced during the countdown");
 
             match.Advance(1.9);
-            Assert.AreEqual(30, match.Nodes[Moon].Ships);
+            Assert.AreEqual(30, match.Nodes[Moon].Darts);
 
             match.Advance(0.1);
-            Assert.AreEqual(31, match.Nodes[Moon].Ships);
+            Assert.AreEqual(31, match.Nodes[Moon].Darts);
         }
 
         [Test]
@@ -396,32 +413,33 @@ namespace Squadra.Tests
             Match match = Custom(Idle(0, Faction.Blue, 40), Planet(10, Faction.Red, 0), Idle(100, Faction.Red, 1));
 
             match.TryLaunch(Faction.Blue, 0, 1);
-            match.Advance(5); // Red made 5 ships; 35 Blue survivors begin capture
-            Assert.AreEqual(35, match.Nodes[1].Ships);
+            match.Advance(5); // Red made 5 Darts
+            FinishBattles(match); // 35 Blue survivors begin capture
+            Assert.AreEqual(35, match.Nodes[1].Darts);
 
             match.Advance(4.9);
-            Assert.AreEqual(35, match.Nodes[1].Ships);
+            Assert.AreEqual(35, match.Nodes[1].Darts);
             Assert.AreEqual(Faction.Red, match.Nodes[1].Owner);
 
             match.Advance(0.1);
             Assert.AreEqual(Faction.Blue, match.Nodes[1].Owner);
 
             match.Advance(1);
-            Assert.AreEqual(36, match.Nodes[1].Ships);
+            Assert.AreEqual(36, match.Nodes[1].Darts);
         }
 
         [Test]
         public void Allied_arrival_reinforces_a_capture_without_restarting_the_clock()
         {
             Match match = Custom(Idle(0, Faction.Blue, 10), Idle(2, Faction.Blue, 6), MoonAt(4), Idle(20, Faction.Red, 5));
-            var reports = Capture(match);
+            var reports = Arrivals(match);
 
             match.TryLaunch(Faction.Blue, 1, 2); // 1 s away, lands at t=1
             match.TryLaunch(Faction.Blue, 0, 2); // 2 s away, lands at t=2
             match.Advance(2);
 
             Node moon = match.Nodes[2];
-            Assert.AreEqual(16, moon.Ships);
+            Assert.AreEqual(16, moon.Darts);
             Assert.AreEqual(Faction.Blue, moon.Captor);
             Assert.AreEqual(1.0, moon.CaptureElapsed, 1e-6);
             Assert.AreEqual(ArrivalOutcome.ReinforcedCapture, reports[1].Outcome);
@@ -431,7 +449,7 @@ namespace Squadra.Tests
         }
 
         [Test]
-        public void Rival_arrival_during_capture_fights_at_once_and_a_winning_captor_keeps_its_clock()
+        public void Rival_arrival_during_capture_pauses_the_clock_and_a_winning_captor_resumes_it()
         {
             Match match = Custom(Idle(0, Faction.Blue, 10), MoonAt(2), Idle(8, Faction.Red, 4));
 
@@ -440,11 +458,25 @@ namespace Squadra.Tests
             match.Advance(3);
 
             Node moon = match.Nodes[1];
-            Assert.AreEqual(6, moon.Ships);
+            Assert.IsTrue(moon.IsContested);
+            Assert.AreEqual(Faction.Blue, moon.Battle.Stationed, "the capturing force is the stationed side");
+            Assert.AreEqual(Faction.Red, moon.Battle.Arriving);
+            Assert.AreEqual(2.0, moon.CaptureElapsed, 1e-6);
+
+            match.Advance(1); // fighting: the capture does not move
+            Assert.IsTrue(moon.IsContested);
+            Assert.AreEqual(Faction.Blue, moon.Captor);
+            Assert.AreEqual(2.0, moon.CaptureElapsed, 1e-6);
+            Assert.AreEqual(0.4f, moon.CaptureProgress, 1e-5f);
+
+            FinishBattles(match);
+            Assert.AreEqual(6, moon.Darts);
             Assert.AreEqual(Faction.Blue, moon.Captor);
             Assert.AreEqual(2.0, moon.CaptureElapsed, 1e-6);
 
-            match.Advance(3);
+            match.Advance(2.9);
+            Assert.AreEqual(Faction.Neutral, moon.Owner, "the three seconds that were left are still needed");
+            match.Advance(0.1);
             Assert.AreEqual(Faction.Blue, moon.Owner);
         }
 
@@ -452,18 +484,19 @@ namespace Squadra.Tests
         public void Rival_that_beats_the_captor_starts_its_own_five_second_capture()
         {
             Match match = Custom(Idle(0, Faction.Blue, 4), MoonAt(2), Idle(8, Faction.Red, 10));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1); // lands at t=1
             match.TryLaunch(Faction.Red, 2, 1);  // arrives at t=3
             match.Advance(3);
+            FinishBattles(match);
 
             Node moon = match.Nodes[1];
-            Assert.AreEqual(6, moon.Ships);
+            Assert.AreEqual(6, moon.Darts);
             Assert.AreEqual(Faction.Red, moon.Captor);
             Assert.AreEqual(Faction.Neutral, moon.Owner);
             Assert.AreEqual(0.0, moon.CaptureElapsed, 1e-6);
-            Assert.AreEqual(ArrivalOutcome.AttackWon, reports[1].Outcome);
+            Assert.AreEqual(BattleOutcome.AttackWon, reports[0].Outcome);
 
             match.Advance(4.9);
             Assert.AreEqual(Faction.Neutral, moon.Owner);
@@ -475,21 +508,22 @@ namespace Squadra.Tests
         public void Tie_during_a_neutral_capture_leaves_the_object_neutral()
         {
             Match match = Custom(Idle(0, Faction.Blue, 7), MoonAt(2), Idle(8, Faction.Red, 7));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.TryLaunch(Faction.Red, 2, 1);
             match.Advance(3);
+            FinishBattles(match);
 
             Node moon = match.Nodes[1];
-            Assert.AreEqual(0, moon.Ships);
+            Assert.AreEqual(0, moon.Darts);
             Assert.AreEqual(Faction.Neutral, moon.Owner);
             Assert.IsFalse(moon.IsBeingCaptured);
-            Assert.AreEqual(ArrivalOutcome.Tie, reports[1].Outcome);
+            Assert.AreEqual(BattleOutcome.Tie, reports[0].Outcome);
 
             match.Advance(10);
             Assert.AreEqual(Faction.Neutral, moon.Owner);
-            Assert.AreEqual(0, moon.Ships);
+            Assert.AreEqual(0, moon.Darts);
         }
 
         [Test]
@@ -497,20 +531,24 @@ namespace Squadra.Tests
         {
             // Red owns the middle planet (empty) and has a reserve further out.
             Match match = Custom(Idle(0, Faction.Blue, 5), Planet(2, Faction.Red, 0), Idle(8, Faction.Red, 9));
-            var reports = Capture(match);
+            var reports = Battles(match);
 
-            match.TryLaunch(Faction.Blue, 0, 1); // arrives t=1: Red made 1 ship, 4 Blue survivors capture
-            match.TryLaunch(Faction.Red, 2, 1);  // arrives t=3: 9 vs 4
+            match.TryLaunch(Faction.Blue, 0, 1); // arrives t=1: Red made 1 Dart, 4 Blue survivors capture
+            match.TryLaunch(Faction.Red, 2, 1);  // arrives t=3: 9 against the 4 captors
             match.Advance(3);
+            FinishBattles(match);
 
             Node planet = match.Nodes[1];
             Assert.AreEqual(Faction.Red, planet.Owner);
             Assert.IsFalse(planet.IsBeingCaptured);
-            Assert.AreEqual(5, planet.Ships);
-            Assert.AreEqual(ArrivalOutcome.ControlRestored, reports[1].Outcome);
+            Assert.AreEqual(5, planet.Darts);
+            Assert.AreEqual(BattleOutcome.AttackWon, reports[0].Outcome);
+            Assert.AreEqual(BattleOutcome.ControlRestored, reports[1].Outcome);
 
-            match.Advance(1);
-            Assert.AreEqual(6, planet.Ships, "production resumes for the incumbent");
+            match.Advance(0.9);
+            Assert.AreEqual(5, planet.Darts);
+            match.Advance(0.1);
+            Assert.AreEqual(6, planet.Darts, "production resumes for the incumbent, with no catching up");
         }
 
         [Test]
@@ -518,14 +556,18 @@ namespace Squadra.Tests
         {
             Match match = Custom(Idle(0, Faction.Blue, 5), Idle(2, Faction.Red, 0), Idle(8, Faction.Red, 5));
 
-            match.TryLaunch(Faction.Blue, 0, 1);
-            match.TryLaunch(Faction.Red, 2, 1);
-            match.Advance(3);
+            match.TryLaunch(Faction.Blue, 0, 1); // lands at t=1; the capture would complete at t=6
+            match.TryLaunch(Faction.Red, 2, 1);  // arrives at t=3; equal forces fight until t=8
+            match.Advance(7);
 
             Node planet = match.Nodes[1];
+            Assert.IsTrue(planet.IsContested);
+            Assert.AreEqual(Faction.Red, planet.Owner, "a capture cannot complete while its force is fighting");
+
+            FinishBattles(match);
             Assert.AreEqual(Faction.Red, planet.Owner);
             Assert.IsFalse(planet.IsBeingCaptured);
-            Assert.AreEqual(0, planet.Ships);
+            Assert.AreEqual(0, planet.Darts);
         }
 
         [Test]
@@ -550,6 +592,7 @@ namespace Squadra.Tests
 
             match.TryLaunch(Faction.Blue, 0, 1);
             match.Advance(5);
+            FinishBattles(match);
             Assert.AreEqual(MatchStatus.InProgress, match.Status, "capturing is not yet owning");
 
             match.Advance(4.9);
@@ -610,9 +653,10 @@ namespace Squadra.Tests
             // Blue's whole fleet dies attacking; Red then takes Blue's empty planet.
             Match match = Custom(Idle(0, Faction.Blue, 5), Idle(4, Faction.Red, 9), Idle(8, Faction.Red, 3));
 
-            match.TryLaunch(Faction.Blue, 0, 1); // destroyed at t=2
+            match.TryLaunch(Faction.Blue, 0, 1); // arrives at t=2 and is destroyed about three seconds later
             match.TryLaunch(Faction.Red, 2, 0);  // 4 s, captures the empty planet at t=9
             match.Advance(8.9);
+            Assert.AreEqual(0, match.Battles.Count);
             Assert.AreEqual(MatchStatus.InProgress, match.Status);
 
             match.Advance(0.2);
@@ -624,14 +668,14 @@ namespace Squadra.Tests
         {
             Match match = Custom(Planet(0, Faction.Blue, 50), Idle(10, Faction.Red, 20));
             match.TryLaunch(Faction.Blue, 0, 1);
-            match.Advance(10);
+            match.Advance(20);
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
 
-            int ships = match.Nodes[0].Ships;
+            int darts = match.Nodes[0].Darts;
             double elapsed = match.Elapsed;
             match.Advance(10);
 
-            Assert.AreEqual(ships, match.Nodes[0].Ships);
+            Assert.AreEqual(darts, match.Nodes[0].Darts);
             Assert.AreEqual(elapsed, match.Elapsed, 1e-9);
             Assert.IsFalse(match.TryLaunch(Faction.Blue, 0, 1));
         }
@@ -645,26 +689,50 @@ namespace Squadra.Tests
             match.Advance(30);
             Assert.AreEqual(Faction.Blue, match.Nodes[Moon].Owner);
 
-            match.TryLaunch(Faction.Blue, Blue, Moon); // merge the planet's 30 new ships at the moon
+            match.TryLaunch(Faction.Blue, Blue, Moon); // merge the planet's 30 new Darts at the moon
             match.Advance(2);
             // Moon: 30 landed + 12 produced (one every 2 s from t=9 to t=31) + 30 merged.
-            Assert.AreEqual(72, match.Nodes[Moon].Ships);
+            Assert.AreEqual(72, match.Nodes[Moon].Darts);
 
             match.TryLaunch(Faction.Blue, Moon, Red); // 3 s; Red has 30 + 35 = 65 on arrival
             match.Advance(3);
+            FinishBattles(match);
             Assert.AreEqual(Faction.Blue, match.Nodes[Red].Captor);
-            Assert.AreEqual(7, match.Nodes[Red].Ships);
+            Assert.AreEqual(7, match.Nodes[Red].Darts);
 
             match.Advance(5);
             Assert.AreEqual(Faction.Blue, match.Nodes[Red].Owner);
             Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
         }
 
-        static List<ArrivalReport> Capture(Match match)
+        static List<ArrivalReport> Arrivals(Match match)
         {
             var reports = new List<ArrivalReport>();
             match.FleetArrived += reports.Add;
             return reports;
+        }
+
+        static List<BattleReport> Battles(Match match)
+        {
+            var reports = new List<BattleReport>();
+            match.BattleEnded += reports.Add;
+            return reports;
+        }
+
+        /// <summary>
+        /// Advances to the moment the last battle under way ends, and no further. Battles take time, so
+        /// a test that is about what a battle leaves behind fights it out with this first.
+        /// </summary>
+        static void FinishBattles(Match match)
+        {
+            for (int guard = 0; match.Battles.Count > 0 && match.Status == MatchStatus.InProgress; guard++)
+            {
+                Assert.Less(guard, 1000, "the battles never ended");
+                double next = double.MaxValue;
+                foreach (Battle battle in match.Battles)
+                    next = Math.Min(next, battle.Remaining);
+                match.Advance(Math.Max(next, 1e-6));
+            }
         }
     }
 }

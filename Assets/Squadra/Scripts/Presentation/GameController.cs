@@ -11,7 +11,8 @@ namespace Squadra
 {
     /// <summary>
     /// Runs one match in the scene. Builds the <see cref="Match"/> from the worlds placed in the scene,
-    /// turns clicks into fleet orders for Blue, advances time and tells the views what to show. When
+    /// turns clicks into fleet orders for Blue, advances time and tells the views what to show: fleets
+    /// leaving and arriving, battles beginning, their casualties as they happen and how they end. When
     /// the match ends it hands the results to the results screen and carries out the action picked there.
     /// All game rules live in the match; nothing here decides an outcome. It also owns the pause: while
     /// paused the match gets no time and no orders, the scene's animation and effects stand still, and
@@ -34,6 +35,17 @@ namespace Squadra
         [Tooltip("Common fleet speed in world units per second.")]
         [SerializeField] float fleetSpeed = 2.4f;
         [SerializeField] float captureSeconds = 5f;
+
+        [Header("Battles")]
+        [Tooltip("Seconds a battle lasts when one side outnumbers the other by the decisive ratio or more.")]
+        [SerializeField] float shortestBattleSeconds = 1f;
+        [Tooltip("Seconds a battle between equal forces lasts.")]
+        [SerializeField] float longestBattleSeconds = 5f;
+        [Tooltip("How many times larger one side must be for the battle to be as short as it gets.")]
+        [SerializeField] float decisiveRatio = 10f;
+        [Tooltip("Battle length between the two ends: balance of the forces from 0 (decisive) to 1 (equal) "
+            + "along the bottom, 0 (shortest) to 1 (longest) up the side.")]
+        [SerializeField] AnimationCurve battleLengthCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
         [Header("Mission")]
         [Tooltip("Who takes part, two to six players. Results list the human player (Blue) first and "
@@ -101,6 +113,11 @@ namespace Squadra
         void Awake()
         {
             var config = new MatchConfig { FleetSpeed = fleetSpeed, CaptureDuration = captureSeconds, Human = Player };
+            config.BattleTiming.ShortestDuration = shortestBattleSeconds;
+            config.BattleTiming.LongestDuration = longestBattleSeconds;
+            config.BattleTiming.DecisiveFraction = 1.0 / Mathf.Max(1f, decisiveRatio);
+            if (battleLengthCurve != null && battleLengthCurve.length > 0)
+                config.BattleTiming.Curve = balance => battleLengthCurve.Evaluate((float)balance);
             foreach (RosterEntry entry in players)
                 config.Players.Add(new MatchPlayer(entry.faction, entry.displayName));
             foreach (WorldView world in worlds)
@@ -109,11 +126,14 @@ namespace Squadra
             match = new Match(config);
             match.FleetLaunched += OnFleetLaunched;
             match.FleetArrived += OnFleetArrived;
-            match.ShipProduced += OnShipProduced;
+            match.DartProduced += OnDartProduced;
             match.CaptureCompleted += OnCaptureCompleted;
+            match.BattleStarted += OnBattleStarted;
+            match.BattleCasualties += OnBattleCasualties;
+            match.BattleEnded += OnBattleEnded;
             match.StatusChanged += OnStatusChanged;
 
-            fleets.Bind(match, worlds, lineMaterial);
+            fleets.Bind(match, worlds, lineMaterial, sounds);
             BuildLanes();
         }
 
@@ -230,10 +250,11 @@ namespace Squadra
             return best;
         }
 
+        // Darts that are capturing or fighting are committed where they are.
         bool IsSelectable(int index)
         {
             Node node = match.Nodes[index];
-            return node.Owner == Player && !node.IsBeingCaptured;
+            return node.Owner == Player && !node.IsBeingCaptured && !node.IsContested;
         }
 
         /// <summary>
@@ -253,6 +274,8 @@ namespace Squadra
             if (selected < 0)
             {
                 if (IsSelectable(index)) selected = index;
+                else if (match.Nodes[index].Owner == Player && match.Nodes[index].IsContested)
+                    Notify("The Darts at " + worlds[index].DisplayName + " are fighting and cannot leave");
                 else Notify("Select one of your own worlds first");
                 return;
             }
@@ -273,7 +296,7 @@ namespace Squadra
             }
             else
             {
-                Notify("No ships stationed at " + worlds[selected].DisplayName + " yet");
+                Notify("No Darts stationed at " + worlds[selected].DisplayName + " yet");
             }
         }
 
@@ -289,9 +312,9 @@ namespace Squadra
 
             if (selected < 0) return "Click one of your worlds to select its fleet";
 
-            int ships = match.Nodes[selected].Ships;
-            if (ships == 0) return "No ships stationed here yet  -  click again to cancel";
-            return "Click a destination to send all " + ships + " ships  -  click "
+            int darts = match.Nodes[selected].Darts;
+            if (darts == 0) return "No Darts stationed here yet  -  click again to cancel";
+            return "Click a destination to send all " + darts + (darts == 1 ? " Dart" : " Darts") + "  -  click "
                 + worlds[selected].DisplayName + " again to cancel";
         }
 
@@ -431,7 +454,7 @@ namespace Squadra
             sounds.FleetDeparted(source.Position);
         }
 
-        void OnShipProduced(Node node)
+        void OnDartProduced(Node node)
         {
             worlds[node.Id].Punch(0.25f);
         }
@@ -466,70 +489,87 @@ namespace Squadra
 
         void OnFleetArrived(ArrivalReport report)
         {
-            fleets.EndTransit(report.FleetId);
+            // The fleet's dots stay on screen: they join whoever they have reached.
+            fleets.Arrive(report);
 
             WorldView world = worlds[report.NodeId];
             Color arriving = Palette.Of(report.Arriving);
             Vector2 above = world.Position + Vector2.up * (world.OrbitRadius + 0.3f);
             world.Punch(1f);
 
-            if (!report.WasBattle)
+            switch (report.Outcome)
             {
-                // Peaceful: reinforcements joining, or an unopposed landing.
-                effects.Shockwave(world.Position, arriving, world.OrbitRadius * 1.25f, world.OrbitRadius * 0.95f,
-                    0.45f, 1.5f);
-                bool landing = report.Outcome == ArrivalOutcome.Landed;
-                if (landing) fleets.Burst(world.Position, world.OrbitRadius, arriving, 12, 1.2f);
-                effects.FloatText(above, landing ? "LANDING" : "+" + report.ArrivingShips,
-                    Palette.Bright(arriving, 0.3f), landing ? 2.6f : 3.6f);
-                sounds.FleetArrived(world.Position);
-                return;
+                case ArrivalOutcome.BattleStarted:
+                    return; // announced by the battle itself
+
+                case ArrivalOutcome.BattleJoined:
+                    // Reinforcements: the battle carries on with more Darts on one side.
+                    effects.Shockwave(world.Position, arriving, world.OrbitRadius * 1.5f, world.OrbitRadius * 1.1f,
+                        0.4f, 1.6f);
+                    effects.FloatText(above, "+" + report.ArrivingDarts, Palette.Bright(arriving, 0.3f), 3.6f);
+                    sounds.FleetArrived(world.Position);
+                    return;
             }
 
-            // Battle: both sides lose the same number of ships in a flash of sparks.
-            Color stationed = Palette.Of(report.Stationed);
-            int sparks = Mathf.Clamp(report.LossesPerSide, 8, 40);
-            fleets.Burst(world.Position, world.OrbitRadius, arriving, sparks, 3.2f);
-            fleets.Burst(world.Position, world.OrbitRadius, stationed, sparks, 2.6f);
-            effects.Shockwave(world.Position, Palette.Starlight, world.OrbitRadius * 0.7f, world.OrbitRadius * 1.9f,
-                0.55f, 2.8f);
-            effects.Shockwave(world.Position, arriving, world.OrbitRadius * 0.9f, world.OrbitRadius * 1.5f,
-                0.75f, 2.2f);
-            world.Flash(0.6f);
-            rig.Shake(Mathf.Min(0.24f, 0.06f + report.LossesPerSide * 0.004f));
-
-            // Combat resolves in an instant, so the fight is heard as a short burst sized to the losses.
-            sounds.BattleStarted(world.Position);
-            sounds.Skirmish(world.Position, report.LossesPerSide,
-                Mathf.Lerp(0.8f, 1.5f, Mathf.Clamp01(report.LossesPerSide / 30f)));
-
-            effects.FloatText(above + Vector2.up * 0.42f, "-" + report.LossesPerSide, Palette.Text, 4.2f);
-            effects.FloatText(above, OutcomeTag(report.Outcome), Palette.Bright(OutcomeColor(report), 0.3f), 2.4f,
-                0.15f, 1.3f);
+            // Peaceful: a fleet joining its own side, or an unopposed landing.
+            effects.Shockwave(world.Position, arriving, world.OrbitRadius * 1.25f, world.OrbitRadius * 0.95f,
+                0.45f, 1.5f);
+            bool landing = report.Outcome == ArrivalOutcome.Landed;
+            if (landing) fleets.Burst(world.Position, world.OrbitRadius, arriving, 12, 1.2f);
+            effects.FloatText(above, landing ? "LANDING" : "+" + report.ArrivingDarts,
+                Palette.Bright(arriving, 0.3f), landing ? 2.6f : 3.6f);
+            sounds.FleetArrived(world.Position);
         }
 
-        static string OutcomeTag(ArrivalOutcome outcome)
+        // Nobody has lost a Dart yet. The fleet layer shows the fight from here on: shots, and an
+        // explosion for the casualties the match reports.
+        void OnBattleStarted(Battle battle)
+        {
+            WorldView world = worlds[battle.NodeId];
+            effects.Shockwave(world.Position, Palette.Starlight, world.OrbitRadius * 0.8f, world.OrbitRadius * 1.6f,
+                0.5f, 2.2f);
+            // One line higher than an arrival's text, which may still be on screen.
+            effects.FloatText(world.Position + Vector2.up * (world.OrbitRadius + 0.72f), "BATTLE",
+                Palette.Bright(Palette.Accent, 0.2f), 2.6f, 0f, 1.2f);
+            world.Flash(0.4f);
+            rig.Shake(0.07f);
+            sounds.BattleStarted(world.Position);
+        }
+
+        void OnBattleCasualties(Battle battle, int pairs)
+        {
+            fleets.BattleCasualties(battle, pairs);
+
+            WorldView world = worlds[battle.NodeId];
+            world.Punch(0.3f);
+            world.Flash(0.12f);
+            rig.Shake(0.015f);
+        }
+
+        void OnBattleEnded(BattleReport report)
+        {
+            fleets.BattleEnded(report);
+
+            WorldView world = worlds[report.NodeId];
+            Color winner = Palette.Of(report.Winner);
+            Vector2 above = world.Position + Vector2.up * (world.OrbitRadius + 0.3f);
+            effects.Shockwave(world.Position, winner, world.OrbitRadius * 0.9f, world.OrbitRadius * 1.7f, 0.7f, 2.4f);
+            world.Flash(0.6f);
+            world.Punch(1f);
+            rig.Shake(Mathf.Min(0.16f, 0.05f + report.LossesPerSide * 0.003f));
+
+            effects.FloatText(above + Vector2.up * 0.42f, "-" + report.LossesPerSide, Palette.Text, 4.2f);
+            effects.FloatText(above, OutcomeTag(report.Outcome), Palette.Bright(winner, 0.3f), 2.4f, 0.15f, 1.3f);
+        }
+
+        static string OutcomeTag(BattleOutcome outcome)
         {
             switch (outcome)
             {
-                case ArrivalOutcome.AttackWon: return "DEFENSES BROKEN";
-                case ArrivalOutcome.Repelled: return "ATTACK REPELLED";
-                case ArrivalOutcome.ControlRestored: return "CONTROL RESTORED";
+                case BattleOutcome.AttackWon: return "DEFENSES BROKEN";
+                case BattleOutcome.Repelled: return "ATTACK REPELLED";
+                case BattleOutcome.ControlRestored: return "CONTROL RESTORED";
                 default: return "MUTUAL DESTRUCTION";
-            }
-        }
-
-        static Color OutcomeColor(ArrivalReport report)
-        {
-            switch (report.Outcome)
-            {
-                case ArrivalOutcome.AttackWon:
-                case ArrivalOutcome.ControlRestored:
-                    return Palette.Of(report.Arriving);
-                case ArrivalOutcome.Repelled:
-                    return Palette.Of(report.Stationed);
-                default:
-                    return Palette.Neutral;
             }
         }
     }
