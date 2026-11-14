@@ -68,14 +68,14 @@ namespace Squadra
 
         public void SetStatus(Match match)
         {
-            int blue = match.TotalShips(Faction.Blue);
+            int blue = match.TotalDarts(Faction.Blue);
             if (blue != shownBlue && blueTally != null)
             {
                 shownBlue = blue;
                 blueTally.text = blue + "\n<size=34%><cspace=0.12em>BLUE FLEET</cspace></size>";
             }
 
-            int red = match.TotalShips(Faction.Red);
+            int red = match.TotalDarts(Faction.Red);
             if (red != shownRed && redTally != null)
             {
                 shownRed = red;

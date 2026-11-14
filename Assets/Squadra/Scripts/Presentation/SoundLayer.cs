@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Squadra
 {
@@ -53,10 +53,12 @@ namespace Squadra
 
     /// <summary>
     /// Plays the match's sound effects: fleets leaving and arriving, battles, captures and the result.
-    /// Sounds are panned by where they happen on the map. The game controller says what happened;
-    /// this layer picks the take and the timing. While the mission is paused every effect holds where
-    /// it is and no new one starts. An effect's level is its own gain, the fade after the match and
-    /// the Sound Effects setting, multiplied afresh every frame, so none of them hides another.
+    /// Sounds are panned by where they happen on the map. The scene says what happened and where;
+    /// this layer picks the take. The shots and explosions of a battle are played as they are shown,
+    /// and are dropped rather than piled up when most voices are already busy. While the mission is
+    /// paused every effect holds where it is and no new one starts. An effect's level is its own gain,
+    /// the fade after the match and the Sound Effects setting, multiplied afresh every frame, so none
+    /// of them hides another.
     /// </summary>
     public sealed class SoundLayer : MonoBehaviour
     {
@@ -66,6 +68,8 @@ namespace Squadra
         [Range(0f, 1f)] [SerializeField] float panWidth = 0.6f;
         [Tooltip("How many effects can sound at once before the oldest is cut off.")]
         [SerializeField] int voiceCount = 20;
+        [Tooltip("Voices the shots and explosions of battles leave free for everything else.")]
+        [SerializeField] int reservedVoices = 5;
 
         [Header("Fleets")]
         [SerializeField] SoundCue departure = new SoundCue(0.55f, 0.04f);
@@ -74,7 +78,8 @@ namespace Squadra
         [Header("Battle")]
         [SerializeField] SoundCue battleStart = new SoundCue(0.65f, 0.03f);
         [SerializeField] SoundCue shot = new SoundCue(0.3f, 0.1f);
-        [SerializeField] SoundCue shipDestroyed = new SoundCue(0.55f, 0.08f);
+        [FormerlySerializedAs("shipDestroyed")]
+        [SerializeField] SoundCue dartDestroyed = new SoundCue(0.55f, 0.08f);
 
         [Header("Worlds")]
         [SerializeField] SoundCue capture = new SoundCue(0.7f, 0f);
@@ -90,20 +95,10 @@ namespace Squadra
         const float MatchFadeSeconds = 0.1f;
         const float MatchFadeFloor = 0.004f;
 
-        struct Pending
-        {
-            public float At;
-            public SoundCue Cue;
-            public Vector2 Position;
-            public float Gain;
-        }
-
-        readonly List<Pending> pending = new List<Pending>();
         AudioSource[] voices;
         float[] voiceGains;
         AudioSource resultVoice;
         int nextVoice;
-        float clock;
         float resultIn = -1f;
         float matchFade = 1f;
         bool matchOver;
@@ -154,33 +149,13 @@ namespace Squadra
 
         public void BattleStarted(Vector2 position) => Play(battleStart, position);
 
-        public void Shot(Vector2 position) => Play(shot, position);
+        /// <summary>One shot of a battle, where it was fired. Skipped when the battles are already loud.</summary>
+        public void Shot(Vector2 position, float gain = 1f) => Play(shot, position, gain, true);
 
-        public void ShipDestroyed(Vector2 position) => Play(shipDestroyed, position);
+        /// <summary>One Dart destroyed in a battle, where it exploded. Skipped when the battles are already loud.</summary>
+        public void DartDestroyed(Vector2 position, float gain = 1f) => Play(dartDestroyed, position, gain, true);
 
         public void WorldCaptured(Vector2 position) => Play(capture, position);
-
-        /// <summary>
-        /// Fills <paramref name="duration"/> seconds with the weapon fire and explosions of a battle in
-        /// which each side lost <paramref name="shipsLost"/> ships. Bigger battles are denser.
-        /// </summary>
-        public void Skirmish(Vector2 position, int shipsLost, float duration)
-        {
-            float intensity = Mathf.Clamp01(shipsLost / 40f);
-            int shots = Mathf.Clamp(Mathf.RoundToInt(duration * Mathf.Lerp(5f, 10f, intensity)), 3, 60);
-            int kills = Mathf.Clamp(1 + shipsLost / 5, 1, Mathf.Max(2, Mathf.RoundToInt(duration * 4f)));
-
-            for (int i = 0; i < shots; i++)
-                Schedule(shot, Random.Range(0.08f, duration), Scatter(position), Random.Range(0.6f, 1f));
-
-            // Explosions start once the shooting is under way; the last one closes the battle.
-            for (int i = 0; i < kills; i++)
-            {
-                float spread = kills == 1 ? 0.6f : Mathf.Lerp(0.3f, 1f, i / (float)(kills - 1));
-                float at = Mathf.Max(0.05f, spread * duration + Random.Range(-0.06f, 0.06f));
-                Schedule(shipDestroyed, at, Scatter(position), Random.Range(0.7f, 1f));
-            }
-        }
 
         /// <summary>Fades out whatever is still sounding and plays the result over the ducked music.</summary>
         public void MatchEnded(bool won)
@@ -188,7 +163,6 @@ namespace Squadra
             if (matchOver) return;
 
             matchOver = true;
-            pending.Clear();
             MusicPlayer.Duck(true);
 
             AudioClip clip = won ? victory : defeat;
@@ -279,16 +253,6 @@ namespace Squadra
                 return;
             }
 
-            clock += Time.deltaTime;
-            for (int i = pending.Count - 1; i >= 0; i--)
-            {
-                Pending due = pending[i];
-                if (due.At > clock) continue;
-
-                pending.RemoveAt(i);
-                Play(due.Cue, due.Position, due.Gain);
-            }
-
             ApplyLevels();
         }
 
@@ -302,14 +266,11 @@ namespace Squadra
             resultVoice.volume = volume * resultVolume * sfx;
         }
 
-        void Schedule(SoundCue cue, float delay, Vector2 position, float gain)
-        {
-            pending.Add(new Pending { At = clock + delay, Cue = cue, Position = position, Gain = gain });
-        }
-
-        void Play(SoundCue cue, Vector2 position, float gain = 1f)
+        // Battle chatter never cuts another effect off: with few voices free it is simply not played.
+        void Play(SoundCue cue, Vector2 position, float gain = 1f, bool chatter = false)
         {
             if (matchOver || paused) return;
+            if (chatter && FreeVoices() <= Mathf.Max(0, reservedVoices)) return;
 
             AudioClip clip = cue.Next();
             if (clip == null) return;
@@ -321,6 +282,14 @@ namespace Squadra
             voice.pitch = 1f + Random.Range(-cue.PitchJitter, cue.PitchJitter);
             voice.panStereo = Pan(position);
             voice.Play();
+        }
+
+        int FreeVoices()
+        {
+            int free = 0;
+            foreach (AudioSource voice in voices)
+                if (!voice.isPlaying) free++;
+            return free;
         }
 
         // A silent voice if there is one; otherwise the next in line is cut off and reused.
@@ -346,11 +315,6 @@ namespace Squadra
 
             Rect view = rig.View;
             return Mathf.Clamp((position.x - view.center.x) / (view.width * 0.5f), -1f, 1f) * panWidth;
-        }
-
-        static Vector2 Scatter(Vector2 position)
-        {
-            return position + Random.insideUnitCircle * 0.8f;
         }
     }
 }

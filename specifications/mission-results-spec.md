@@ -1,5 +1,7 @@
 # Squadra mission results and campaign completion
 
+> **Superseded in part by [Darts and progressive fleet battles](dart-battle-spec.md).** The basic unit this document calls a ship is now a Dart, and the results labels are Darts destroyed and Darts lost. Combat is no longer resolved at once: casualties are counted pair by pair as a battle removes them, including the pair that ends the match. The accounting rules below are otherwise unchanged. The text below is kept as written.
+
 ## Problem Statement
 
 When a mission ends, I see Victory or Defeat over a faded battlefield, but I cannot review each player's combat results or choose where to go next. I want to see the mission duration, ships destroyed, and ships lost, then continue, retry, or return to the mission map. Finishing the campaign should feel like a conclusion and thank me for playing.

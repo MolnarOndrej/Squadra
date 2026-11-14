@@ -8,8 +8,8 @@ namespace Squadra.EditorTools
     /// <summary>
     /// Renders the sound effects described in <see cref="SoundRecipes"/> to WAV files and sets the import
     /// settings for them and for the music. Run it from <c>Squadra &gt; Rebuild Sound Effects</c>.
-    /// It overwrites the WAV files it generates and nothing else: the ship explosions are recordings kept
-    /// in the same folder as <c>ShipDestroyed_N.ogg</c>, and any take you add yourself is left alone.
+    /// It overwrites the WAV files it generates and nothing else: the Dart explosions are recordings kept
+    /// in the same folder as <c>DartDestroyed_N.ogg</c>, and any take you add yourself is left alone.
     /// The menu's cues land in the same folder; its music is rendered into <see cref="MenuMusicFolder"/>.
     /// </summary>
     public static class SquadraSoundBuilder
@@ -27,7 +27,7 @@ namespace Squadra.EditorTools
         public const string Arrival = "Arrival";
         public const string BattleStart = "BattleStart";
         public const string Shot = "Shot";
-        public const string ShipDestroyed = "ShipDestroyed";
+        public const string DartDestroyed = "DartDestroyed";
         public const string Capture = "Capture";
         public const string Victory = "Victory";
         public const string Defeat = "Defeat";

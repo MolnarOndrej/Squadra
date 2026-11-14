@@ -2,12 +2,15 @@ using System.Globalization;
 using Squadra.Simulation;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Squadra
 {
     /// <summary>
-    /// One planet or moon in the scene. Holds the object's starting rules (owner, ships, production rate)
-    /// and shows its live state: ownership ring and aura, selection outline, fleet count and capture progress.
+    /// One planet or moon in the scene. Holds the object's starting rules (owner, Darts, production rate)
+    /// and shows its live state: ownership ring and aura, selection outline, fleet count and capture
+    /// progress. While a battle is fought here it shows both sides' counts and that they are fighting,
+    /// and a capture that was running is shown held at the progress it had reached.
     /// </summary>
     [ExecuteAlways]
     public sealed class WorldView : MonoBehaviour
@@ -19,8 +22,9 @@ namespace Squadra
         [SerializeField] string displayName = "World";
         [SerializeField] NodeKind kind = NodeKind.Planet;
         [SerializeField] Faction startingOwner = Faction.Neutral;
-        [SerializeField] int startingShips;
-        [Tooltip("Seconds per produced ship while owned and outside capture.")]
+        [FormerlySerializedAs("startingShips")]
+        [SerializeField] int startingDarts;
+        [Tooltip("Seconds per produced Dart while owned and outside capture.")]
         [SerializeField] float productionInterval = 1f;
 
         [Header("Look")]
@@ -45,9 +49,31 @@ namespace Squadra
         float hoverAmount;
         float punch;
         float flash;
-        int shownShips = int.MinValue;
-        Faction shownCountFaction = (Faction)(-1);
-        int shownCaptionKey = int.MinValue;
+        long shownCountKey = long.MinValue;
+        long shownCaptionKey = long.MinValue;
+
+        /// <summary>What there is to show of one map object at one moment.</summary>
+        struct State
+        {
+            public Faction Owner;
+            public Faction Occupant;
+            public Faction Captor;
+            public int Darts;
+            public float CaptureProgress;
+            public float CaptureRemaining;
+            public float Interval;
+
+            /// <summary>True while a battle is fought here. <see cref="Darts"/> is then the stationed side's count.</summary>
+            public bool Fighting;
+            public Faction Arriving;
+            public int ArrivingDarts;
+        }
+
+        /// <summary>The Dart count as shown under the world. Both sides' counts during a battle.</summary>
+        public string CountText => countLabel != null ? countLabel.GetParsedText() : string.Empty;
+
+        /// <summary>The line under the count: production, a capture, or the battle.</summary>
+        public string CaptionText => captionLabel != null ? captionLabel.text : string.Empty;
 
         public string DisplayName => displayName;
         public float BodyRadius => bodyRadius;
@@ -66,12 +92,12 @@ namespace Squadra
                 Kind = kind,
                 Position = new MapPoint(transform.position.x, transform.position.y),
                 Owner = startingOwner,
-                Ships = startingShips,
+                Darts = startingDarts,
                 ProductionInterval = productionInterval,
             };
         }
 
-        /// <summary>Scale-pops the fleet count, e.g. when a ship is built or a fleet arrives.</summary>
+        /// <summary>Scale-pops the fleet count, e.g. when a Dart is built or a fleet arrives.</summary>
         public void Punch(float amount)
         {
             punch = Mathf.Max(punch, amount);
@@ -85,8 +111,20 @@ namespace Squadra
 
         public void Refresh(Node node, float deltaTime, bool selected, bool hovered)
         {
-            Render(node.Owner, node.Occupant, node.Ships, node.Captor, node.CaptureProgress,
-                (float)node.CaptureRemaining, (float)node.ProductionInterval, deltaTime, selected, hovered);
+            Battle battle = node.Battle;
+            Render(new State
+            {
+                Owner = node.Owner,
+                Occupant = node.Occupant,
+                Captor = node.Captor,
+                Darts = node.Darts,
+                CaptureProgress = node.CaptureProgress,
+                CaptureRemaining = (float)node.CaptureRemaining,
+                Interval = (float)node.ProductionInterval,
+                Fighting = battle != null,
+                Arriving = battle != null ? battle.Arriving : Faction.Neutral,
+                ArrivingDarts = battle != null ? battle.ArrivingDarts : 0,
+            }, deltaTime, selected, hovered);
         }
 
         // ------------------------------------------------------------------ lifecycle
@@ -109,8 +147,13 @@ namespace Squadra
             if (surface == null || ownerRing == null) return;
             EnsureHandles();
             Layout();
-            Render(startingOwner, startingOwner, startingShips, Faction.Neutral, 0f, 0f, productionInterval,
-                1000f, false, false);
+            Render(new State
+            {
+                Owner = startingOwner,
+                Occupant = startingOwner,
+                Darts = startingDarts,
+                Interval = productionInterval,
+            }, 1000f, false, false);
         }
 
         void EnsureHandles()
@@ -147,16 +190,15 @@ namespace Squadra
 
         // ------------------------------------------------------------------ rendering
 
-        void Render(Faction ownerFaction, Faction occupant, int ships, Faction captor, float captureProgress,
-            float captureRemaining, float interval, float deltaTime, bool selected, bool hovered)
+        void Render(State state, float deltaTime, bool selected, bool hovered)
         {
             if (owner == null) return;
 
             float blend = 1f - Mathf.Exp(-deltaTime * 6f);
             float fast = 1f - Mathf.Exp(-deltaTime * 14f);
-            bool owned = ownerFaction != Faction.Neutral;
+            bool owned = state.Owner != Faction.Neutral;
 
-            shownColor = Color.Lerp(shownColor, Palette.Of(ownerFaction), blend);
+            shownColor = Color.Lerp(shownColor, Palette.Of(state.Owner), blend);
             ownedAmount = Mathf.Lerp(ownedAmount, owned ? 1f : 0f, blend);
             selectAmount = Mathf.Lerp(selectAmount, selected ? 1f : 0f, fast);
             hoverAmount = Mathf.Lerp(hoverAmount, hovered ? 1f : 0f, fast);
@@ -185,19 +227,26 @@ namespace Squadra
                 aura.SetPropertyBlock(auraBlock);
             }
 
-            // Capture: an arc in the captor's color filling clockwise over a faint full track.
-            bool capturing = captor != Faction.Neutral;
+            // Capture: an arc in the captor's color filling clockwise over a faint full track. While the
+            // captor is fighting, the arc stays where it had got to, broken into dashes and no longer
+            // pulsing: held, not lost.
+            bool capturing = state.Captor != Faction.Neutral;
+            bool held = capturing && state.Fighting;
             capture.Visible = capturing;
             if (capturing)
             {
                 capture.Radius = OrbitRadius + 0.2f;
                 capture.Thickness = 0.075f;
                 capture.Softness = 0.1f;
-                capture.Glow = 0.35f;
-                capture.Arc = captureProgress;
-                capture.Track = 0.1f;
+                capture.Glow = held ? 0.15f : 0.35f;
+                capture.Arc = state.CaptureProgress;
+                capture.Track = held ? 0.22f : 0.1f;
+                capture.Dashes = held ? 40f : 0f;
+                capture.DashFill = 0.55f;
+                capture.Spin = 0f;
                 capture.Additive = 0.6f;
-                capture.Tint = Palette.Hdr(Palette.Of(captor), 2.3f + 0.4f * Mathf.Sin(time * 6f), 1f);
+                capture.Tint = Palette.Hdr(Palette.Of(state.Captor),
+                    held ? 1.3f : 2.3f + 0.4f * Mathf.Sin(time * 6f), 1f);
                 capture.Apply();
             }
 
@@ -219,22 +268,33 @@ namespace Squadra
                 selection.Apply();
             }
 
-            RenderLabels(ownerFaction, occupant, ships, captor, captureRemaining, interval);
+            RenderLabels(state, time);
         }
 
-        void RenderLabels(Faction ownerFaction, Faction occupant, int ships, Faction captor, float captureRemaining,
-            float interval)
+        void RenderLabels(State state, float time)
         {
             if (countLabel != null)
             {
-                bool show = occupant != Faction.Neutral;
-                if (ships != shownShips || occupant != shownCountFaction)
+                bool show = state.Fighting || state.Occupant != Faction.Neutral;
+                long key = state.Darts + 100000L * (int)state.Occupant;
+                if (state.Fighting) key += 1000000L * (1 + (int)state.Arriving) + 10000000L * state.ArrivingDarts;
+                if (key != shownCountKey)
                 {
-                    shownShips = ships;
-                    shownCountFaction = occupant;
-                    if (show) countLabel.SetText("{0}", ships);
-                    else countLabel.SetText(string.Empty);
-                    countLabel.color = Palette.Bright(Palette.Of(occupant), 0.3f);
+                    shownCountKey = key;
+                    if (state.Fighting)
+                    {
+                        // Both sides, each in its own color: the stationed side first.
+                        countLabel.color = Color.white;
+                        countLabel.text = Colored(state.Occupant, state.Darts)
+                            + "<size=38%><color=#" + ColorUtility.ToHtmlStringRGB(Palette.TextDim) + ">  VS  </color></size>"
+                            + Colored(state.Arriving, state.ArrivingDarts);
+                    }
+                    else
+                    {
+                        if (show) countLabel.SetText("{0}", state.Darts);
+                        else countLabel.SetText(string.Empty);
+                        countLabel.color = Palette.Bright(Palette.Of(state.Occupant), 0.3f);
+                    }
                 }
 
                 float scale = 1f + punch * 0.35f;
@@ -251,32 +311,59 @@ namespace Squadra
             if (captionLabel == null) return;
 
             // The caption only changes when its content does: one key per distinct text.
-            bool capturing = captor != Faction.Neutral;
-            int tenths = capturing ? Mathf.CeilToInt(captureRemaining * 10f) : 0;
-            int key = capturing
-                ? 1000000 + (int)captor * 100000 + tenths
-                : (int)ownerFaction * 10000 + Mathf.RoundToInt(interval * 100f);
-            if (key == shownCaptionKey) return;
-            shownCaptionKey = key;
+            bool capturing = state.Captor != Faction.Neutral;
+            int tenths = capturing ? Mathf.CeilToInt(state.CaptureRemaining * 10f) : 0;
+            long captionKey = capturing
+                ? 1000000 + (int)state.Captor * 100000 + tenths
+                : (int)state.Owner * 10000 + Mathf.RoundToInt(state.Interval * 100f);
+            if (state.Fighting) captionKey += 100000000L * (1 + (int)state.Arriving) + 1000000000L * (int)state.Occupant;
 
-            if (capturing)
+            if (captionKey != shownCaptionKey)
             {
-                captionLabel.text = Palette.NameOf(captor) + " CAPTURING  " + (tenths / 10f).ToString("0.0", CultureInfo.InvariantCulture) + "s";
-                captionLabel.color = Palette.Bright(Palette.Of(captor), 0.2f);
+                shownCaptionKey = captionKey;
+                if (state.Fighting && capturing)
+                {
+                    // No battle countdown: a reinforcement can change how long the fight lasts.
+                    captionLabel.text = "FIGHTING  -  " + Palette.NameOf(state.Captor) + " CAPTURE PAUSED  "
+                        + (tenths / 10f).ToString("0.0", CultureInfo.InvariantCulture) + "s";
+                    captionLabel.color = Palette.Bright(Palette.Accent, 0.15f);
+                }
+                else if (state.Fighting)
+                {
+                    captionLabel.text = "FIGHTING  -  " + Palette.NameOf(state.Occupant) + " VS "
+                        + Palette.NameOf(state.Arriving);
+                    captionLabel.color = Palette.Bright(Palette.Accent, 0.15f);
+                }
+                else if (capturing)
+                {
+                    captionLabel.text = Palette.NameOf(state.Captor) + " CAPTURING  "
+                        + (tenths / 10f).ToString("0.0", CultureInfo.InvariantCulture) + "s";
+                    captionLabel.color = Palette.Bright(Palette.Of(state.Captor), 0.2f);
+                }
+                else if (state.Owner == Faction.Neutral)
+                {
+                    captionLabel.text = displayName.ToUpperInvariant() + "  -  NEUTRAL";
+                    captionLabel.color = Palette.TextDim;
+                }
+                else
+                {
+                    string rate = Mathf.Approximately(state.Interval, 1f)
+                        ? "+1 / s"
+                        : "+1 / " + state.Interval.ToString("0.#", CultureInfo.InvariantCulture) + "s";
+                    captionLabel.text = displayName.ToUpperInvariant() + "  -  " + rate;
+                    captionLabel.color = Palette.TextDim;
+                }
             }
-            else if (ownerFaction == Faction.Neutral)
-            {
-                captionLabel.text = displayName.ToUpperInvariant() + "  -  NEUTRAL";
-                captionLabel.color = Palette.TextDim;
-            }
-            else
-            {
-                string rate = Mathf.Approximately(interval, 1f)
-                    ? "+1 / s"
-                    : "+1 / " + interval.ToString("0.#", CultureInfo.InvariantCulture) + "s";
-                captionLabel.text = displayName.ToUpperInvariant() + "  -  " + rate;
-                captionLabel.color = Palette.TextDim;
-            }
+
+            // The fighting caption pulses. It follows game time, so it holds still under the pause menu.
+            float alpha = state.Fighting ? 0.72f + 0.28f * Mathf.Sin(time * 7f) : 1f;
+            if (!Mathf.Approximately(captionLabel.alpha, alpha)) captionLabel.alpha = alpha;
+        }
+
+        static string Colored(Faction faction, int darts)
+        {
+            return "<color=#" + ColorUtility.ToHtmlStringRGB(Palette.Bright(Palette.Of(faction), 0.3f)) + ">"
+                + darts.ToString(CultureInfo.InvariantCulture) + "</color>";
         }
     }
 }

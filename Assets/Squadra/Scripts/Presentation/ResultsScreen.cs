@@ -245,8 +245,8 @@ namespace Squadra
             }
 
             row.Add(who);
-            row.Add(Number(player.ShipsDestroyed));
-            row.Add(Number(player.ShipsLost));
+            row.Add(Number(player.DartsDestroyed));
+            row.Add(Number(player.DartsLost));
             return row;
         }
 

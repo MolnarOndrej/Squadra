@@ -263,7 +263,7 @@ MonoBehaviour:
   displayName: Ember
   kind: 0
   startingOwner: 2
-  startingShips: 30
+  startingDarts: 30
   productionInterval: 1
   bodyRadius: 1.2
   surface: {fileID: 338216437}
@@ -4315,7 +4315,7 @@ MonoBehaviour:
   displayName: Lune
   kind: 1
   startingOwner: 0
-  startingShips: 0
+  startingDarts: 0
   productionInterval: 2
   bodyRadius: 0.55
   surface: {fileID: 547492134}
@@ -4841,7 +4841,7 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 5832f7548ab44044d9be61d44fe280d3, type: 3}
     volume: 0.3
     pitchJitter: 0.1
-  shipDestroyed:
+  dartDestroyed:
     clips:
     - {fileID: 8300000, guid: 28dc4940f8ec9ec42a41794a26fb317c, type: 3}
     - {fileID: 8300000, guid: 4288c81a3c717d643a4ceaa1ab9379ab, type: 3}
@@ -5661,7 +5661,7 @@ MonoBehaviour:
   displayName: Thalassa
   kind: 0
   startingOwner: 1
-  startingShips: 30
+  startingDarts: 30
   productionInterval: 1
   bodyRadius: 1.15
   surface: {fileID: 39952306}
