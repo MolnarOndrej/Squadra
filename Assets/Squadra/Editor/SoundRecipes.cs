@@ -98,9 +98,9 @@ namespace Squadra.EditorTools
             }
 
             float[] impact = Buffer(1.0);
-            Osc(impact, Wave.Sine, 0, 1.0, t => Sweep(140, 55, t / 0.3), t => Pluck(t, 0.003, 0.22));
+            Osc(impact, SynthWave.Sine, 0, 1.0, t => Sweep(140, 55, t / 0.3), t => Pluck(t, 0.003, 0.22));
             float[] burst = Noise(rng, 0.8);
-            Svf(burst, Filter.Low, t => Sweep(1500, 180, t / 0.4), 0.9);
+            Svf(burst, SynthFilter.Low, t => Sweep(1500, 180, t / 0.4), 0.9);
             Normalize(burst, 1);
             Shape(burst, t => Pluck(t, 0.002, 0.16));
             Mix(impact, burst, 0, 0.7);
@@ -114,13 +114,13 @@ namespace Squadra.EditorTools
                 double Bend(double t) => root * (bendFrom + (bendTo - bendFrom) * Clamp01(t / span));
                 double Gate(double t) => Hold(t, 0.006, span - 0.05, 0.05);
 
-                Osc(horn, Wave.Saw, start, span, t => Bend(t), t => 0.5 * Gate(t), rng.NextDouble());
-                Osc(horn, Wave.Saw, start, span, t => Bend(t) * 1.41421, t => 0.35 * Gate(t), rng.NextDouble());
-                Osc(horn, Wave.Square, start, span, t => Bend(t) * 2, t => 0.2 * Gate(t), rng.NextDouble());
-                Osc(horn, Wave.Square, start, span, t => Bend(t) * 0.5, t => 0.3 * Gate(t), rng.NextDouble());
+                Osc(horn, SynthWave.Saw, start, span, t => Bend(t), t => 0.5 * Gate(t), rng.NextDouble());
+                Osc(horn, SynthWave.Saw, start, span, t => Bend(t) * 1.41421, t => 0.35 * Gate(t), rng.NextDouble());
+                Osc(horn, SynthWave.Square, start, span, t => Bend(t) * 2, t => 0.2 * Gate(t), rng.NextDouble());
+                Osc(horn, SynthWave.Square, start, span, t => Bend(t) * 0.5, t => 0.3 * Gate(t), rng.NextDouble());
             }
 
-            Svf(horn, Filter.Low, t => 2600, 1.4);
+            Svf(horn, SynthFilter.Low, t => 2600, 1.4);
             Normalize(horn, 1);
 
             float[] mix = Buffer(1.3);
@@ -130,7 +130,7 @@ namespace Squadra.EditorTools
             foreach (double ringPitch in new[] { 1830.0, 2740.0 })
             {
                 float[] ring = Noise(rng, 1.0);
-                Svf(ring, Filter.Band, t => ringPitch, 30);
+                Svf(ring, SynthFilter.Band, t => ringPitch, 30);
                 Normalize(ring, 1);
                 Shape(ring, t => Pluck(t, 0.002, 0.35));
                 Mix(mix, ring, 0, ringPitch < 2000 ? 0.12 : 0.08);
@@ -147,28 +147,28 @@ namespace Squadra.EditorTools
             switch (take)
             {
                 case 0:
-                    Zap(mix, rng, 0, 2600, 300, 0.26, Wave.Saw, 0);
+                    Zap(mix, rng, 0, 2600, 300, 0.26, SynthWave.Saw, 0);
                     break;
                 case 1:
-                    Zap(mix, rng, 0, 3400, 520, 0.18, Wave.Square, 0);
+                    Zap(mix, rng, 0, 3400, 520, 0.18, SynthWave.Square, 0);
                     break;
                 case 2:
-                    Zap(mix, rng, 0, 1500, 140, 0.4, Wave.Saw, 0);
-                    Osc(mix, Wave.Sine, 0, 0.4, t => Sweep(200, 70, t / 0.2), t => 0.5 * Pluck(t, 0.003, 0.1));
+                    Zap(mix, rng, 0, 1500, 140, 0.4, SynthWave.Saw, 0);
+                    Osc(mix, SynthWave.Sine, 0, 0.4, t => Sweep(200, 70, t / 0.2), t => 0.5 * Pluck(t, 0.003, 0.1));
                     break;
                 case 3:
-                    Zap(mix, rng, 0, 2900, 420, 0.11, Wave.Saw, 0);
-                    Zap(mix, rng, 0.095, 3100, 450, 0.13, Wave.Saw, 0);
+                    Zap(mix, rng, 0, 2900, 420, 0.11, SynthWave.Saw, 0);
+                    Zap(mix, rng, 0.095, 3100, 450, 0.13, SynthWave.Saw, 0);
                     break;
                 default:
-                    Zap(mix, rng, 0, 2100, 260, 0.3, Wave.Saw, 0.09);
+                    Zap(mix, rng, 0, 2100, 260, 0.3, SynthWave.Saw, 0.09);
                     break;
             }
 
             return Finish(OutputPeak, Reverb(mix, 0.45, 0.6, 0.45, 0.2));
         }
 
-        static void Zap(float[] target, Random rng, double start, double from, double to, double length, Wave wave,
+        static void Zap(float[] target, Random rng, double start, double from, double to, double length, SynthWave wave,
             double wobble)
         {
             double Pitch(double t)
@@ -178,13 +178,13 @@ namespace Squadra.EditorTools
 
             float[] zap = Buffer(length);
             Osc(zap, wave, 0, length, Pitch, t => 0.6);
-            Osc(zap, Wave.Sine, 0, length, t => Pitch(t) * 0.5, t => 0.4);
-            Svf(zap, Filter.Low, t => Pitch(t) * 2.5 + 500, 2.2);
+            Osc(zap, SynthWave.Sine, 0, length, t => Pitch(t) * 0.5, t => 0.4);
+            Svf(zap, SynthFilter.Low, t => Pitch(t) * 2.5 + 500, 2.2);
             Shape(zap, t => Pluck(t, 0.002, length * 0.6) * (1 - Smooth((t - length * 0.8) / (length * 0.2))));
             Normalize(zap, 1);
 
             float[] click = Noise(rng, 0.05);
-            Svf(click, Filter.High, t => 3200, 0.8);
+            Svf(click, SynthFilter.High, t => 3200, 0.8);
             Shape(click, t => Pluck(t, 0.0005, 0.009));
 
             Mix(target, zap, start, 0.8);
@@ -210,22 +210,22 @@ namespace Squadra.EditorTools
 
             double landing = 0.05 + (steps.Length - 1) * gap;
             Bell(mix, landing + 0.05, root * steps[steps.Length - 1] * 2, 0.16, 0.5);
-            Osc(mix, Wave.Sine, landing, 0.8, t => root / 4, t => 0.5 * Pluck(t, 0.01, 0.3));
+            Osc(mix, SynthWave.Sine, landing, 0.8, t => root / 4, t => 0.5 * Pluck(t, 0.01, 0.3));
 
             float[] pad = Buffer(1.6);
             foreach (double ratio in new[] { 0.5, 0.5 * Fifth, 1.0, MajorThird })
             {
                 foreach (double detune in new[] { 0.996, 1.004 })
-                    Osc(pad, Wave.Saw, 0, 1.6, t => root * ratio * detune, t => 1, rng.NextDouble());
+                    Osc(pad, SynthWave.Saw, 0, 1.6, t => root * ratio * detune, t => 1, rng.NextDouble());
             }
 
-            Svf(pad, Filter.Low, t => Sweep(500, 2600, t / 0.5), 1.0);
+            Svf(pad, SynthFilter.Low, t => Sweep(500, 2600, t / 0.5), 1.0);
             Normalize(pad, 1);
             Shape(pad, t => Hold(t, 0.3, 0.7, 0.85));
             Mix(mix, pad, 0, 0.3);
 
             float[] air = Noise(rng, 1.2);
-            Svf(air, Filter.Band, t => Sweep(2500, 9000, t / 0.45), 2.5);
+            Svf(air, SynthFilter.Band, t => Sweep(2500, 9000, t / 0.45), 2.5);
             Normalize(air, 1);
             Shape(air, t => Hold(t, 0.42, 0.45, 0.6));
             Mix(mix, air, 0, 0.16);
@@ -267,12 +267,12 @@ namespace Squadra.EditorTools
                 Brass(mix, rng, Final, pitch, 2.0, 0.24);
 
             // Drums on the two landings.
-            Osc(mix, Wave.Sine, 0.48, 0.9, t => Sweep(110, 62, t / 0.12), t => 0.5 * Pluck(t, 0.004, 0.3));
-            Osc(mix, Wave.Sine, Final, 1.2, t => Sweep(120, 62, t / 0.14), t => 0.8 * Pluck(t, 0.004, 0.35));
+            Osc(mix, SynthWave.Sine, 0.48, 0.9, t => Sweep(110, 62, t / 0.12), t => 0.5 * Pluck(t, 0.004, 0.3));
+            Osc(mix, SynthWave.Sine, Final, 1.2, t => Sweep(120, 62, t / 0.14), t => 0.8 * Pluck(t, 0.004, 0.35));
 
             // A swell of air into the last chord and chimes sparkling above it.
             float[] air = Noise(rng, 3.4);
-            Svf(air, Filter.High, t => 5000, 0.8);
+            Svf(air, SynthFilter.High, t => 5000, 0.8);
             Shape(air, t => t < Final ? Smooth((t - 0.9) / (Final - 0.9)) : Math.Exp(-(t - Final) / 0.7));
             Mix(mix, air, 0, 0.1);
 
@@ -302,16 +302,16 @@ namespace Squadra.EditorTools
 
             float[] drone = Buffer(4.6);
             foreach (double pitch in new[] { C2, C2 * 1.006, G2 })
-                Osc(drone, Wave.Saw, 0, 4.6, t => pitch, t => 0.33, rng.NextDouble());
-            Svf(drone, Filter.Low, t => 380, 0.9);
+                Osc(drone, SynthWave.Saw, 0, 4.6, t => pitch, t => 0.33, rng.NextDouble());
+            Svf(drone, SynthFilter.Low, t => 380, 0.9);
             Normalize(drone, 1);
             Shape(drone, t => Hold(t, 0.4, 3.2, 1.3));
             Mix(mix, drone, 0, 0.28);
 
             // A dull impact to open.
-            Osc(mix, Wave.Sine, 0, 1.6, t => Sweep(100, 45, t / 0.5), t => 0.8 * Pluck(t, 0.005, 0.4));
+            Osc(mix, SynthWave.Sine, 0, 1.6, t => Sweep(100, 45, t / 0.5), t => 0.8 * Pluck(t, 0.005, 0.4));
             float[] thud = Noise(rng, 1.0);
-            Svf(thud, Filter.Low, t => 320, 0.8);
+            Svf(thud, SynthFilter.Low, t => 320, 0.8);
             Normalize(thud, 1);
             Shape(thud, t => Pluck(t, 0.004, 0.25));
             Mix(mix, thud, 0, 0.4);
@@ -325,8 +325,8 @@ namespace Squadra.EditorTools
         public static float[][] MenuHover()
         {
             float[] mix = Buffer(0.2);
-            Osc(mix, Wave.Sine, 0, 0.09, t => Sweep(1650, 2100, t / 0.05), t => 0.5 * Pluck(t, 0.002, 0.016));
-            Osc(mix, Wave.Sine, 0, 0.06, t => 3300, t => 0.12 * Pluck(t, 0.001, 0.009));
+            Osc(mix, SynthWave.Sine, 0, 0.09, t => Sweep(1650, 2100, t / 0.05), t => 0.5 * Pluck(t, 0.002, 0.016));
+            Osc(mix, SynthWave.Sine, 0, 0.06, t => 3300, t => 0.12 * Pluck(t, 0.001, 0.009));
 
             return Finish(0.5, Reverb(mix, 0.2, 0.5, 0.5, 0.08));
         }
@@ -339,7 +339,7 @@ namespace Squadra.EditorTools
             float[] mix = Buffer(0.7);
             Bell(mix, 0, G5, 0.5, 0.13);
             Bell(mix, 0.065, D6, 0.55, 0.2);
-            Osc(mix, Wave.Sine, 0, 0.2, t => G5 / 2, t => 0.25 * Pluck(t, 0.004, 0.07));
+            Osc(mix, SynthWave.Sine, 0, 0.2, t => G5 / 2, t => 0.25 * Pluck(t, 0.004, 0.07));
 
             return Finish(OutputPeak, Reverb(mix, 0.5, 0.7, 0.4, 0.2), Reverb(mix, 0.5, 0.7, 0.4, 0.2, 23));
         }
@@ -355,8 +355,8 @@ namespace Squadra.EditorTools
             float[] mix = Buffer(0.7);
             Bell(mix, 0, D5, 0.45, 0.11);
             Bell(mix, 0.065, G4, 0.5, 0.18);
-            Osc(mix, Wave.Sine, 0, 0.3, t => Sweep(260, 130, t / 0.16), t => 0.4 * Pluck(t, 0.004, 0.08));
-            Svf(mix, Filter.Low, t => 3200, 0.8);
+            Osc(mix, SynthWave.Sine, 0, 0.3, t => Sweep(260, 130, t / 0.16), t => 0.4 * Pluck(t, 0.004, 0.08));
+            Svf(mix, SynthFilter.Low, t => 3200, 0.8);
 
             return Finish(OutputPeak, Reverb(mix, 0.5, 0.7, 0.5, 0.2), Reverb(mix, 0.5, 0.7, 0.5, 0.2, 23));
         }
@@ -409,12 +409,12 @@ namespace Squadra.EditorTools
                     {
                         double pitch = chord[n];
                         foreach (double detune in detunes)
-                            Osc(pad, Wave.Saw, 0, voiceLength, t => pitch * detune, t => 1, rng.NextDouble());
+                            Osc(pad, SynthWave.Saw, 0, voiceLength, t => pitch * detune, t => 1, rng.NextDouble());
                     }
 
                     // The filter opens and closes once over the chord, like a slow breath.
                     double drift = side == 0 ? 0 : 0.9;
-                    Svf(pad, Filter.Low, t => 420 + 520 * Smooth(Math.Sin(Math.PI * t / voiceLength + drift)), 0.8);
+                    Svf(pad, SynthFilter.Low, t => 420 + 520 * Smooth(Math.Sin(Math.PI * t / voiceLength + drift)), 0.8);
                     Normalize(pad, 1);
                     Shape(pad, Swell);
 
@@ -425,8 +425,8 @@ namespace Squadra.EditorTools
                     double root = chord[0];
                     double air = chord[chord.Length - 1] * 4;
                     double wobble = side == 0 ? 0.11 : 0.13;
-                    Osc(channel, Wave.Sine, start, voiceLength, t => root, t => 0.3 * Swell(t));
-                    Osc(channel, Wave.Sine, start, voiceLength, t => air,
+                    Osc(channel, SynthWave.Sine, start, voiceLength, t => root, t => 0.3 * Swell(t));
+                    Osc(channel, SynthWave.Sine, start, voiceLength, t => air,
                         t => 0.025 * Swell(t) * (0.6 + 0.4 * Math.Sin(2 * Math.PI * wobble * t)));
                 }
 
@@ -496,8 +496,8 @@ namespace Squadra.EditorTools
 
             float[] voice = Buffer(length + 0.2);
             foreach (double detune in new[] { 0.9985, 1.0, 1.0015 })
-                Osc(voice, Wave.Saw, 0, length + 0.2, t => pitch * detune * Vibrato(t), t => 0.33, rng.NextDouble());
-            Svf(voice, Filter.Low, t => Math.Min(9000, 900 + pitch + 3200 * Envelope(t) * Math.Exp(-t / 1.6)), 0.9);
+                Osc(voice, SynthWave.Saw, 0, length + 0.2, t => pitch * detune * Vibrato(t), t => 0.33, rng.NextDouble());
+            Svf(voice, SynthFilter.Low, t => Math.Min(9000, 900 + pitch + 3200 * Envelope(t) * Math.Exp(-t / 1.6)), 0.9);
             Shape(voice, Envelope);
             Mix(target, voice, start, amplitude);
         }
@@ -510,9 +510,9 @@ namespace Squadra.EditorTools
 
             float[] voice = Buffer(length + 0.5);
             foreach (double detune in new[] { 0.995, 1.005 })
-                Osc(voice, Wave.Saw, 0, length + 0.5, t => Pitch(t) * detune, t => 0.4, rng.NextDouble());
-            Osc(voice, Wave.Sine, 0, length + 0.5, t => Pitch(t) * 0.5, t => 0.3);
-            Svf(voice, Filter.Low, t => Sweep(2200, 700, t / length), 0.9);
+                Osc(voice, SynthWave.Saw, 0, length + 0.5, t => Pitch(t) * detune, t => 0.4, rng.NextDouble());
+            Osc(voice, SynthWave.Sine, 0, length + 0.5, t => Pitch(t) * 0.5, t => 0.3);
+            Svf(voice, SynthFilter.Low, t => Sweep(2200, 700, t / length), 0.9);
             Shape(voice, t => Hold(t, 0.08, length, 0.45));
             Mix(target, voice, start, amplitude);
         }

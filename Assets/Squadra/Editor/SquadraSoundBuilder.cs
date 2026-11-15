@@ -53,14 +53,14 @@ namespace Squadra.EditorTools
             int written = 0;
             for (int i = 0; i < SoundRecipes.DepartureTakes; i++)
             {
-                if (TryLoadSource(SoundRecipes.DepartureEngines[i], out SoundSynth.Recording engine))
+                if (TryLoadSource(SoundRecipes.DepartureEngines[i], out Recording engine))
                     written += Write(TakeName(Departure, i), SoundRecipes.Departure(i, engine));
             }
 
             for (int i = 0; i < SoundRecipes.ArrivalTakes; i++)
             {
-                if (TryLoadSource(SoundRecipes.ArrivalEngines[i], out SoundSynth.Recording engine)
-                    && TryLoadSource(SoundRecipes.ArrivalPulses[i], out SoundSynth.Recording pulse))
+                if (TryLoadSource(SoundRecipes.ArrivalEngines[i], out Recording engine)
+                    && TryLoadSource(SoundRecipes.ArrivalPulses[i], out Recording pulse))
                     written += Write(TakeName(Arrival, i), SoundRecipes.Arrival(i, engine, pulse));
             }
 
@@ -147,7 +147,7 @@ namespace Squadra.EditorTools
         }
 
         // Decodes a source recording to mono samples. Logs and returns false when it cannot be read.
-        static bool TryLoadSource(string name, out SoundSynth.Recording recording)
+        static bool TryLoadSource(string name, out Recording recording)
         {
             recording = default;
             string path = SourceFolder + "/" + name + ".ogg";
@@ -175,7 +175,7 @@ namespace Squadra.EditorTools
                 mono[i] = sum / clip.channels;
             }
 
-            recording = new SoundSynth.Recording(mono, clip.frequency);
+            recording = new Recording(mono, clip.frequency);
             return true;
         }
 

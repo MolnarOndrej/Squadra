@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Squadra
@@ -6,10 +7,10 @@ namespace Squadra
     public sealed class DotBatch
     {
         readonly Mesh mesh;
-        readonly System.Collections.Generic.List<Vector3> vertices = new System.Collections.Generic.List<Vector3>(1024);
-        readonly System.Collections.Generic.List<Vector2> uvs = new System.Collections.Generic.List<Vector2>(1024);
-        readonly System.Collections.Generic.List<Color> colors = new System.Collections.Generic.List<Color>(1024);
-        readonly System.Collections.Generic.List<int> triangles = new System.Collections.Generic.List<int>(1536);
+        readonly List<Vector3> vertices = new List<Vector3>(1024);
+        readonly List<Vector2> uvs = new List<Vector2>(1024);
+        readonly List<Color> colors = new List<Color>(1024);
+        readonly List<int> triangles = new List<int>(1536);
 
         public DotBatch(MeshFilter filter)
         {

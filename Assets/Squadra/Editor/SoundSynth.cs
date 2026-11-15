@@ -12,35 +12,6 @@ namespace Squadra.EditorTools
     {
         public const int Rate = 44100;
 
-        public enum Wave
-        {
-            Sine,
-            Saw,
-            Square,
-        }
-
-        public enum Filter
-        {
-            Low,
-            Band,
-            High,
-        }
-
-        /// <summary>A mono recording used as raw material, at its own sample rate.</summary>
-        public readonly struct Recording
-        {
-            public readonly float[] Samples;
-            public readonly int SampleRate;
-
-            public Recording(float[] samples, int sampleRate)
-            {
-                Samples = samples;
-                SampleRate = sampleRate;
-            }
-
-            public double Seconds => Samples.Length / (double)SampleRate;
-        }
-
         // ------------------------------------------------------------------ buffers
 
         public static float[] Buffer(double seconds)
@@ -142,7 +113,7 @@ namespace Squadra.EditorTools
         /// Adds an oscillator to the buffer. Frequency and amplitude are functions of the time since
         /// <paramref name="start"/>. Saw and square are band-limited so pitch sweeps stay clean.
         /// </summary>
-        public static void Osc(float[] target, Wave wave, double start, double length,
+        public static void Osc(float[] target, SynthWave wave, double start, double length,
             Func<double, double> frequency, Func<double, double> amplitude, double phase = 0)
         {
             int from = Math.Max(0, Samples(start));
@@ -154,10 +125,10 @@ namespace Squadra.EditorTools
                 double sample;
                 switch (wave)
                 {
-                    case Wave.Saw:
+                    case SynthWave.Saw:
                         sample = 2 * phase - 1 - PolyBlep(phase, step);
                         break;
-                    case Wave.Square:
+                    case SynthWave.Square:
                         sample = (phase < 0.5 ? 1 : -1) + PolyBlep(phase, step) - PolyBlep((phase + 0.5) % 1.0, step);
                         break;
                     default:
@@ -223,7 +194,7 @@ namespace Squadra.EditorTools
                 double pitch = frequency * ratios[k];
                 double gain = amplitude * gains[k];
                 double decay = tau / (1 + 0.6 * k);
-                Osc(target, Wave.Sine, start, decay * 8, t => pitch, t => gain * Pluck(t, 0.003, decay));
+                Osc(target, SynthWave.Sine, start, decay * 8, t => pitch, t => gain * Pluck(t, 0.003, decay));
             }
         }
 
@@ -233,7 +204,7 @@ namespace Squadra.EditorTools
         /// A two-pole state-variable filter whose cutoff may move over time. <paramref name="q"/> near 0.7
         /// is neutral; higher values ring at the cutoff. The band-pass output peaks at unity gain.
         /// </summary>
-        public static void Svf(float[] data, Filter mode, Func<double, double> cutoff, double q)
+        public static void Svf(float[] data, SynthFilter mode, Func<double, double> cutoff, double q)
         {
             double k = 1.0 / q;
             double a1 = 0, a2 = 0, a3 = 0, ic1 = 0, ic2 = 0;
@@ -257,10 +228,10 @@ namespace Squadra.EditorTools
 
                 switch (mode)
                 {
-                    case Filter.Low:
+                    case SynthFilter.Low:
                         data[i] = (float)v2;
                         break;
-                    case Filter.Band:
+                    case SynthFilter.Band:
                         data[i] = (float)(k * v1);
                         break;
                     default:
@@ -392,8 +363,8 @@ namespace Squadra.EditorTools
         /// </summary>
         public static float[] Halve(float[] data)
         {
-            Svf(data, Filter.Low, t => Rate * 0.2, 0.7);
-            Svf(data, Filter.Low, t => Rate * 0.2, 0.7);
+            Svf(data, SynthFilter.Low, t => Rate * 0.2, 0.7);
+            Svf(data, SynthFilter.Low, t => Rate * 0.2, 0.7);
             var half = new float[data.Length / 2];
             for (int i = 0; i < half.Length; i++)
                 half[i] = data[i * 2];
