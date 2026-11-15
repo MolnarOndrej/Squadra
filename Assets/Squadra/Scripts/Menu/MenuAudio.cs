@@ -13,9 +13,9 @@ namespace Squadra
         [SerializeField] AudioClip hover;
         [SerializeField] AudioClip select;
         [SerializeField] AudioClip back;
-        [Range(0f, 1f)] [SerializeField] float volume = 0.6f;
+        [SerializeField, Range(0f, 1f)] float volume = 0.6f;
         [Tooltip("Hover level as a fraction of the other cues, so sweeping across buttons stays quiet.")]
-        [Range(0f, 1f)] [SerializeField] float hoverLevel = 0.5f;
+        [SerializeField, Range(0f, 1f)] float hoverLevel = 0.5f;
 
         AudioSource source;
 

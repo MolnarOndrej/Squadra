@@ -150,7 +150,7 @@ namespace Squadra
 
         static string SuggestedPlayerId(MissionDefinition mission)
         {
-            for (int number = 1;; number++)
+            for (int number = 1; ; number++)
             {
                 string id = "player" + number;
                 if (mission.FindPlayer(id) == null) return id;

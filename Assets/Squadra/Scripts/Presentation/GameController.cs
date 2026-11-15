@@ -53,7 +53,8 @@ namespace Squadra
         [Header("Mission")]
         [Tooltip("Who takes part, two to six players. Results list the human player (Blue) first and "
             + "the others in this order.")]
-        [SerializeField] RosterEntry[] players =
+        [SerializeField]
+        RosterEntry[] players =
         {
             new RosterEntry { faction = Faction.Blue, displayName = "Blue" },
             new RosterEntry { faction = Faction.Red, displayName = "Red" },

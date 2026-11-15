@@ -17,10 +17,10 @@ namespace Squadra
         static MusicPlayer current;
 
         [SerializeField] AudioClip track;
-        [Range(0f, 1f)] [SerializeField] float volume = 0.3f;
+        [SerializeField, Range(0f, 1f)] float volume = 0.3f;
         [SerializeField] float fadeInSeconds = 3f;
         [Tooltip("Music level while a match result is on screen, as a fraction of the normal volume.")]
-        [Range(0f, 1f)] [SerializeField] float duckedLevel = 0.3f;
+        [SerializeField, Range(0f, 1f)] float duckedLevel = 0.3f;
         [SerializeField] float duckSeconds = 0.5f;
         [Tooltip("Seconds the playing track takes to fade out when another scene brings a different one.")]
         [SerializeField] float switchSeconds = 0.6f;

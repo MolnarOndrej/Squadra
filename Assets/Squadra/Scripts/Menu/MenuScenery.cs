@@ -26,7 +26,7 @@ namespace Squadra
         [Header("Orbits")]
         [SerializeField] float innerOrbitRadius = 4.5f;
         [SerializeField] float outerOrbitRadius = 5.5f;
-        [Range(0f, 1f)] [SerializeField] float orbitOpacity = 0.22f;
+        [SerializeField, Range(0f, 1f)] float orbitOpacity = 0.22f;
         [SerializeField] float moonRadius = 0.34f;
         [Tooltip("Where on the inner orbit the moon starts, in degrees counter-clockwise from the right.")]
         [SerializeField] float moonStartAngle = 118f;

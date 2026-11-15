@@ -15,9 +15,9 @@ namespace Squadra
     public sealed class SoundLayer : MonoBehaviour
     {
         [SerializeField] CameraRig rig;
-        [Range(0f, 1f)] [SerializeField] float volume = 0.85f;
+        [SerializeField, Range(0f, 1f)] float volume = 0.85f;
         [Tooltip("How far a sound at the edge of the view is panned to that side.")]
-        [Range(0f, 1f)] [SerializeField] float panWidth = 0.6f;
+        [SerializeField, Range(0f, 1f)] float panWidth = 0.6f;
         [Tooltip("How many effects can sound at once before the oldest is cut off.")]
         [SerializeField] int voiceCount = 20;
         [Tooltip("Voices the shots and explosions of battles leave free for everything else.")]
@@ -39,7 +39,7 @@ namespace Squadra
         [Header("Match result")]
         [SerializeField] AudioClip victory;
         [SerializeField] AudioClip defeat;
-        [Range(0f, 1f)] [SerializeField] float resultVolume = 0.9f;
+        [SerializeField, Range(0f, 1f)] float resultVolume = 0.9f;
         [Tooltip("Seconds between the match ending and its result sound, while the other effects fade.")]
         [SerializeField] float resultDelay = 0.25f;
 
