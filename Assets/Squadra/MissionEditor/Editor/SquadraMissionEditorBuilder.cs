@@ -26,7 +26,7 @@ namespace Squadra.EditorTools
         public const string BuildFolder = "Builds/MissionEditor";
         public const string ExecutableName = "SquadraMissionEditor.exe";
 
-        const string Folder = SquadraSceneBuilder.Root + "/MissionEditor";
+        const string Folder = ProjectFolders.Root + "/MissionEditor";
         const string UiFolder = Folder + "/UI";
         const string LayoutPath = UiFolder + "/MissionEditor.uxml";
         const string ThemePath = UiFolder + "/MissionEditorTheme.tss";

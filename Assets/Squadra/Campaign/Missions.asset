@@ -15,7 +15,7 @@ MonoBehaviour:
   missions:
   - id: mission-01
     scene: {fileID: 102900000, guid: 8c9cfa26abfee488c85f1582747f6a02, type: 3}
-    scenePath: Assets/Scenes/SampleScene.unity
+    scenePath: Assets/Squadra/Match/Scenes/SampleScene.unity
   - id: mission-02
     scene: {fileID: 0}
     scenePath: 

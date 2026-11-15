@@ -35,7 +35,17 @@ Each stage is one commit. Mechanical moves are separate from changes to responsi
 | `f24e04a` | Formatting | `.editorconfig`, and the twelve places where the code differed from it. |
 | `f22342b` | Guidance and checks | `AGENTS.md`, `TypeFileConventionTests`, a pointer in `README.md`. |
 
-After the work there are 160 project C# files and 22,025 lines. Neither number was a goal.
+After these stages there are 160 project C# files and 22,025 lines. Neither number was a goal.
+
+## Regrouping by feature
+
+A later commit moved every file into a folder for its feature, as `MissionEditor` already was: `Match`, `Results`, `Pause`, `Campaign`, `MainMenu`, `Settings`, `Menus`, `Audio`, `Visuals`, `SceneBuilding` and `Conventions`. `AGENTS.md` lists what each holds and uses. The folders `Scripts`, `Editor`, `UI`, `Tests`, `Shaders`, `Materials` and `Textures` under `Assets/Squadra`, and `Assets/Scenes`, are gone.
+
+- Every file moved with its `.meta`, so its identity is unchanged. No namespace, type name or rule assembly changed. A line-by-line comparison of all C# files before and after shows only the path constants and messages of the builders; the builders' root folder constant moved from `SquadraSceneBuilder` to the new `ProjectFolders`, so that `Visuals` and `MissionEditor` no longer reach into `Match` for it.
+- The one test assembly became one per feature (`Squadra.Match.Tests`, `Squadra.Campaign.Tests`, `Squadra.Pause.Tests`), and `Squadra.Tests.Conventions` became `Squadra.Conventions.Tests`. The tests and their names are the same.
+- Paths written as text were updated: the builders' constants, the `src` references of three `.uxml` files, the mission catalog's scene path and the build scene list.
+- `AudioMix` stays in `Pause/Rules`, in the `Squadra.Pause` assembly, although it is about sound. `MainMenu.uss` stays with the main menu although the results panel and the pause menu use it too.
+- Verified: 364 of 364 tests pass; formatting and unused usings are clean; the mission editor and match scenarios give output identical to the baseline; the main menu scenario gives the same elements, classes, texts and focus (Unity lists an element's classes in an order that differs between editor sessions, so classes were compared as sets); the pause menu, results screen and main menu are styled as before; the three builders run from their new folders and generate the same scenes and materials; a Windows player with the moved scenes builds without errors.
 
 ## Assessed and left as they are
 
