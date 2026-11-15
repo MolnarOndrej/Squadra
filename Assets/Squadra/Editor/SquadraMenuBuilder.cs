@@ -37,11 +37,11 @@ namespace Squadra.EditorTools
         [MenuItem("Squadra/Rebuild Main Menu Scene")]
         public static void Build()
         {
-            var space = Load<Material>(SquadraSceneBuilder.MaterialFolder + "/Space.mat");
-            var planet = Load<Material>(SquadraSceneBuilder.MaterialFolder + "/Thalassa.mat");
-            var moon = Load<Material>(SquadraSceneBuilder.MaterialFolder + "/Lune.mat");
-            var ring = Load<Material>(SquadraSceneBuilder.MaterialFolder + "/Ring.mat");
-            var profile = Load<VolumeProfile>(SquadraSceneBuilder.SettingsFolder + "/SpaceVolume.asset");
+            var space = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Space.mat");
+            var planet = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Thalassa.mat");
+            var moon = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Lune.mat");
+            var ring = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Ring.mat");
+            var profile = Load<VolumeProfile>(SquadraAssetBuilder.SettingsFolder + "/SpaceVolume.asset");
             var layout = Load<VisualTreeAsset>(LayoutPath);
             var theme = Load<ThemeStyleSheet>(ThemePath);
             if (space == null || planet == null || moon == null || ring == null || profile == null)
@@ -76,40 +76,40 @@ namespace Squadra.EditorTools
 
             MeshRenderer backdropQuad = Shapes.CreateQuad("Space Backdrop", null, space, OrderBackdrop);
             var backdrop = backdropQuad.gameObject.AddComponent<Backdrop>();
-            SquadraSceneBuilder.Wire(backdrop, "rig", rig);
-            SquadraSceneBuilder.Relayout(backdrop);
+            SceneWiring.Wire(backdrop, "rig", rig);
+            SceneWiring.Relayout(backdrop);
 
             var scenery = new GameObject("Scenery").AddComponent<MenuScenery>();
             Transform sceneryRoot = scenery.transform;
-            SquadraSceneBuilder.Wire(scenery, "rig", rig);
-            SquadraSceneBuilder.Wire(scenery, "innerOrbit", Shapes.CreateQuad("Inner Orbit", sceneryRoot, ring, OrderOrbits));
-            SquadraSceneBuilder.Wire(scenery, "outerOrbit", Shapes.CreateQuad("Outer Orbit", sceneryRoot, ring, OrderOrbits));
-            SquadraSceneBuilder.Wire(scenery, "planet", Shapes.CreateQuad("Planet", sceneryRoot, planet, OrderPlanet));
-            SquadraSceneBuilder.Wire(scenery, "moon", Shapes.CreateQuad("Moon", sceneryRoot, moon, OrderMoon));
-            SquadraSceneBuilder.Relayout(scenery);
+            SceneWiring.Wire(scenery, "rig", rig);
+            SceneWiring.Wire(scenery, "innerOrbit", Shapes.CreateQuad("Inner Orbit", sceneryRoot, ring, OrderOrbits));
+            SceneWiring.Wire(scenery, "outerOrbit", Shapes.CreateQuad("Outer Orbit", sceneryRoot, ring, OrderOrbits));
+            SceneWiring.Wire(scenery, "planet", Shapes.CreateQuad("Planet", sceneryRoot, planet, OrderPlanet));
+            SceneWiring.Wire(scenery, "moon", Shapes.CreateQuad("Moon", sceneryRoot, moon, OrderMoon));
+            SceneWiring.Relayout(scenery);
 
             var music = new GameObject("Music").AddComponent<MusicPlayer>();
             AudioClip track = SquadraSoundBuilder.LoadMenuMusic();
             if (track == null) Debug.LogWarning("Squadra: no menu track in " + SquadraSoundBuilder.MenuMusicFolder);
-            SquadraSceneBuilder.Wire(music, "track", track);
+            SceneWiring.Wire(music, "track", track);
 
             var sounds = new GameObject("Menu Sounds").AddComponent<MenuAudio>();
-            SquadraSceneBuilder.Wire(sounds, "hover", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuHover));
-            SquadraSceneBuilder.Wire(sounds, "select", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuSelect));
-            SquadraSceneBuilder.Wire(sounds, "back", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuBack));
+            SceneWiring.Wire(sounds, "hover", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuHover));
+            SceneWiring.Wire(sounds, "select", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuSelect));
+            SceneWiring.Wire(sounds, "back", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuBack));
 
             // Missions per Page is set on this object in the Inspector.
             var map = new GameObject("Mission Map").AddComponent<MissionMap>();
-            SquadraSceneBuilder.Wire(map, "catalog", catalog);
+            SceneWiring.Wire(map, "catalog", catalog);
 
             var menuObject = new GameObject("Menu");
             var document = menuObject.AddComponent<UIDocument>();
             document.panelSettings = panel;
             document.visualTreeAsset = layout;
             var menu = menuObject.AddComponent<MainMenu>();
-            SquadraSceneBuilder.Wire(menu, "document", document);
-            SquadraSceneBuilder.Wire(menu, "map", map);
-            SquadraSceneBuilder.Wire(menu, "sounds", sounds);
+            SceneWiring.Wire(menu, "document", document);
+            SceneWiring.Wire(menu, "map", map);
+            SceneWiring.Wire(menu, "sounds", sounds);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();

@@ -70,8 +70,8 @@ namespace Squadra.EditorTools
             document.visualTreeAsset = layout;
             var shell = editorObject.AddComponent<StandaloneMissionEditorShell>();
             var view = editorObject.AddComponent<MissionEditorView>();
-            SquadraSceneBuilder.Wire(view, "document", document);
-            SquadraSceneBuilder.Wire(view, "shell", shell);
+            SceneWiring.Wire(view, "document", document);
+            SceneWiring.Wire(view, "shell", shell);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
