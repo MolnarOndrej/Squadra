@@ -1,39 +1,5 @@
 namespace Squadra.Campaign
 {
-    /// <summary>Which heading the results screen shows.</summary>
-    public enum ResultsHeading
-    {
-        Victory,
-        Defeat,
-
-        /// <summary>The last mission of the catalog was won: the campaign is over.</summary>
-        CampaignComplete,
-    }
-
-    /// <summary>The actions of the results screen, in the order they are shown.</summary>
-    public enum ResultsAction
-    {
-        NextMission,
-        Restart,
-        BackToMenu,
-    }
-
-    /// <summary>What the results screen does with its Next Mission action.</summary>
-    public enum NextMissionState
-    {
-        /// <summary>No mission follows this one in the catalog: the action is not shown at all.</summary>
-        Hidden,
-
-        /// <summary>The following mission can be launched.</summary>
-        Enabled,
-
-        /// <summary>This mission was won, but the following one has no scenario or cannot be launched yet.</summary>
-        ComingSoon,
-
-        /// <summary>This attempt was lost. Shown disabled whether or not the following mission is open.</summary>
-        WinRequired,
-    }
-
     /// <summary>
     /// What the results screen offers after one attempt at a mission: its heading, what becomes of the
     /// Next Mission action and which action starts with the keyboard focus.

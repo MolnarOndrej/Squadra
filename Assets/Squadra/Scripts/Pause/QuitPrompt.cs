@@ -1,18 +1,5 @@
 namespace Squadra.Pause
 {
-    /// <summary>How the mission stands when the player asks to leave it.</summary>
-    public enum MissionStanding
-    {
-        /// <summary>The match is still being played: leaving abandons it.</summary>
-        Unfinished,
-
-        /// <summary>The match was won and the victory is already recorded.</summary>
-        Won,
-
-        /// <summary>The match was lost. Leaving changes nothing.</summary>
-        Lost,
-    }
-
     /// <summary>
     /// The text of a quit confirmation: where the player is going and what leaving costs. Only an
     /// unfinished mission warns about lost mission progress; a result that is already on screen is

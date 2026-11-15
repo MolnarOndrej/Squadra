@@ -4,19 +4,6 @@ using UnityEngine.UIElements;
 
 namespace Squadra
 {
-    /// <summary>One answer a mission editor dialog offers.</summary>
-    public readonly struct DialogChoice
-    {
-        public DialogChoice(string label, Action chosen)
-        {
-            Label = label;
-            Chosen = chosen;
-        }
-
-        public string Label { get; }
-        public Action Chosen { get; }
-    }
-
     /// <summary>
     /// The mission editor's question box: a title, a message and up to three answers, over a layer that
     /// covers the whole editor so nothing beneath can be clicked. The last answer is always the safe

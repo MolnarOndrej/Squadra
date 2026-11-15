@@ -3,14 +3,6 @@ using UnityEngine.UIElements;
 
 namespace Squadra
 {
-    public enum MenuIconKind
-    {
-        Lock,
-        Check,
-        Previous,
-        Next,
-    }
-
     /// <summary>
     /// A small vector icon for the menu, drawn to fit the element's box. Its color comes from the
     /// <c>--icon-color</c> style variable, so a parent's state class can recolor it.

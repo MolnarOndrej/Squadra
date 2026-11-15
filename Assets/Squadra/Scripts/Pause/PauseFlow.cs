@@ -2,57 +2,6 @@ using System.Collections.Generic;
 
 namespace Squadra.Pause
 {
-    /// <summary>Which screen of the pause menu is showing.</summary>
-    public enum PauseScreen
-    {
-        /// <summary>The pause menu is closed and the mission, or its result, is in front.</summary>
-        Closed,
-
-        /// <summary>The root pause menu: Paused above its four actions.</summary>
-        Menu,
-
-        /// <summary>The shared Settings screen, opened from the pause menu.</summary>
-        Settings,
-    }
-
-    /// <summary>The actions of the root pause menu, in the order they are shown.</summary>
-    public enum PauseAction
-    {
-        Resume,
-        Settings,
-        QuitToMenu,
-        QuitToDesktop,
-    }
-
-    /// <summary>Where a confirmed quit leads.</summary>
-    public enum QuitDestination
-    {
-        /// <summary>The menu's mission map.</summary>
-        Menu,
-
-        /// <summary>Out of the game.</summary>
-        Desktop,
-    }
-
-    /// <summary>What one press of Escape does in a mission scene.</summary>
-    public enum EscapeStep
-    {
-        /// <summary>Nothing: something else used the press, or the mission is being left.</summary>
-        None,
-
-        /// <summary>The pause menu opens and the mission freezes.</summary>
-        Open,
-
-        /// <summary>The pause menu closes and the mission, or its result, carries on.</summary>
-        Resume,
-
-        /// <summary>Settings closes and the root pause menu comes back.</summary>
-        LeaveSettings,
-
-        /// <summary>The open dialog is cancelled; the screen it was opened from comes back.</summary>
-        CancelDialog,
-    }
-
     /// <summary>
     /// The navigation rules of the pause menu: which screen is showing, what Escape does next and
     /// whether a quit has been confirmed. The mission stays paused for as long as the menu is open,

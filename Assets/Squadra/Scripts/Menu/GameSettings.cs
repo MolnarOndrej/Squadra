@@ -5,14 +5,6 @@ using UnityEngine;
 
 namespace Squadra
 {
-    /// <summary>How the game uses the display. Which modes exist depends on the platform.</summary>
-    public enum DisplayMode
-    {
-        Windowed,
-        BorderlessFullscreen,
-        ExclusiveFullscreen,
-    }
-
     /// <summary>
     /// The player's preferences: audio volumes, Mute in Background, VSync and the display. Setting a value
     /// applies it at once; <see cref="Save"/> writes everything to the local player preferences, and the
