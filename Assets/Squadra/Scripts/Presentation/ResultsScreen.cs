@@ -22,8 +22,6 @@ namespace Squadra
         const string HiddenClass = "hidden";
         const string ShownClass = "results--shown";
         const string FadeClass = "fade--on";
-        const string PointerModeClass = "menu-root--pointer";
-        const string KeyboardModeClass = "menu-root--keys";
         const string TooltipOnClass = "results__tooltip--on";
 
         // Indexed by ResultsHeading.
@@ -75,8 +73,7 @@ namespace Squadra
         bool suspended;
         float guard;
         ResultsAction? focusBeforeSuspend;
-        bool keyboardMode;
-        Vector3 lastPointer = new Vector3(float.NaN, float.NaN);
+        MenuInputMode inputMode;
 
         /// <summary>True once <see cref="Show"/> has put the results on screen.</summary>
         public bool Visible => visible;
@@ -94,7 +91,7 @@ namespace Squadra
         public bool Leaving => leaving;
 
         /// <summary>True while the keyboard is the input in use and the focused action is highlighted.</summary>
-        public bool KeyboardMode => keyboardMode;
+        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
 
         /// <summary>What the campaign offers on this screen.</summary>
         public ResultsPlan Plan => plan;
@@ -176,7 +173,7 @@ namespace Squadra
             panel.RemoveFromClassList(ShownClass);
             panel.SetEnabled(!suspended);
             root.EnableInClassList(HiddenClass, suspended);
-            SetKeyboardMode(false);
+            inputMode.Set(false);
         }
 
         /// <summary>
@@ -202,7 +199,7 @@ namespace Squadra
             guard = ResumeGuardSeconds;
             panel.SetEnabled(true);
             root.RemoveFromClassList(HiddenClass);
-            if (sounds != null) sounds.PointerActive = !keyboardMode;
+            if (sounds != null) sounds.PointerActive = !KeyboardMode;
             if (!ready) return;
 
             // Focus only takes once the panel is displayed again, a frame after its class changes.
@@ -304,30 +301,11 @@ namespace Squadra
 
         // ------------------------------------------------------------------ input in use
 
-        // As in the menu: the style sheet highlights the hovered action in pointer mode and the focused
-        // one in keyboard mode.
-        void SetKeyboardMode(bool keys)
-        {
-            keyboardMode = keys;
-            if (sounds != null) sounds.PointerActive = !keys;
-            root.EnableInClassList(KeyboardModeClass, keys);
-            root.EnableInClassList(PointerModeClass, !keys);
-        }
-
-        // The panel also reports the pointer when the layout changes under it; only real movement counts.
-        void OnPointerMoved(PointerMoveEvent moved)
-        {
-            if (moved.position == lastPointer) return;
-
-            lastPointer = moved.position;
-            if (keyboardMode) SetKeyboardMode(false);
-        }
-
         // A click beside the buttons does nothing at all: it must not even take the focus away from the
         // action the keyboard would activate.
         void OnPointerDown(PointerDownEvent pressed)
         {
-            if (keyboardMode) SetKeyboardMode(false);
+            if (inputMode.Keyboard) inputMode.Set(false);
             if (!(pressed.target is Button)) root.focusController?.IgnoreEvent(pressed);
         }
 
@@ -335,7 +313,7 @@ namespace Squadra
         void OnPointerEnter(PointerEnterEvent pointer)
         {
             var button = (Button)pointer.currentTarget;
-            if (!ready || leaving || suspended || keyboardMode || !button.enabledInHierarchy) return;
+            if (!ready || leaving || suspended || inputMode.Keyboard || !button.enabledInHierarchy) return;
 
             if (sounds != null) sounds.Hover();
             button.Focus();
@@ -344,7 +322,7 @@ namespace Squadra
         // Should the focus ever be lost, the first arrow or Tab press brings it back to the default action.
         void OnNavigationMove(NavigationMoveEvent move)
         {
-            if (!keyboardMode) SetKeyboardMode(true);
+            if (!inputMode.Keyboard) inputMode.Set(true);
             if (!ready || leaving || FocusedAction != null) return;
 
             move.StopPropagation();
@@ -388,7 +366,11 @@ namespace Squadra
             foreach (Button button in new[] { nextButton, restartButton, backButton })
                 button.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
 
-            root.RegisterCallback<PointerMoveEvent>(OnPointerMoved, TrickleDown.TrickleDown);
+            // As in the menu: the hovered action is highlighted in pointer mode, the focused one in
+            // keyboard mode. The mode outlives a tree the document builds anew.
+            if (inputMode == null) inputMode = new MenuInputMode(sounds);
+            inputMode.Attach(root);
+            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
             return true;
@@ -418,7 +400,7 @@ namespace Squadra
                 // The default action starts out highlighted, so it is plain what Enter would do. Moving
                 // the mouse hands the highlight over to whatever is under the pointer.
                 ready = true;
-                SetKeyboardMode(true);
+                inputMode.Set(true);
                 FocusDefault();
             }
 
@@ -436,8 +418,8 @@ namespace Squadra
             }
 
             Keyboard keyboard = Keyboard.current;
-            if (ready && !keyboardMode && keyboard != null && keyboard.anyKey.wasPressedThisFrame)
-                SetKeyboardMode(true);
+            if (ready && !inputMode.Keyboard && keyboard != null && keyboard.anyKey.wasPressedThisFrame)
+                inputMode.Set(true);
         }
     }
 }

@@ -19,8 +19,6 @@ namespace Squadra
         const string HiddenClass = "hidden";
         const string ActiveScreenClass = "screen--active";
         const string FadeClass = "fade--on";
-        const string PointerModeClass = "menu-root--pointer";
-        const string KeyboardModeClass = "menu-root--keys";
         const string PopupClass = "unity-base-dropdown";
         const long LeaveFadeMilliseconds = 350;
 
@@ -46,8 +44,7 @@ namespace Squadra
         MenuDialog dialog;
 
         bool popupWasOpen;
-        bool keyboardMode;
-        Vector3 lastPointer = new Vector3(float.NaN, float.NaN);
+        MenuInputMode inputMode;
 
         /// <summary>The pause screen in front, or <see cref="PauseScreen.Closed"/> while the mission runs.</summary>
         public PauseScreen Screen => flow.Screen;
@@ -67,7 +64,7 @@ namespace Squadra
         /// True while the keyboard is the input in use: the focused control is highlighted. False while
         /// the mouse is: only the control under the pointer is.
         /// </summary>
-        public bool KeyboardMode => keyboardMode;
+        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
 
         /// <summary>The root menu action that has the keyboard focus, or null when none has.</summary>
         public PauseAction? FocusedAction
@@ -111,9 +108,9 @@ namespace Squadra
             {
                 case EscapeStep.Open:
                     game.SetPaused(true);
-                    SetKeyboardMode(true);
+                    inputMode.Set(true);
                     Refresh();
-                    FocusSoon(ButtonOf(PauseFlow.InitialFocus));
+                    MenuFocus.Soon(root, ButtonOf(PauseFlow.InitialFocus));
                     break;
                 case EscapeStep.Resume:
                     sounds.Back();
@@ -122,7 +119,7 @@ namespace Squadra
                 case EscapeStep.LeaveSettings:
                     sounds.Back();
                     Refresh();
-                    FocusSoon(ButtonOf(PauseAction.Settings));
+                    MenuFocus.Soon(root, ButtonOf(PauseAction.Settings));
                     break;
                 case EscapeStep.CancelDialog:
                     dialog.Cancel(true);
@@ -152,7 +149,7 @@ namespace Squadra
                     sounds.Select();
                     settings.Open();
                     Refresh();
-                    FocusSoon(settings.DefaultFocus);
+                    MenuFocus.Soon(root, settings.DefaultFocus);
                     return true;
                 case PauseAction.QuitToMenu:
                     sounds.Select();
@@ -183,7 +180,7 @@ namespace Squadra
 
             sounds.Back();
             Refresh();
-            FocusSoon(ButtonOf(PauseAction.Settings));
+            MenuFocus.Soon(root, ButtonOf(PauseAction.Settings));
         }
 
         /// <summary>What a dialog's Confirm button does.</summary>
@@ -246,7 +243,7 @@ namespace Squadra
         void OnDialogOpened()
         {
             Refresh();
-            FocusSoon(dialog.CancelButton);
+            MenuFocus.Soon(root, dialog.CancelButton);
         }
 
         void OnDialogClosed(Focusable returnTo)
@@ -257,9 +254,9 @@ namespace Squadra
             // Back to whatever opened the dialog, unless that control is gone (a closed dropdown list).
             VisualElement screen = flow.Screen == PauseScreen.Settings ? settingsScreen : menuScreen;
             var opener = returnTo as VisualElement;
-            if (opener != null && opener.panel != null && screen.Contains(opener)) FocusSoon(opener);
-            else if (flow.Screen == PauseScreen.Settings) FocusSoon(settings.DefaultFocus);
-            else FocusSoon(ButtonOf(PauseFlow.InitialFocus));
+            if (opener != null && opener.panel != null && screen.Contains(opener)) MenuFocus.Soon(root, opener);
+            else if (flow.Screen == PauseScreen.Settings) MenuFocus.Soon(root, settings.DefaultFocus);
+            else MenuFocus.Soon(root, ButtonOf(PauseFlow.InitialFocus));
         }
 
         // ------------------------------------------------------------------ screens
@@ -298,39 +295,6 @@ namespace Squadra
         Button ButtonOf(PauseAction action)
         {
             return buttons[(int)action];
-        }
-
-        // Focus only takes once the element is displayed, which is a frame after its class changes.
-        // By then the target may have been disabled or hidden again; asking such an element to take the
-        // focus would clear it altogether, so it is left where it is.
-        void FocusSoon(Focusable target)
-        {
-            if (target == null) return;
-            root.schedule.Execute(() =>
-            {
-                if (target.canGrabFocus) target.Focus();
-            }).StartingIn(20);
-        }
-
-        // ------------------------------------------------------------------ input in use
-
-        // As in the main menu: the style sheet highlights hovered controls in pointer mode and the
-        // focused one in keyboard mode.
-        void SetKeyboardMode(bool keys)
-        {
-            keyboardMode = keys;
-            sounds.PointerActive = !keys;
-            root.EnableInClassList(KeyboardModeClass, keys);
-            root.EnableInClassList(PointerModeClass, !keys);
-        }
-
-        // The panel also reports the pointer when the layout changes under it; only real movement counts.
-        void OnPointerMoved(PointerMoveEvent moved)
-        {
-            if (moved.position == lastPointer) return;
-
-            lastPointer = moved.position;
-            if (keyboardMode) SetKeyboardMode(false);
         }
 
         // ------------------------------------------------------------------ lifecycle
@@ -373,10 +337,14 @@ namespace Squadra
             settings = new SettingsScreen(settingsScreen, this, sounds);
             root.Query<Button>().ForEach(sounds.AttachHover);
 
-            SetKeyboardMode(false);
-            root.RegisterCallback<PointerMoveEvent>(OnPointerMoved, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerDownEvent>(_ => SetKeyboardMode(false), TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(_ => SetKeyboardMode(true), TrickleDown.TrickleDown);
+            // As in the main menu: hovered controls are highlighted in pointer mode, the focused one
+            // in keyboard mode.
+            inputMode = new MenuInputMode(sounds);
+            inputMode.Attach(root);
+            inputMode.Set(false);
+            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerDownEvent>(_ => inputMode.Set(false), TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
             Refresh();
         }
 
@@ -389,7 +357,7 @@ namespace Squadra
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
-                if (flow.IsOpen && !keyboardMode && keyboard.anyKey.wasPressedThisFrame) SetKeyboardMode(true);
+                if (flow.IsOpen && !inputMode.Keyboard && keyboard.anyKey.wasPressedThisFrame) inputMode.Set(true);
                 if (keyboard.escapeKey.wasPressedThisFrame) PressEscape(popupOpen || popupWasOpen);
             }
 
