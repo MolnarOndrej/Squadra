@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Squadra.Missions;
 
 namespace Squadra.MissionEditing
@@ -14,21 +12,18 @@ namespace Squadra.MissionEditing
     /// and exits through <see cref="IMissionEditorShell"/> and touches the disk through
     /// <see cref="IMissionFileStore"/>, so the same session runs in the standalone editor, inside the
     /// game and in a test.
+    ///
+    /// The steps of reading and writing a file, with their messages, are in
+    /// <see cref="MissionFileOperations"/>, and the list of fields holding invalid text is in
+    /// <see cref="InvalidInputs"/>. The session keeps the state and decides what each outcome means.
     /// </summary>
     public sealed class MissionEditorSession
     {
-        sealed class InvalidInput
-        {
-            public string Label;
-            public bool OfSelection;
-        }
-
-        readonly IMissionFileStore files;
         readonly IMissionEditorShell shell;
         readonly IMissionEditorPrompts prompts;
         readonly Func<string> newMissionId;
-        readonly Func<MissionDefinition, string> serialize;
-        readonly Dictionary<string, InvalidInput> invalidInputs = new Dictionary<string, InvalidInput>(StringComparer.Ordinal);
+        readonly MissionFileOperations fileOperations;
+        readonly InvalidInputs invalidInputs = new InvalidInputs();
 
         // The file's text when it was last opened or saved; null while the mission has no file.
         string baseline;
@@ -43,11 +38,11 @@ namespace Squadra.MissionEditing
         public MissionEditorSession(IMissionFileStore files, IMissionEditorShell shell, IMissionEditorPrompts prompts,
             Func<string> newMissionId = null, Func<MissionDefinition, string> serialize = null)
         {
-            this.files = files ?? throw new ArgumentNullException(nameof(files));
+            if (files == null) throw new ArgumentNullException(nameof(files));
             this.shell = shell ?? throw new ArgumentNullException(nameof(shell));
             this.prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
             this.newMissionId = newMissionId ?? MissionDocument.GenerateMissionId;
-            this.serialize = serialize ?? MissionJson.Write;
+            fileOperations = new MissionFileOperations(files, shell, prompts, serialize ?? MissionJson.Write);
             Adopt(MissionDocument.CreateNew(this.newMissionId()), null, null);
         }
 
@@ -105,7 +100,7 @@ namespace Squadra.MissionEditing
         /// <summary>True while a question to the author is open. Commands are ignored until it is answered.</summary>
         public bool Busy { get; private set; }
 
-        public bool HasInvalidInput => invalidInputs.Count > 0;
+        public bool HasInvalidInput => invalidInputs.Any;
 
         /// <summary>Raised when anything the editor shows may have changed.</summary>
         public event Action Changed;
@@ -134,7 +129,7 @@ namespace Squadra.MissionEditing
             Selection = Selection.None;
             Tool = EditorTool.Select;
             ConnectionSource = null;
-            invalidInputs.Clear();
+            invalidInputs.ClearAll();
         }
 
         void OnDocumentChanged()
@@ -176,42 +171,23 @@ namespace Squadra.MissionEditing
         /// </summary>
         public void ReportInvalidInput(string field, string label, bool ofSelection)
         {
-            invalidInputs[field] = new InvalidInput { Label = label, OfSelection = ofSelection };
+            invalidInputs.Report(field, label, ofSelection);
         }
 
         public void ClearInvalidInput(string field)
         {
-            invalidInputs.Remove(field);
+            invalidInputs.Clear(field);
         }
 
         /// <summary>True while a field's invalid text is still waiting to be corrected or given up.</summary>
         public bool IsInvalidInput(string field)
         {
-            return invalidInputs.ContainsKey(field);
-        }
-
-        string InvalidLabels(bool selectionOnly)
-        {
-            var text = new StringBuilder();
-            foreach (InvalidInput input in invalidInputs.Values)
-            {
-                if (selectionOnly && !input.OfSelection) continue;
-                if (text.Length > 0) text.Append(", ");
-                text.Append(input.Label);
-            }
-
-            return text.ToString();
+            return invalidInputs.Contains(field);
         }
 
         void DiscardInvalidInput(bool selectionOnly)
         {
-            var doomed = new List<string>();
-            foreach (KeyValuePair<string, InvalidInput> input in invalidInputs)
-                if (!selectionOnly || input.Value.OfSelection) doomed.Add(input.Key);
-            if (doomed.Count == 0) return;
-
-            foreach (string field in doomed) invalidInputs.Remove(field);
-            InvalidInputDiscarded?.Invoke();
+            if (invalidInputs.Discard(selectionOnly)) InvalidInputDiscarded?.Invoke();
         }
 
         // Settles invalid field text before an action that would put it away. A save discards it at
@@ -219,7 +195,7 @@ namespace Squadra.MissionEditing
         // author's permission: the text stays until that change really happens.
         void SettleInvalidInput(bool discardNow, Action<bool> then)
         {
-            if (invalidInputs.Count == 0)
+            if (!invalidInputs.Any)
             {
                 then(true);
                 return;
@@ -232,7 +208,7 @@ namespace Squadra.MissionEditing
                 return;
             }
 
-            prompts.AskInvalidInput(InvalidLabels(false), discard =>
+            prompts.AskInvalidInput(invalidInputs.Labels(false), discard =>
             {
                 if (!discard)
                 {
@@ -249,7 +225,7 @@ namespace Squadra.MissionEditing
         // Runs an action that changes the selection, once the selected object's fields are settled.
         void LeaveSelection(Action then)
         {
-            string labels = InvalidLabels(true);
+            string labels = invalidInputs.Labels(true);
             if (labels.Length == 0)
             {
                 then();
@@ -317,29 +293,19 @@ namespace Squadra.MissionEditing
 
         void Load(string path, Action then)
         {
-            string name = Path.GetFileName(path);
-            MissionFileContent content = files.Read(path);
-            if (content.Status != MissionFileStatus.Ok)
+            fileOperations.Read(path, (mission, fileText) =>
             {
-                prompts.ShowError("Could not open " + name,
-                    content.Error + "\n\nThe current mission is unchanged.", then);
-                return;
-            }
+                if (mission != null)
+                {
+                    Adopt(new MissionDocument(mission), path, fileText);
+                    int warnings = Validation.WarningCount;
+                    Status = "Opened " + FileName
+                        + (warnings == 0 ? "." : " with " + EditorWording.Count(warnings, "warning") + ".");
+                    DocumentReplaced?.Invoke();
+                }
 
-            MissionReadResult result = MissionJson.Read(content.Text);
-            if (!result.Ok)
-            {
-                prompts.ShowError("Could not open " + name,
-                    name + " is not a valid mission file:\n\n" + Describe(result.Issues)
-                    + "\n\nThe file was not opened and the current mission is unchanged.", then);
-                return;
-            }
-
-            Adopt(new MissionDocument(result.Mission), path, content.Text);
-            int warnings = Validation.WarningCount;
-            Status = "Opened " + name + (warnings == 0 ? "." : " with " + Count(warnings, "warning") + ".");
-            DocumentReplaced?.Invoke();
-            then();
+                then();
+            });
         }
 
         /// <summary>
@@ -426,115 +392,36 @@ namespace Squadra.MissionEditing
                     return;
                 }
 
-                Prepare(text =>
+                fileOperations.Prepare(Document.Mission, Validation, text =>
                 {
                     if (text == null) then(false);
-                    else WriteOverCurrentFile(text, null, then);
+                    else fileOperations.WriteOverFile(FilePath, baseline, text, SuggestFileName, path => Saved(path, text, then));
                 });
             });
         }
 
         void SaveToChosenFile(Action<bool> then)
         {
-            Prepare(text =>
+            fileOperations.Prepare(Document.Mission, Validation, text =>
             {
                 if (text == null) then(false);
-                else ChooseAndWrite(text, then);
+                else fileOperations.WriteToChosenFile(text, SuggestFileName, path => Saved(path, text, then));
             });
         }
 
-        // Validates and serializes before anything is written or even asked. Answers null on failure.
-        void Prepare(Action<string> then)
+        // Asked for at the moment the file dialog opens, which can be after other questions.
+        string SuggestFileName()
         {
-            MissionValidation current = Validation;
-            if (current.HasErrors)
-            {
-                var errors = new List<MissionIssue>();
-                foreach (MissionIssue issue in current.Issues)
-                    if (issue.IsError) errors.Add(issue);
-                prompts.ShowError("The mission cannot be saved",
-                    "Correct " + (errors.Count == 1 ? "this error" : "these errors") + " first:\n\n" + Describe(errors)
-                    + "\n\nNothing was written.", () => then(null));
-                return;
-            }
-
-            string text;
-            try
-            {
-                text = serialize(Document.Mission);
-            }
-            catch (Exception problem)
-            {
-                prompts.ShowError("The mission cannot be saved",
-                    "The mission could not be turned into file text: " + problem.Message
-                    + "\n\nNothing was written. Your changes are still here.", () => then(null));
-                return;
-            }
-
-            then(text);
+            return FilePath != null ? FileName : Document.Mission.Id + ".json";
         }
 
-        void ChooseAndWrite(string text, Action<bool> then)
+        // The end of every save. A path means the text is in that file, which is the mission's file
+        // from now on; null means nothing was written and nothing changes.
+        void Saved(string path, string text, Action<bool> then)
         {
-            shell.ChooseFileToSave(SuggestedFileName, destination =>
+            if (path == null)
             {
-                if (destination == null || string.IsNullOrEmpty(destination.Path))
-                {
-                    then(false);
-                    return;
-                }
-
-                if (destination.ReplacementConfirmed || !files.Exists(destination.Path))
-                {
-                    Write(destination.Path, text, then);
-                    return;
-                }
-
-                prompts.ConfirmReplaceFile(destination.Path, confirmed =>
-                {
-                    if (confirmed) Write(destination.Path, text, then);
-                    else then(false);
-                });
-            });
-        }
-
-        string SuggestedFileName => FilePath != null ? FileName : Document.Mission.Id + ".json";
-
-        // Saves over the mission's own file, unless that file is no longer what the editor last read or
-        // wrote. Then the author decides, and Overwrite covers the file only as it was when they were
-        // asked: if it has changed yet again by the time of writing, they are asked again.
-        void WriteOverCurrentFile(string text, MissionFileContent? authorized, Action<bool> then)
-        {
-            MissionFileContent found = files.Read(FilePath);
-            bool untouched = found.Status == MissionFileStatus.Ok && string.Equals(found.Text, baseline, StringComparison.Ordinal);
-            if (untouched || (authorized.HasValue && authorized.Value.Same(found)))
-            {
-                Write(FilePath, text, then);
-                return;
-            }
-
-            ExternalChange change = found.Status == MissionFileStatus.Missing ? ExternalChange.Deleted
-                : found.Status == MissionFileStatus.Unreadable ? ExternalChange.Unreadable
-                : ExternalChange.Modified;
-            prompts.AskExternalChange(FilePath, change, choice =>
-            {
-                if (choice == ExternalChangeChoice.Overwrite) WriteOverCurrentFile(text, found, then);
-                else if (choice == ExternalChangeChoice.SaveAs) ChooseAndWrite(text, then);
-                else then(false);
-            });
-        }
-
-        void Write(string path, string text, Action<bool> then)
-        {
-            try
-            {
-                files.WriteAtomically(path, text);
-            }
-            catch (MissionFileException problem)
-            {
-                prompts.ShowError("Could not save " + Path.GetFileName(path),
-                    problem.Message + "\n\nNothing was written to " + path
-                    + ". Your changes are still here; try again or use Save As.", () => then(false));
+                then(false);
                 return;
             }
 
@@ -542,7 +429,8 @@ namespace Squadra.MissionEditing
             baseline = text;
             edited = false;
             int warnings = Validation.WarningCount;
-            Status = "Saved " + FileName + (warnings == 0 ? "." : " with " + Count(warnings, "warning") + ".");
+            Status = "Saved " + FileName
+                + (warnings == 0 ? "." : " with " + EditorWording.Count(warnings, "warning") + ".");
             then(true);
         }
 
@@ -751,7 +639,8 @@ namespace Squadra.MissionEditing
                 foreach (MissionEdge edge in Document.Mission.Edges)
                     if (MissionRules.SameId(edge.Source, selected.NodeId) || MissionRules.SameId(edge.Target, selected.NodeId)) routes++;
                 Document.RemoveNode(selected.NodeId);
-                Status = "Deleted node " + selected.NodeId + (routes == 0 ? "." : " and " + Count(routes, "route") + ".");
+                Status = "Deleted node " + selected.NodeId
+                    + (routes == 0 ? "." : " and " + EditorWording.Count(routes, "route") + ".");
             }
             else
             {
@@ -761,27 +650,6 @@ namespace Squadra.MissionEditing
 
             RaiseChanged();
             return true;
-        }
-
-        // ------------------------------------------------------------------ wording
-
-        static string Count(int count, string noun)
-        {
-            return count + " " + noun + (count == 1 ? "" : "s");
-        }
-
-        static string Describe(IReadOnlyList<MissionIssue> issues)
-        {
-            const int shown = 8;
-            var text = new StringBuilder();
-            for (int i = 0; i < issues.Count && i < shown; i++)
-            {
-                if (i > 0) text.Append('\n');
-                text.Append("- ").Append(issues[i]);
-            }
-
-            if (issues.Count > shown) text.Append("\n- and ").Append(issues.Count - shown).Append(" more");
-            return text.ToString();
         }
     }
 }
