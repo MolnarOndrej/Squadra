@@ -25,6 +25,8 @@ namespace Squadra.Simulation
 
         public double Remaining => System.Math.Max(0, Duration - Elapsed);
 
+        internal bool HasArrived => Duration - Elapsed <= Match.Epsilon;
+
         public float Progress
         {
             get

@@ -24,7 +24,7 @@ namespace Squadra.Simulation
         public double ProductionInterval { get; set; }
 
         /// <summary>Formal owner. Changes only when a capture completes.</summary>
-        public Faction Owner { get; internal set; }
+        public Faction Owner { get; private set; }
 
         /// <summary>
         /// Darts stationed here. They belong to <see cref="Occupant"/>. During a battle this is the
@@ -33,15 +33,15 @@ namespace Squadra.Simulation
         public int Darts { get; internal set; }
 
         /// <summary>The faction currently claiming this object, or Neutral when no capture is running.</summary>
-        public Faction Captor { get; internal set; }
+        public Faction Captor { get; private set; }
 
         public double CaptureDuration { get; }
-        public double CaptureElapsed { get; internal set; }
+        public double CaptureElapsed { get; private set; }
 
         /// <summary>The battle being fought here, or null. Production and capture wait while it lasts.</summary>
         public Battle Battle { get; internal set; }
 
-        internal double ProductionClock;
+        double productionClock;
 
         public bool IsBeingCaptured => Captor != Faction.Neutral;
 
@@ -81,9 +81,68 @@ namespace Squadra.Simulation
             get
             {
                 if (!IsProducing) return 0f;
-                double p = ProductionClock / ProductionInterval;
+                double p = productionClock / ProductionInterval;
                 return p >= 1 ? 1f : (float)p;
             }
+        }
+
+        // ------------------------------------------------------------------ clocks, driven by the match
+
+        /// <summary>
+        /// Seconds until this object's next event: a casualty of its battle, the end of its capture or
+        /// its next Dart. Only one of the three clocks runs at a time.
+        /// </summary>
+        internal double TimeToNextEvent
+        {
+            get
+            {
+                if (IsContested) return Battle.TimeToNextPair;
+                if (IsBeingCaptured) return CaptureDuration - CaptureElapsed;
+                if (IsProducing) return ProductionInterval - productionClock;
+                return double.PositiveInfinity;
+            }
+        }
+
+        internal void Advance(double seconds)
+        {
+            // A contested object neither produces nor is captured: both clocks keep their place.
+            if (IsContested) Battle.Advance(seconds);
+            else if (IsBeingCaptured) CaptureElapsed += seconds;
+            else if (IsProducing) productionClock += seconds;
+        }
+
+        internal bool IsProductionDue => IsProducing && ProductionInterval - productionClock <= Match.Epsilon;
+
+        internal void ProduceDart()
+        {
+            productionClock = System.Math.Max(0, productionClock - ProductionInterval);
+            Darts++;
+        }
+
+        internal bool IsCaptureDue =>
+            !IsContested && IsBeingCaptured && CaptureDuration - CaptureElapsed <= Match.Epsilon;
+
+        /// <summary>Starts a claimant's countdown from zero.</summary>
+        internal void BeginCapture(Faction captor)
+        {
+            Captor = captor;
+            CaptureElapsed = 0;
+        }
+
+        internal void ClearCapture()
+        {
+            Captor = Faction.Neutral;
+            CaptureElapsed = 0;
+        }
+
+        /// <summary>Hands the object to its captor and returns the previous owner.</summary>
+        internal Faction CompleteCapture()
+        {
+            Faction previousOwner = Owner;
+            Owner = Captor;
+            ClearCapture();
+            productionClock = 0; // a newly captured object starts a fresh production interval
+            return previousOwner;
         }
     }
 }

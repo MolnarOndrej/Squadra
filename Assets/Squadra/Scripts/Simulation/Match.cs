@@ -7,20 +7,22 @@ namespace Squadra.Simulation
     /// The whole match simulation: fleet orders, elapsed time, arrivals, battles, capture, production, each
     /// player's combat totals and the match result. The scene sends orders and time to this boundary and
     /// displays the state it exposes.
+    ///
+    /// The match decides what happens and in which order. Each <see cref="Node"/>, <see cref="Fleet"/>
+    /// and <see cref="Battle"/> keeps its own clocks and counts, and the <see cref="MatchRoster"/> keeps
+    /// the players' combat totals.
     /// </summary>
     public sealed class Match
     {
         // Tolerance for "this event is due now", so that stepping time in many small float increments
         // lands on whole-second events instead of missing them by a rounding error.
-        const double Epsilon = 1e-7;
+        internal const double Epsilon = 1e-7;
 
         readonly List<Node> nodes = new List<Node>();
         readonly List<Fleet> fleets = new List<Fleet>();
         readonly List<Fleet> arrivals = new List<Fleet>();
         readonly List<Battle> battles = new List<Battle>();
-        readonly List<MatchPlayer> players = new List<MatchPlayer>();
-        readonly int[] dartsDestroyed;
-        readonly int[] dartsLost;
+        readonly MatchRoster roster;
         int nextFleetId = 1;
 
         public Match(MatchConfig config)
@@ -35,9 +37,7 @@ namespace Squadra.Simulation
                 nodes.Add(new Node(i, config.Nodes[i], CaptureDuration));
 
             Human = config.Human;
-            BuildRoster(config);
-            dartsDestroyed = new int[players.Count];
-            dartsLost = new int[players.Count];
+            roster = new MatchRoster(config, nodes);
         }
 
         public IReadOnlyList<Node> Nodes => nodes;
@@ -66,7 +66,7 @@ namespace Squadra.Simulation
         /// Everyone taking part, the human player first and the rest in roster order. A player stays on
         /// the roster after losing every Dart and object. Neutral is never on it.
         /// </summary>
-        public IReadOnlyList<MatchPlayer> Players => players;
+        public IReadOnlyList<MatchPlayer> Players => roster.Players;
 
         /// <summary>The final results, taken when the match ends. Null while it is in progress.</summary>
         public MatchResults Results { get; private set; }
@@ -99,89 +99,14 @@ namespace Squadra.Simulation
 
         // ------------------------------------------------------------------ players
 
-        // The roster comes from the mission, not from who still has Darts: the configured players, then
-        // any starting owner the configuration left out, so nobody who can fight is without a row.
-        void BuildRoster(MatchConfig config)
-        {
-            var roster = new List<MatchPlayer>();
-            foreach (MatchPlayer player in config.Players)
-            {
-                if (player.Faction == Faction.Neutral)
-                    throw new ArgumentException("Neutral cannot be a player.", nameof(config));
-                if (roster.Exists(listed => listed.Faction == player.Faction))
-                    throw new ArgumentException(player.Faction + " is on the roster twice.", nameof(config));
-                roster.Add(player);
-            }
-
-            foreach (Node node in nodes)
-            {
-                Faction owner = node.Owner;
-                if (owner != Faction.Neutral && !roster.Exists(listed => listed.Faction == owner))
-                    roster.Add(new MatchPlayer(owner));
-            }
-
-            if (roster.Count > MatchConfig.MaxPlayers)
-            {
-                throw new ArgumentException(
-                    "A match has at most " + MatchConfig.MaxPlayers + " players, not " + roster.Count + ".",
-                    nameof(config));
-            }
-
-            int human = roster.FindIndex(listed => listed.Faction == Human);
-            if (human >= 0) players.Add(roster[human]);
-            for (int i = 0; i < roster.Count; i++)
-            {
-                if (i != human) players.Add(roster[i]);
-            }
-        }
-
-        int PlayerIndex(Faction faction)
-        {
-            for (int i = 0; i < players.Count; i++)
-            {
-                if (players[i].Faction == faction) return i;
-            }
-
-            return -1;
-        }
-
         /// <summary>True for a roster player. False for Neutral.</summary>
-        public bool IsPlayer(Faction faction) => PlayerIndex(faction) >= 0;
+        public bool IsPlayer(Faction faction) => roster.Contains(faction);
 
         /// <summary>Individual Darts this player's fleets have destroyed so far, neutral guards included.</summary>
-        public int DartsDestroyed(Faction faction)
-        {
-            int index = PlayerIndex(faction);
-            return index < 0 ? 0 : dartsDestroyed[index];
-        }
+        public int DartsDestroyed(Faction faction) => roster.DartsDestroyed(faction);
 
         /// <summary>This player's Darts destroyed in combat so far, attacking or defending.</summary>
-        public int DartsLost(Faction faction)
-        {
-            int index = PlayerIndex(faction);
-            return index < 0 ? 0 : dartsLost[index];
-        }
-
-        // Casualties of one step of a battle, counted when they happen. A side's casualties are its own
-        // losses and the other side's kills. Only roster players keep totals, so Darts lost to neutral
-        // guards are credited to nobody, while destroyed guards still count for the player that
-        // destroyed them.
-        void RecordCasualties(Faction arriving, int arrivingCasualties, Faction stationed, int stationedCasualties)
-        {
-            int arrivingPlayer = PlayerIndex(arriving);
-            if (arrivingPlayer >= 0)
-            {
-                dartsLost[arrivingPlayer] += arrivingCasualties;
-                dartsDestroyed[arrivingPlayer] += stationedCasualties;
-            }
-
-            int stationedPlayer = PlayerIndex(stationed);
-            if (stationedPlayer >= 0)
-            {
-                dartsLost[stationedPlayer] += stationedCasualties;
-                dartsDestroyed[stationedPlayer] += arrivingCasualties;
-            }
-        }
+        public int DartsLost(Faction faction) => roster.DartsLost(faction);
 
         // ------------------------------------------------------------------ orders
 
@@ -249,14 +174,7 @@ namespace Squadra.Simulation
         {
             double next = double.PositiveInfinity;
             foreach (Node node in nodes)
-            {
-                if (node.IsContested)
-                    next = Math.Min(next, node.Battle.TimeToNextPair);
-                else if (node.IsBeingCaptured)
-                    next = Math.Min(next, node.CaptureDuration - node.CaptureElapsed);
-                else if (node.IsProducing)
-                    next = Math.Min(next, node.ProductionInterval - node.ProductionClock);
-            }
+                next = Math.Min(next, node.TimeToNextEvent);
 
             foreach (Fleet fleet in fleets)
                 next = Math.Min(next, fleet.Duration - fleet.Elapsed);
@@ -268,16 +186,7 @@ namespace Squadra.Simulation
         {
             Elapsed += step;
             foreach (Node node in nodes)
-            {
-                if (node.IsContested)
-                {
-                    // A contested object neither produces nor is captured: both clocks keep their place.
-                    node.Battle.ScheduleClock += step;
-                    node.Battle.Elapsed += step;
-                }
-                else if (node.IsBeingCaptured) node.CaptureElapsed += step;
-                else if (node.IsProducing) node.ProductionClock += step;
-            }
+                node.Advance(step);
 
             foreach (Fleet fleet in fleets)
                 fleet.Elapsed += step;
@@ -290,24 +199,25 @@ namespace Squadra.Simulation
         {
             foreach (Node node in nodes)
             {
-                while (node.IsProducing && node.ProductionInterval - node.ProductionClock <= Epsilon)
+                while (node.IsProductionDue)
                 {
-                    node.ProductionClock = Math.Max(0, node.ProductionClock - node.ProductionInterval);
-                    node.Darts++;
+                    node.ProduceDart();
                     DartProduced?.Invoke(node);
                 }
             }
 
             foreach (Node node in nodes)
             {
-                if (!node.IsContested && node.IsBeingCaptured && node.CaptureDuration - node.CaptureElapsed <= Epsilon)
-                    CompleteCapture(node);
+                if (!node.IsCaptureDue) continue;
+
+                Faction previousOwner = node.CompleteCapture();
+                CaptureCompleted?.Invoke(node, previousOwner);
             }
 
             arrivals.Clear();
             foreach (Fleet fleet in fleets)
             {
-                if (fleet.Duration - fleet.Elapsed <= Epsilon) arrivals.Add(fleet);
+                if (fleet.HasArrived) arrivals.Add(fleet);
             }
 
             foreach (Fleet fleet in arrivals)
@@ -321,23 +231,6 @@ namespace Squadra.Simulation
             {
                 if (node.IsContested) ResolveBattle(node);
             }
-        }
-
-        // ------------------------------------------------------------------ capture
-
-        void CompleteCapture(Node node)
-        {
-            Faction previousOwner = node.Owner;
-            node.Owner = node.Captor;
-            ClearCapture(node);
-            node.ProductionClock = 0; // a newly captured object starts a fresh production interval
-            CaptureCompleted?.Invoke(node, previousOwner);
-        }
-
-        static void ClearCapture(Node node)
-        {
-            node.Captor = Faction.Neutral;
-            node.CaptureElapsed = 0;
         }
 
         // ------------------------------------------------------------------ arrivals
@@ -363,20 +256,11 @@ namespace Squadra.Simulation
 
             if (node.IsContested)
             {
-                // Join the side the fleet belongs to. The battle's schedule is replaced once every
+                // Join the side the fleet belongs to. The battle replaces its schedule once every
                 // arrival of this instant has been counted.
                 Battle battle = node.Battle;
-                if (fleet.Faction == battle.Stationed)
-                {
-                    battle.StationedDarts += fleet.Darts;
-                    node.Darts = battle.StationedDarts;
-                }
-                else
-                {
-                    battle.ArrivingDarts += fleet.Darts;
-                }
-
-                battle.Reinforced = true;
+                battle.Reinforce(fleet.Faction, fleet.Darts);
+                node.Darts = battle.StationedDarts;
                 outcome = ArrivalOutcome.BattleJoined;
             }
             else if (fleet.Faction == stationed)
@@ -392,13 +276,12 @@ namespace Squadra.Simulation
                 node.Darts = fleet.Darts;
                 if (fleet.Faction == node.Owner)
                 {
-                    ClearCapture(node);
+                    node.ClearCapture();
                     outcome = ArrivalOutcome.Merged;
                 }
                 else
                 {
-                    node.Captor = fleet.Faction;
-                    node.CaptureElapsed = 0;
+                    node.BeginCapture(fleet.Faction);
                     outcome = ArrivalOutcome.Landed;
                 }
             }
@@ -409,7 +292,7 @@ namespace Squadra.Simulation
                 var battle = new Battle(node.Id, stationed, stationedDarts, fleet.Faction, fleet.Darts);
                 node.Battle = battle;
                 battles.Add(battle);
-                Schedule(battle);
+                battle.Schedule(BattleTiming);
                 outcome = ArrivalOutcome.BattleStarted;
                 BattleStarted?.Invoke(battle);
             }
@@ -420,57 +303,25 @@ namespace Squadra.Simulation
 
         // ------------------------------------------------------------------ battles
 
-        // Spreads the pairs still to be lost evenly over a fresh duration for the forces now present.
-        void Schedule(Battle battle)
-        {
-            battle.ScheduleClock = 0;
-            battle.ScheduleDuration = BattleTiming.Duration(battle.ArrivingDarts, battle.StationedDarts);
-            battle.SchedulePairs = Math.Max(1, Math.Min(battle.ArrivingDarts, battle.StationedDarts));
-            battle.PairsDone = 0;
-        }
-
         void ResolveBattle(Node node)
         {
             Battle battle = node.Battle;
-            int pairs = 0;
-
-            if (battle.Reinforced)
-            {
-                // Reinforcements have been counted. A pair that was already due still falls now, against
-                // the reinforced forces; whatever fighting is left gets a fresh schedule.
-                battle.Reinforced = false;
-                if (battle.TimeToNextPair <= Epsilon) pairs += LosePair(battle);
-                if (battle.ArrivingDarts > 0 && battle.StationedDarts > 0) Schedule(battle);
-            }
-
-            while (battle.ArrivingDarts > 0 && battle.StationedDarts > 0 && battle.TimeToNextPair <= Epsilon)
-                pairs += LosePair(battle);
-
+            int pairs = battle.TakeDueCasualties(BattleTiming);
             if (pairs > 0)
             {
                 node.Darts = battle.StationedDarts;
-                RecordCasualties(battle.Arriving, pairs, battle.Stationed, pairs);
+                roster.RecordCasualties(battle.Arriving, pairs, battle.Stationed, pairs);
                 BattleCasualties?.Invoke(battle, pairs);
             }
 
-            if (battle.ArrivingDarts == 0 || battle.StationedDarts == 0) EndBattle(node, battle);
-        }
-
-        // One Dart from each side, at the same moment.
-        static int LosePair(Battle battle)
-        {
-            battle.ArrivingDarts--;
-            battle.StationedDarts--;
-            battle.LossesPerSide++;
-            battle.PairsDone++;
-            return 1;
+            if (battle.IsDecided) EndBattle(node, battle);
         }
 
         void EndBattle(Node node, Battle battle)
         {
             node.Battle = null;
             battles.Remove(battle);
-            battle.IsOver = true;
+            battle.End();
 
             BattleOutcome outcome;
             if (battle.ArrivingDarts > 0)
@@ -479,14 +330,13 @@ namespace Squadra.Simulation
                 if (battle.Arriving == node.Owner)
                 {
                     // The incumbent owner beat a capturing force: control is restored immediately.
-                    ClearCapture(node);
+                    node.ClearCapture();
                     outcome = BattleOutcome.ControlRestored;
                 }
                 else
                 {
                     // A new claimant starts its own countdown from zero.
-                    node.Captor = battle.Arriving;
-                    node.CaptureElapsed = 0;
+                    node.BeginCapture(battle.Arriving);
                     outcome = BattleOutcome.AttackWon;
                 }
             }
@@ -501,7 +351,7 @@ namespace Squadra.Simulation
                 // A tie empties the object and clears any capture: it stays with its prior owner,
                 // or neutral if it was neutral.
                 node.Darts = 0;
-                ClearCapture(node);
+                node.ClearCapture();
                 outcome = BattleOutcome.Tie;
             }
 
@@ -606,16 +456,7 @@ namespace Squadra.Simulation
         void SetStatus(MatchStatus status)
         {
             Status = status;
-
-            var totals = new PlayerResult[players.Count];
-            for (int i = 0; i < totals.Length; i++)
-            {
-                MatchPlayer player = players[i];
-                totals[i] = new PlayerResult(player.Faction, player.Name, player.Faction == Human,
-                    dartsDestroyed[i], dartsLost[i]);
-            }
-
-            Results = new MatchResults(status, Elapsed, totals);
+            Results = new MatchResults(status, Elapsed, roster.Totals());
             StatusChanged?.Invoke(status);
         }
 
