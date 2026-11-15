@@ -1,0 +1,74 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <!--
+        The mission editor: a toolbar, the schematic canvas beside a panel of properties, a status
+        line, and a dialog layer over all of it. The rows inside the panel's sections are filled in by
+        MissionEditorView, because they follow the mission and the selection.
+    -->
+    <ui:Style src="MissionEditor.uss" />
+    <ui:VisualElement name="editorRoot" class="editor-root">
+
+        <ui:VisualElement name="editorContent" class="editor-content">
+            <ui:VisualElement name="toolbar" class="toolbar">
+                <ui:Button name="newButton" text="New" class="tool-button" />
+                <ui:Button name="openButton" text="Open" class="tool-button" />
+                <ui:Button name="saveButton" text="Save" class="tool-button" />
+                <ui:Button name="saveAsButton" text="Save As" class="tool-button" />
+                <ui:VisualElement class="toolbar__gap" />
+                <ui:Button name="addNodeButton" text="Add Node" class="tool-button" />
+                <ui:Button name="addConnectionButton" text="Add Connection" class="tool-button" />
+                <ui:Button name="deleteButton" text="Delete Selected" class="tool-button" />
+                <ui:VisualElement class="toolbar__gap" />
+                <ui:Button name="zoomOutButton" text="-" class="tool-button tool-button--square" />
+                <ui:Label name="zoomLabel" text="100%" class="toolbar__zoom" />
+                <ui:Button name="zoomInButton" text="+" class="tool-button tool-button--square" />
+                <ui:Button name="fitButton" text="Fit to Map" class="tool-button" />
+                <ui:VisualElement class="toolbar__gap" />
+                <ui:Button name="distancesButton" text="Distances" class="tool-button" />
+                <ui:VisualElement class="toolbar__spring" />
+                <ui:Label name="fileLabel" class="toolbar__file" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="workspace">
+                <Squadra.MissionCanvas name="canvas" class="canvas" />
+
+                <ui:ScrollView name="sidePanel" class="side-panel">
+                    <ui:VisualElement class="section">
+                        <ui:Label text="SELECTION" class="section__title" />
+                        <ui:VisualElement name="selectionBody" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="section">
+                        <ui:Label text="MISSION" class="section__title" />
+                        <ui:VisualElement name="missionBody" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="section">
+                        <ui:Label text="PLAYERS" class="section__title" />
+                        <ui:VisualElement name="playersBody" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="section">
+                        <ui:Label text="VALIDATION" class="section__title" />
+                        <ui:Label name="validationSummary" class="validation__summary" />
+                        <ui:VisualElement name="validationBody" />
+                    </ui:VisualElement>
+                </ui:ScrollView>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="status-bar">
+                <ui:Label name="statusLabel" class="status-bar__status" />
+                <ui:Label name="hintLabel" class="status-bar__hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="dialogLayer" class="modal hidden">
+            <ui:VisualElement class="dialog">
+                <ui:Label name="dialogTitle" class="dialog__title" />
+                <ui:ScrollView class="dialog__scroll">
+                    <ui:Label name="dialogMessage" class="dialog__message" />
+                </ui:ScrollView>
+                <ui:VisualElement name="dialogButtons" class="dialog__buttons" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,47 @@
+@import url("unity-theme://default");
+
+/* The open list of a dropdown is attached to the panel, outside the editor's own tree, so its look is set here. */
+
+.unity-base-dropdown__container-outer {
+    background-color: #0A0E22;
+    border-width: 1px;
+    border-color: #FFD166;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/*
+ * The list is made as wide as its field, border included, while its rows are given the field's full
+ * width. Without the negative margin the rows are two borders too wide for the list, which brings up
+ * a horizontal scroll bar and, to make room for that, a vertical one. The margin is larger than the
+ * border because a one-pixel border is drawn wider on a scaled display; the list's box clips the rest.
+ */
+.unity-base-dropdown__container-inner {
+    margin: 0 -2px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 3px 0;
+}
+
+.unity-base-dropdown__item {
+    height: 26px;
+    padding: 0 8px;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.unity-base-dropdown__item:hover,
+.unity-base-dropdown__item:focus,
+.unity-base-dropdown__item:checked {
+    background-color: rgba(255, 209, 102, 0.16);
+}
+
+.unity-base-dropdown__label {
+    font-size: 13px;
+    color: #E6ECFF;
+}
+
+.unity-base-dropdown__checkmark {
+    width: 14px;
+    height: 14px;
+    -unity-background-image-tint-color: #FFD166;
+}
