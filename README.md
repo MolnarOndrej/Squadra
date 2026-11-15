@@ -62,6 +62,67 @@ Esc opens the pause menu at any point of a mission, a victory or defeat screen i
 
 The game keeps running while another application is in front; it is never paused by switching away. With **Mute in Background** checked (Settings > Sound, off by default) nothing is heard until the game is in front again. It only silences the output: volumes, a pause and the music's place in its track are untouched.
 
+## Mission editor
+
+The Mission Editor is a separate Windows program, `SquadraMissionEditor.exe`, for drawing mission maps: worlds, the routes fleets may travel between them, who owns what and how many Darts each world starts with. It needs neither Unity nor the game, and can run beside the game. It only writes mission files; the game does not load them yet, so a saved mission is not playable so far.
+
+To build it, run **Squadra > Build Mission Editor (Windows)** in Unity. The program is written to `Builds/MissionEditor`. To try it inside Unity instead, open `Assets/Squadra/MissionEditor/Scenes/MissionEditor.unity` and press Play.
+
+The window is a toolbar, the map, and a panel with the selected object, the mission's settings, its players and the validation messages.
+
+- **New**, **Open**, **Save** and **Save As** work on one `.json` file per mission (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S). Save asks for a file the first time.
+- **Add Node**, then a click on the map, places a neutral planet with no Darts. Nodes are named `N1`, `N2` and so on; a node keeps its ID for good, and deleting a node never renumbers the others.
+- **Add Connection** adds a route. With a node selected the route starts from that node and one click on another node finishes it; with nothing selected, click one node and then the other. Routes run both ways. A node cannot be connected to itself, and two nodes cannot be connected twice.
+- Click a node or a route to select it. Drag a node to move it. **Delete Selected**, or the Delete key, removes a route, or a node together with its routes. Esc cancels a tool that is waiting for a click.
+- Drag the background, or drag with the middle or right button, to pan. Scroll to zoom, or use **-** and **+**. **Fit to Map** shows every node. **Distances** writes each route's distance on the map. None of these change the mission.
+- A selected node shows its ID, type (planet or moon), owner, starting Darts and X and Y; type exact coordinates there. A selected route shows its two ends and its distance. Planets are drawn as discs and moons as smaller crescents, in their owner's color; neutral nodes are gray.
+- **Mission** holds the mission's ID, its name and the distance scale. A route's distance is the straight line between its nodes on the map, times the distance scale.
+- **Players** lists up to six players, each with an ID and one of six colors that no other player has. A player's ID is fixed once the player is added. Removing a player that owns nodes asks first and makes those nodes neutral; a player that owns none is removed at once.
+- **Validation** lists what is wrong with the mission. Warnings (separate groups of nodes, nodes on the same spot, routes of no length) never stop a save; click a message to select what it is about.
+
+What is typed into a field is applied at once when it is a valid value. Text that is not stays in the field, marked in red with the reason, and the mission keeps its previous value; saving, leaving the mission or selecting something else then asks whether to discard that text or go back to it. Numbers use a period as the decimal sign.
+
+The editor does not lose work quietly:
+
+- New, Open and closing the window (or Ctrl+Q) offer **Save**, **Discard** and **Cancel** when the mission has unsaved changes. A new mission has none until it is first edited, so an untouched editor closes without asking. After Save the action only goes on if the save succeeded; after Discard the mission stays open until the new or opened mission has really taken its place.
+- A file that cannot be read as a mission is refused with the reasons, and the mission being edited is left as it was.
+- A save writes a temporary file beside the destination and swaps it in, so a failed save leaves the previous file whole and the changes unsaved.
+- If the mission's file was changed or deleted by something else since the editor opened or saved it, Save asks: **Overwrite**, **Save As** or **Cancel**.
+
+It does not protect against the program being killed or the power failing, there is no undo, and two programs editing the same file at the same time are not supported.
+
+### Mission files
+
+A mission is one UTF-8 JSON file with nothing beside it. Every field is required, names and values are case-sensitive, and a file with an unknown field, a missing field, a value of the wrong type, a property named twice or another `schemaVersion` is refused rather than read in part.
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "first-contact",
+  "name": "First Contact",
+  "map": { "distanceScale": 1 },
+  "players": [
+    { "id": "player1", "color": "blue" },
+    { "id": "player2", "color": "red" }
+  ],
+  "nodes": [
+    { "id": "N1", "type": "planet", "position": { "x": -6, "y": 0 }, "owner": "player1", "darts": 30 },
+    { "id": "N2", "type": "moon", "position": { "x": 0, "y": 2.5 }, "owner": null, "darts": 0 },
+    { "id": "N3", "type": "planet", "position": { "x": 6, "y": 0 }, "owner": "player2", "darts": 30 }
+  ],
+  "edges": [
+    { "source": "N1", "target": "N2" },
+    { "source": "N2", "target": "N3" }
+  ]
+}
+```
+
+- IDs are made of ASCII letters, digits, underscores and hyphens. Node IDs are unique among nodes and player IDs among players.
+- `color` is one of `blue`, `red`, `green`, `yellow`, `purple`, `orange`; no two players share one. `type` is `planet` or `moon`.
+- `owner` is a player's ID, or `null` for a neutral node. `darts` is a whole number from 0 to 2147483647.
+- Positions are in map units, X to the right and Y up; negative and fractional values are fine. Coordinates and the distance scale may be at most 1000000000 in size, and the distance scale must be greater than 0.
+- An edge names the two nodes it joins, in either order. Distances are calculated, never stored. Numbers are written in full, so saving a file again does not move anything.
+
 ## Project layout
 
 - `Assets/Squadra/Scripts/Simulation` holds the rules: one `Match` class owns orders, time, battles, capture, production, each player's combat totals and the result. It has no Unity dependencies.
@@ -69,12 +130,13 @@ The game keeps running while another application is in front; it is never paused
 - `Assets/Squadra/Scripts/Campaign` holds the campaign rules: which missions are completed, available, locked or previews, when an unlock is shown, how missions are grouped into map pages, and what the results screen offers after a mission. It has no Unity dependencies.
 - `Assets/Squadra/Scripts/Pause` holds the pause rules: which pause screen is in front, what each press of Esc does, when a quit goes ahead, the text of the quit confirmations, and how pausing and background muting combine with the volume settings. It has no Unity dependencies.
 - `Assets/Squadra/Scripts/Menu` holds the menu scene's components: the main menu and its screens, the mission map, the settings, and the menu's sounds. The Settings screen and the confirmation dialog are shared with the pause menu.
+- `Assets/Squadra/MissionEditor` holds everything of the Mission Editor. `Missions` is the mission file format: the mission definition, the JSON reader and writer, and the validator. `Editing` is the editor's rules: the editing operations on a mission, and the session that carries out New, Open, Save and Quit and decides when work may be replaced or a file overwritten. Neither has Unity dependencies, a window or a scene. `View` is what the editor shows: its view, the map canvas, its dialogs, and the standalone shell with the Windows file dialogs. File selection and exit sit behind the shell, so the same editor can later be brought into the game with a shell of the game's own. `UI` holds its layout, look, theme and panel settings; unlike the menu it is laid out in real pixels instead of being scaled to the window. `Scenes` holds its scene, `Editor` the menu items that rebuild the scene and build the program, and `Tests` its tests.
 - `Assets/Squadra/UI` holds the menu's layout (`MainMenu.uxml`), look (`MainMenu.uss`) and panel settings, the results panel's layout and look (`MissionResults.uxml`, `MissionResults.uss`) and the pause menu's (`PauseMenu.uxml`, `PauseMenu.uss`). All are built with UI Toolkit and share the panel settings and the button styles. `Settings.uxml` and `Dialog.uxml` are the Settings screen and the confirmation dialog, used by both the main menu and the pause menu.
 - `Assets/Squadra/Campaign/Missions.asset` is the mission catalog: the ordered missions, each with a stable id and an optional gameplay scene. A mission needs its scene in the build to be playable.
 - `Assets/Squadra/Shaders` holds the procedural shaders for the planets, space backdrop, rings and fleet dots.
-- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog. **Squadra > Rewire Results Screen In Open Scene** adds the results screen to a mission scene that does not have it yet and leaves the rest of the scene alone; **Squadra > Rewire Pause Menu In Open Scene** does the same for the pause menu.
+- `Assets/Squadra/Editor` adds the menu item **Squadra > Rebuild First Playable Scene**, which regenerates the scene, materials and post-processing profile from code. It overwrites manual edits to those generated assets. **Squadra > Rebuild Main Menu Scene** does the same for the menu scene and puts it first in the build; it keeps the UI files and an existing mission catalog. **Squadra > Rewire Results Screen In Open Scene** adds the results screen to a mission scene that does not have it yet and leaves the rest of the scene alone; **Squadra > Rewire Pause Menu In Open Scene** does the same for the pause menu. The Mission Editor's own menu items are in its folder: **Squadra > Rebuild Mission Editor Scene** regenerates its scene, and **Squadra > Build Mission Editor (Windows)** builds the Mission Editor from that scene alone; neither touches the game's scene list, so a game build still starts in the menu.
 - `Assets/Squadra/Audio` holds the sound effects (`Sfx`), the mission track (`Music`) and the menu track (`MenuMusic`).
-- `Assets/Squadra/Tests/EditMode` holds the match, battle, match results, campaign and pause rule tests. Run them from **Window > General > Test Runner** (EditMode).
+- `Assets/Squadra/Tests/EditMode` holds the match, battle, match results, campaign and pause rule tests; the mission format, mission editing and mission file tests are in `Assets/Squadra/MissionEditor/Tests`. Run them all from **Window > General > Test Runner** (EditMode).
 - The specifications are in `specifications/`. `dart-battle-spec.md` is the current word on the basic unit's name and on combat; the older specifications keep their original wording and carry a note where it replaces them.
 
 ## Mission map
