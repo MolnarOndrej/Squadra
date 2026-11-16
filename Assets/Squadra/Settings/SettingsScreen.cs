@@ -20,6 +20,7 @@ namespace Squadra
         readonly MenuAudio sounds;
         readonly Button[] tabs;
         readonly VisualElement[] panels;
+        readonly Button backButton;
         readonly DropdownField displayModeField;
         readonly DropdownField resolutionField;
         readonly Toggle vsyncToggle;
@@ -84,6 +85,8 @@ namespace Squadra
                 language, displayModeField, resolutionField, vsyncToggle, masterSlider, musicSlider, sfxSlider,
                 muteToggle,
             };
+            backButton = screen.Q<Button>("settingsBackButton");
+            screen.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
             SelectTab(0);
         }
 
@@ -124,6 +127,55 @@ namespace Squadra
                 tabs[i].EnableInClassList(SelectedTabClass, i == index);
                 panels[i].EnableInClassList("hidden", i != index);
             }
+        }
+
+        // ------------------------------------------------------------------ keyboard
+
+        // Up and Down walk one column: the tabs, the rows of the category showing, then Back, wrapping
+        // around at both ends. From Back or the first row they return to the selected tab. Left and Right
+        // stay with the controls (between tabs, slider values). The panel's own choice goes by position,
+        // which skips the rows from a tab at the edge, so the screen takes these moves over and gives the
+        // hover cue itself.
+        void OnNavigationMove(NavigationMoveEvent move)
+        {
+            int step = move.direction == NavigationMoveEvent.Direction.Down ? 1
+                : move.direction == NavigationMoveEvent.Direction.Up ? -1 : 0;
+            if (step == 0) return;
+
+            List<VisualElement> column = Column();
+            int at = PlaceOfFocus(column);
+            if (at < 0) return;
+
+            move.StopPropagation();
+            backButton.focusController.IgnoreEvent(move);
+            column[(at + step + column.Count) % column.Count].Focus();
+            sounds.Hover();
+        }
+
+        // Where the focus is in the column, any tab counting as the first place; -1 outside it. A field
+        // passes the focus on to its input, so the field is found among the focused element's ancestors.
+        int PlaceOfFocus(List<VisualElement> column)
+        {
+            for (var element = backButton.focusController?.focusedElement as VisualElement;
+                 element != null;
+                 element = element.parent)
+            {
+                if (System.Array.IndexOf(tabs, element) >= 0) return 0;
+                int place = column.IndexOf(element);
+                if (place >= 0) return place;
+            }
+
+            return -1;
+        }
+
+        // The selected tab, the rows of its category that can take the focus, and Back.
+        List<VisualElement> Column()
+        {
+            var column = new List<VisualElement> { tabs[tab] };
+            foreach (VisualElement field in fields)
+                if (panels[tab].Contains(field) && field.canGrabFocus) column.Add(field);
+            column.Add(backButton);
+            return column;
         }
 
         // ------------------------------------------------------------------ display
