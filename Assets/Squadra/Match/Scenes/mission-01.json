@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mission-01",
+  "name": "First Contact",
+  "map": { "distanceScale": 1 },
+  "players": [
+    { "id": "player1", "color": "blue" },
+    { "id": "player2", "color": "red" }
+  ],
+  "nodes": [
+    { "id": "N1", "type": "planet", "size": 1.15, "position": { "x": -11.6667, "y": 7.1584 }, "owner": "player1", "darts": 30 },
+    { "id": "N2", "type": "moon", "size": 0.55, "position": { "x": -2.1333, "y": 10.975 }, "owner": null, "darts": 0 },
+    { "id": "N3", "type": "planet", "size": 1.2, "position": { "x": 7.5333, "y": 7.5083 }, "owner": "player2", "darts": 30 }
+  ],
+  "edges": [
+    { "source": "N3", "target": "N2" },
+    { "source": "N2", "target": "N1" },
+    { "source": "N1", "target": "N3" }
+  ]
+}
