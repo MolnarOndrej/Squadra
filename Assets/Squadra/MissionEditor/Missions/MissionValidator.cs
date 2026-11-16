@@ -117,8 +117,10 @@ namespace Squadra.Missions
 
                 if (!MissionRules.IsDefined(node.Type))
                     issues.Add(Error(IssueCode.UnsupportedNodeType, at + ".type",
-                        "Node " + Quote(node.Id) + " has a type this version does not know. Use \"planet\" or \"moon\".",
-                        node.Id));
+                        "Node " + Quote(node.Id) + " has a type this version does not know. Use "
+                        + MissionRules.TypeNameList + ".", node.Id));
+
+                CheckSize(node, at + ".size", issues);
 
                 CheckCoordinate(node, node.X, at + ".position.x", "X", issues);
                 CheckCoordinate(node, node.Y, at + ".position.y", "Y", issues);
@@ -148,6 +150,20 @@ namespace Squadra.Missions
                 : "is not a finite number";
             issues.Add(Error(IssueCode.InvalidCoordinate, at,
                 "The " + axis + " coordinate of node " + Quote(node.Id) + " " + problem + ".", node.Id));
+        }
+
+        static void CheckSize(MissionNode node, string at, List<MissionIssue> issues)
+        {
+            if (MissionRules.IsValidNodeSize(node.Size)) return;
+
+            string problem = MissionRules.IsFinite(node.Size)
+                ? "is " + MissionNumbers.Format(node.Size) + ", outside the supported range of "
+                  + MissionNumbers.Format(MissionRules.MinNodeSize) + " to "
+                  + MissionNumbers.Format(MissionRules.MaxNodeSize)
+                : "is not a finite number";
+            issues.Add(Error(IssueCode.InvalidSize, at,
+                "The size of node " + Quote(node.Id) + " " + problem + ". Size is the body's radius in game world units.",
+                node.Id));
         }
 
         static void CheckEdges(MissionDefinition mission, List<MissionIssue> issues)

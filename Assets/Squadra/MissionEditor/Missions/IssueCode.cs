@@ -20,6 +20,7 @@ namespace Squadra.Missions
         UnsupportedColor,
         DuplicateColor,
         UnsupportedNodeType,
+        InvalidSize,
         InvalidCoordinate,
         InvalidDarts,
         UnknownOwner,

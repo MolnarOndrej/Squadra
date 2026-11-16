@@ -44,6 +44,7 @@ namespace Squadra.Missions
                 text.Append(i == 0 ? "\n" : ",\n");
                 text.Append("    { \"id\": ").Append(Quoted(node.Id));
                 text.Append(", \"type\": ").Append(Quoted(type));
+                text.Append(", \"size\": ").Append(Number(node.Size, "the size of node " + node.Id));
                 text.Append(", \"position\": { \"x\": ").Append(Number(node.X, "the X coordinate of node " + node.Id));
                 text.Append(", \"y\": ").Append(Number(node.Y, "the Y coordinate of node " + node.Id)).Append(" }");
                 text.Append(", \"owner\": ").Append(node.Owner == null ? "null" : Quoted(node.Owner));

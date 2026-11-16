@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Squadra.MissionEditing;
 using Squadra.Missions;
@@ -9,12 +10,17 @@ namespace Squadra
     /// <summary>
     /// The text on the mission canvas: node IDs and, when asked for, route distances. They are
     /// ordinary labels laid over the drawing, so their text keeps one size on screen at any zoom.
-    /// Labels are reused; those of nodes out of view are hidden.
+    /// A node's ID stands under its body. Labels are reused; those of nodes out of view are hidden.
     /// </summary>
     sealed class MissionCanvasLabels
     {
         const string NodeLabelClass = "canvas__node-label";
         const string DistanceLabelClass = "canvas__distance-label";
+
+        // How far outside the canvas a body may be for its label still to be laid out, and the room
+        // a label is given at the canvas's edges, in pixels.
+        const double NodeLabelMargin = 80d;
+        const double NodeLabelRoom = 24d;
 
         readonly VisualElement layer;
         readonly List<Label> nodeLabels = new List<Label>();
@@ -46,13 +52,22 @@ namespace Squadra
             int used = 0;
             foreach (MissionNode node in mission.Nodes)
             {
-                Vector2 center = viewport.MapToCanvas(node.X, node.Y);
-                if (center.x < -80f || center.x > box.width + 80f || center.y < -40f || center.y > box.height + 20f) continue;
+                NodeFootprint body = viewport.FootprintOf(node, mission.DistanceScale);
+                if (!body.Touches(box, NodeLabelMargin)) continue;
+
+                double left = body.X;
+                double top = body.Y + MissionCanvasPainter.ReachOf(body) + 4d;
+                if (body.Touches(box, 0d))
+                {
+                    // A body that runs off the canvas keeps its ID in view, at the nearest edge.
+                    left = Math.Max(NodeLabelRoom, Math.Min(box.width - NodeLabelRoom, left));
+                    top = Math.Min(top, box.height - NodeLabelRoom);
+                }
 
                 Label label = LabelAt(nodeLabels, used++, NodeLabelClass);
                 label.text = node.Id;
-                label.style.left = center.x;
-                label.style.top = center.y + MissionCanvasPainter.RadiusOf(node, viewport) + 4f;
+                label.style.left = (float)Math.Max(-NodeLabelMargin, Math.Min(box.width + NodeLabelMargin, left));
+                label.style.top = (float)Math.Min(top, box.height + NodeLabelMargin);
                 label.style.translate = new Translate(Length.Percent(-50f), 0f);
                 label.EnableInClassList(NodeLabelClass + "--selected", session.Selection.IsNode(node.Id));
             }

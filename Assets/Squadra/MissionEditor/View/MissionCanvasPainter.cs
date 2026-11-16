@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Squadra.MissionEditing;
 using Squadra.Missions;
 using UnityEngine;
@@ -7,14 +8,31 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// Draws the mission canvas: the grid, routes as straight lines, a disc for each planet and a
-    /// crescent for each moon in its owner's color, the selection and the connection being made.
+    /// Draws the mission canvas: the grid, routes as straight lines, a disc for each planet, a
+    /// crescent for each moon and a rock for each asteroid in its owner's color, the selection and
+    /// the connection being made. A node's symbol is as large as its body is on the map, the
+    /// <see cref="NodeFootprint"/>; the dark edge, a planet's rim, the marker of a body too small to
+    /// see and the selection ring are drawn around that in fixed pixels and are no part of its size.
     /// It reads the session and the viewport and keeps nothing between frames.
     /// </summary>
     static class MissionCanvasPainter
     {
-        const float PlanetRadius = 15f;
-        const float MoonRadius = 10f;
+        // The dark edge that sets a symbol off from the grid and the routes: this far outside the body.
+        const float EdgeWidth = 2f;
+
+        // A planet shows its rim once there is room for one inside it.
+        const double RimInset = 3.5;
+        const double SmallestRimmedRadius = 8d;
+
+        // A body drawn smaller than this gets a thin ring around it, so that it can be found.
+        const double SmallestPlainRadius = 4d;
+        const double MarkerRadius = 7d;
+
+        const double SelectionGap = 6d;
+        const float SelectionWidth = 3f;
+
+        // How far outside the canvas a body may be and still have something to draw on it.
+        const double DrawMargin = 16d;
 
         static readonly Color GridColor = new Color(0.53f, 0.57f, 0.69f, 0.07f);
         static readonly Color GridMajorColor = new Color(0.53f, 0.57f, 0.69f, 0.14f);
@@ -22,10 +40,14 @@ namespace Squadra
         static readonly Color RouteColor = new Color(0.62f, 0.67f, 0.8f, 0.75f);
         static readonly Color OutlineColor = new Color(0.02f, 0.024f, 0.06f, 1f);
 
-        /// <summary>The radius a node's symbol is drawn with, in pixels.</summary>
-        public static float RadiusOf(MissionNode node, MapViewport viewport)
+        /// <summary>
+        /// How far from a node's middle its drawing reaches, in pixels, the edge and the selection
+        /// ring aside: the body's radius, or the marker's for a body too small to see. Labels stand
+        /// clear of it.
+        /// </summary>
+        public static double ReachOf(NodeFootprint body)
         {
-            return (node.Type == MissionNodeType.Moon ? MoonRadius : PlanetRadius) * viewport.SymbolScale;
+            return body.Radius < SmallestPlainRadius ? MarkerRadius : body.Radius;
         }
 
         /// <param name="pointer">
@@ -61,54 +83,74 @@ namespace Squadra
                 Line(painter, viewport.MapToCanvas(from.X, from.Y), pointer.Value, pending, 2f);
             }
 
+            // In mission order, so that of two overlapping bodies the later one is on top: the one a
+            // click picks.
+            var outline = new NodeOutline(box);
             foreach (MissionNode node in mission.Nodes)
             {
-                Vector2 center = viewport.MapToCanvas(node.X, node.Y);
-                float radius = RadiusOf(node, viewport);
-                if (center.x < -radius - 12f || center.x > box.width + radius + 12f
-                    || center.y < -radius - 12f || center.y > box.height + radius + 12f)
-                    continue;
+                NodeFootprint body = viewport.FootprintOf(node, mission.DistanceScale);
+                if (!body.Touches(box, DrawMargin)) continue;
 
-                DrawNode(painter, center, radius, node.Type, PlayerColors.Of(mission, node));
+                DrawNode(painter, outline, body, node.Type, PlayerColors.Of(mission, node));
                 if (selection.IsNode(node.Id) || MissionRules.SameId(session.ConnectionSource, node.Id))
-                    Ring(painter, center, radius + 6f, Palette.Accent, 3f);
+                {
+                    double ring = ReachOf(body) + SelectionGap;
+                    Stroke(painter, outline.Circle(body.X, body.Y, ring), Palette.Accent, SelectionWidth);
+                }
             }
         }
 
-        // A planet is a full disc. A moon is smaller and has a bite taken out of it, a crescent, so
-        // the two can be told apart without relying on size alone.
-        static void DrawNode(Painter2D painter, Vector2 center, float radius, MissionNodeType type, Color color)
+        // A planet is a full disc with a rim, a moon a crescent and an asteroid a rock with corners,
+        // so the three can be told apart at one size. Each is exactly as large as the body.
+        static void DrawNode(Painter2D painter, NodeOutline outline, NodeFootprint body, MissionNodeType type, Color color)
         {
-            Disc(painter, center, radius + 2f, OutlineColor);
-            Disc(painter, center, radius, color);
-            if (type == MissionNodeType.Moon)
-            {
-                Disc(painter, center + new Vector2(radius * 0.42f, -radius * 0.3f), radius * 0.72f, OutlineColor);
-            }
-            else
+            // The edge is a line along the outline whose inner half the color then covers. A body
+            // thinner than the edge gets a thinner one, or the edge would be all there is to see.
+            List<Vector2> symbol = outline.Symbol(type, body.X, body.Y, body.Radius);
+            Stroke(painter, symbol, OutlineColor, (float)Math.Min(2d * EdgeWidth, 2d * body.Radius));
+            Fill(painter, symbol, color);
+
+            if (type == MissionNodeType.Planet && body.Radius >= SmallestRimmedRadius)
             {
                 Color rim = Color.Lerp(color, Color.white, 0.45f);
-                Ring(painter, center, radius - 3.5f, rim, 1.5f);
+                Stroke(painter, outline.Circle(body.X, body.Y, body.Radius - RimInset), rim, 1.5f);
+            }
+
+            if (body.Radius < SmallestPlainRadius)
+            {
+                Color marker = color;
+                marker.a = 0.8f;
+                Stroke(painter, outline.Circle(body.X, body.Y, MarkerRadius), marker, 1f);
             }
         }
 
-        static void Disc(Painter2D painter, Vector2 center, float radius, Color color)
+        static void Fill(Painter2D painter, List<Vector2> outline, Color color)
         {
+            if (!Trace(painter, outline)) return;
+
             painter.fillColor = color;
-            painter.BeginPath();
-            painter.Arc(center, radius, Angle.Degrees(0f), Angle.Degrees(360f));
-            painter.ClosePath();
             painter.Fill();
         }
 
-        static void Ring(Painter2D painter, Vector2 center, float radius, Color color, float width)
+        static void Stroke(Painter2D painter, List<Vector2> outline, Color color, float width)
         {
+            if (!Trace(painter, outline)) return;
+
             painter.strokeColor = color;
             painter.lineWidth = width;
-            painter.BeginPath();
-            painter.Arc(center, radius, Angle.Degrees(0f), Angle.Degrees(360f));
-            painter.ClosePath();
             painter.Stroke();
+        }
+
+        // Makes a closed outline the painter's path. False for an outline with nothing to draw.
+        static bool Trace(Painter2D painter, List<Vector2> outline)
+        {
+            if (outline.Count < 3) return false;
+
+            painter.BeginPath();
+            painter.MoveTo(outline[0]);
+            for (int i = 1; i < outline.Count; i++) painter.LineTo(outline[i]);
+            painter.ClosePath();
+            return true;
         }
 
         static void Line(Painter2D painter, Vector2 a, Vector2 b, Color color, float width)

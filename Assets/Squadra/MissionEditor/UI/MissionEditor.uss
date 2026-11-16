@@ -222,6 +222,12 @@
     white-space: normal;
 }
 
+/* A section note placed under one row, in line with the row's control. */
+.row__note {
+    margin: -2px 0 6px 104px;
+    font-size: 12px;
+}
+
 /* Text fields and dropdowns */
 
 .row__control .unity-base-text-field__input,

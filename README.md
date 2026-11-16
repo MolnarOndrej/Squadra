@@ -71,11 +71,13 @@ To build it, run **Squadra > Build Mission Editor (Windows)** in Unity. The prog
 The window is a toolbar, the map, and a panel with the selected object, the mission's settings, its players and the validation messages.
 
 - **New**, **Open**, **Save** and **Save As** work on one `.json` file per mission (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S). Save asks for a file the first time.
-- **Add Node**, then a click on the map, places a neutral planet with no Darts. Nodes are named `N1`, `N2` and so on; a node keeps its ID for good, and deleting a node never renumbers the others.
+- **Add Node**, then a click on the map, places a neutral planet of size 1 with no Darts. Nodes are named `N1`, `N2` and so on; a node keeps its ID for good, and deleting a node never renumbers the others.
 - **Add Connection** adds a route. With a node selected the route starts from that node and one click on another node finishes it; with nothing selected, click one node and then the other. Routes run both ways. A node cannot be connected to itself, and two nodes cannot be connected twice.
 - Click a node or a route to select it. Drag a node to move it. **Delete Selected**, or the Delete key, removes a route, or a node together with its routes. Esc cancels a tool that is waiting for a click.
-- Drag the background, or drag with the middle or right button, to pan. Scroll to zoom, or use **-** and **+**. **Fit to Map** shows every node. **Distances** writes each route's distance on the map. None of these change the mission.
-- A selected node shows its ID, type (planet or moon), owner, starting Darts and X and Y; type exact coordinates there. A selected route shows its two ends and its distance. Planets are drawn as discs and moons as smaller crescents, in their owner's color; neutral nodes are gray.
+- Drag the background, or drag with the middle or right button, to pan. Scroll to zoom, or use **-** and **+**. **Fit to Map** shows every node, the whole of its body included. **Distances** writes each route's distance on the map. None of these change the mission.
+- A selected node shows its ID, type (planet, moon or asteroid), size, owner, starting Darts and X and Y; type exact coordinates there. A selected route shows its two ends and its distance.
+- **Size** is the body's radius in game world units, from 0.1 to 5 for every type. A planet starts at 1, a moon at 0.5 and an asteroid at 0.3. Changing a node's type sets its size to the new type's default, whatever it was; set the size again afterwards if it should differ. An asteroid is a node like the others, with an owner, Darts and routes; in the game it will never produce Darts, which follows from its type and is not a setting.
+- Planets are drawn as discs, moons as crescents and asteroids as rocks, in their owner's color; neutral nodes are gray. Each is drawn at the real size of its body: its size divided by the distance scale, in map units, so at 100% a planet of size 1 on a map of scale 1 is 40 pixels in radius, and nodes of one size are equally large whatever their type. Zooming and the distance scale change how large a body looks, never its size. Bodies may overlap; nothing is moved or refused, and of two overlapping nodes a click picks the one added later. A body too small to see has a thin ring around it and can still be clicked. A route's distance is measured between the middles of its nodes, whatever their sizes.
 - **Mission** holds the mission's ID, its name and the distance scale. A route's distance is the straight line between its nodes on the map, times the distance scale.
 - **Players** lists up to six players, each with an ID and one of six colors that no other player has. A player's ID is fixed once the player is added. Removing a player that owns nodes asks first and makes those nodes neutral; a player that owns none is removed at once.
 - **Validation** lists what is wrong with the mission. Warnings (separate groups of nodes, nodes on the same spot, routes of no length) never stop a save; click a message to select what it is about.
@@ -106,19 +108,22 @@ A mission is one UTF-8 JSON file with nothing beside it. Every field is required
     { "id": "player2", "color": "red" }
   ],
   "nodes": [
-    { "id": "N1", "type": "planet", "position": { "x": -6, "y": 0 }, "owner": "player1", "darts": 30 },
-    { "id": "N2", "type": "moon", "position": { "x": 0, "y": 2.5 }, "owner": null, "darts": 0 },
-    { "id": "N3", "type": "planet", "position": { "x": 6, "y": 0 }, "owner": "player2", "darts": 30 }
+    { "id": "N1", "type": "planet", "size": 1, "position": { "x": -6, "y": 0 }, "owner": "player1", "darts": 30 },
+    { "id": "N2", "type": "moon", "size": 0.5, "position": { "x": 0, "y": 2.5 }, "owner": null, "darts": 0 },
+    { "id": "N3", "type": "planet", "size": 1.2, "position": { "x": 6, "y": 0 }, "owner": "player2", "darts": 30 },
+    { "id": "N4", "type": "asteroid", "size": 0.3, "position": { "x": 2, "y": -3 }, "owner": null, "darts": 0 }
   ],
   "edges": [
     { "source": "N1", "target": "N2" },
-    { "source": "N2", "target": "N3" }
+    { "source": "N2", "target": "N3" },
+    { "source": "N3", "target": "N4" }
   ]
 }
 ```
 
 - IDs are made of ASCII letters, digits, underscores and hyphens. Node IDs are unique among nodes and player IDs among players.
-- `color` is one of `blue`, `red`, `green`, `yellow`, `purple`, `orange`; no two players share one. `type` is `planet` or `moon`.
+- `color` is one of `blue`, `red`, `green`, `yellow`, `purple`, `orange`; no two players share one. `type` is `planet`, `moon` or `asteroid`.
+- `size` is the body's radius in game world units, a number from 0.1 to 5. Every node states it, one at its type's default too; a file is never given a default for a size it leaves out. There is no field for what a node produces.
 - `owner` is a player's ID, or `null` for a neutral node. `darts` is a whole number from 0 to 2147483647.
 - Positions are in map units, X to the right and Y up; negative and fractional values are fine. Coordinates and the distance scale may be at most 1000000000 in size, and the distance scale must be greater than 0.
 - An edge names the two nodes it joins, in either order. Distances are calculated, never stored. Numbers are written in full, so saving a file again does not move anything.

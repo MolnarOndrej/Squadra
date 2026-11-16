@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// The Selection section of the property panel: the selected node's type, owner, Darts and
+    /// The Selection section of the property panel: the selected node's type, size, owner, Darts and
     /// position, or the selected route's ends and distances. Its controls are made anew when the
     /// selection changes and only brought up to date while it stays the same.
     /// </summary>
@@ -15,7 +15,8 @@ namespace Squadra
     {
         const string NeutralChoice = "(neutral)";
 
-        static readonly string[] TypeChoices = { "Planet", "Moon" };
+        // In the order of MissionNodeType.
+        static readonly string[] TypeChoices = { "Planet", "Moon", "Asteroid" };
 
         readonly MissionEditorSession session;
         readonly VisualElement body;
@@ -103,6 +104,15 @@ namespace Squadra
                 int index = Array.IndexOf(TypeChoices, changed.newValue);
                 if (index >= 0) session.Document.SetNodeType(id, (MissionNodeType)index);
             });
+
+            // Under Type, because a change of type sets the size to the new type's default.
+            entries.Add(new MissionTextEntry(session, body, "node.size", "Size", true,
+                () => MissionFields.Format(NodeOr(id).Size),
+                text => MissionFields.TryParseSize(text, out double size, out string error)
+                    ? MissionTextEntry.Problem(session.Document.SetNodeSize(id, size))
+                    : error,
+                text => MissionFields.TryParseSize(text, out double size, out _) && size == NodeOr(id).Size));
+            MissionEditorRows.RowNote(body, "The body's radius in game world units.");
 
             ownerField = MissionEditorRows.Dropdown(body, "Owner", OwnerChoices());
             ownerField.RegisterValueChangedCallback(changed =>
