@@ -1,0 +1,39 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="Settings" src="../../Settings/UI/Settings.uxml" />
+    <ui:Template name="Dialog" src="../../Menus/UI/Dialog.uxml" />
+    <ui:Style src="MainMenu.uss" />
+    <ui:VisualElement name="menuRoot" class="menu-root menu-root--pointer">
+
+        <ui:VisualElement name="mainScreen" class="screen">
+            <ui:Label name="title" text="SQUADRA" class="title" />
+            <ui:VisualElement class="title-rule" />
+            <ui:VisualElement class="main-buttons">
+                <ui:Button name="singlePlayerButton" text="SINGLE PLAYER" class="menu-button" />
+                <ui:Button name="multiPlayerButton" text="MULTI PLAYER" enabled="false" class="menu-button" />
+                <ui:Button name="settingsButton" text="SETTINGS" class="menu-button" />
+                <ui:Button name="quitButton" text="QUIT" class="menu-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="mapScreen" class="screen hidden">
+            <ui:Label text="CAMPAIGN" class="screen-title" />
+            <ui:Label text="Choose a mission" class="screen-subtitle" />
+            <ui:VisualElement class="map-body">
+                <ui:Button name="previousPageButton" class="page-arrow">
+                    <Squadra.MenuIcon kind="Previous" class="page-arrow__icon" />
+                </ui:Button>
+                <ui:VisualElement name="missionSlots" class="mission-slots" />
+                <ui:Button name="nextPageButton" class="page-arrow">
+                    <Squadra.MenuIcon kind="Next" class="page-arrow__icon" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:Button name="mapBackButton" text="BACK" class="menu-button back-button" />
+        </ui:VisualElement>
+
+        <ui:Instance template="Settings" name="settingsScreen" class="screen hidden" />
+
+        <ui:Instance template="Dialog" name="dialog" class="modal hidden" />
+
+        <ui:VisualElement name="fade" picking-mode="Ignore" class="fade fade--on" />
+    </ui:VisualElement>
+</ui:UXML>

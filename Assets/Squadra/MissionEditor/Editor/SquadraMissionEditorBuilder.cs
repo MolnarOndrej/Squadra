@@ -26,7 +26,7 @@ namespace Squadra.EditorTools
         public const string BuildFolder = "Builds/MissionEditor";
         public const string ExecutableName = "SquadraMissionEditor.exe";
 
-        const string Folder = SquadraSceneBuilder.Root + "/MissionEditor";
+        const string Folder = ProjectFolders.Root + "/MissionEditor";
         const string UiFolder = Folder + "/UI";
         const string LayoutPath = UiFolder + "/MissionEditor.uxml";
         const string ThemePath = UiFolder + "/MissionEditorTheme.tss";
@@ -70,8 +70,8 @@ namespace Squadra.EditorTools
             document.visualTreeAsset = layout;
             var shell = editorObject.AddComponent<StandaloneMissionEditorShell>();
             var view = editorObject.AddComponent<MissionEditorView>();
-            SquadraSceneBuilder.Wire(view, "document", document);
-            SquadraSceneBuilder.Wire(view, "shell", shell);
+            SceneWiring.Wire(view, "document", document);
+            SceneWiring.Wire(view, "shell", shell);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
