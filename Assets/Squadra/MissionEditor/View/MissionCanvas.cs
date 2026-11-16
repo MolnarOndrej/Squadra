@@ -46,6 +46,12 @@ namespace Squadra
             /// <summary>The left button is down on empty space: a click if it comes up here, a pan if it moves.</summary>
             BackgroundPress,
 
+            /// <summary>
+            /// The right button is down, wherever: a cancel if it comes up before moving past the drag
+            /// threshold, a pan once it has.
+            /// </summary>
+            RightPress,
+
             /// <summary>The left button is down on the selected node: a drag moves it.</summary>
             NodePress,
             MovingNode,
@@ -235,8 +241,10 @@ namespace Squadra
 
         /// <summary>
         /// A mouse button going down at a canvas position: 0 left, 1 right, 2 middle. The left button
-        /// selects and may begin a drag; the others pan. Returns true when a gesture began that the
-        /// matching <see cref="PointerRelease"/> ends.
+        /// selects and may begin a drag; the right one cancels when it comes up without dragging and
+        /// pans when it drags; the others pan. Neither the right nor the middle button picks what lies
+        /// under the pointer. Returns true when a gesture began that the matching
+        /// <see cref="PointerRelease"/> ends.
         /// </summary>
         public bool PointerPress(Vector2 position, int button)
         {
@@ -244,6 +252,12 @@ namespace Squadra
 
             pressedAt = position;
             lastPointer = position;
+            if (button == 1)
+            {
+                gesture = Gesture.RightPress;
+                return true;
+            }
+
             if (button != 0)
             {
                 gesture = Gesture.Panning;
@@ -286,7 +300,8 @@ namespace Squadra
             lastPointer = position;
 
             bool moved = (position - pressedAt).sqrMagnitude > DragThreshold * DragThreshold;
-            if (gesture == Gesture.BackgroundPress && moved)
+            // Once past the threshold the gesture is a pan to the end, even if the pointer comes back.
+            if ((gesture == Gesture.BackgroundPress || gesture == Gesture.RightPress) && moved)
             {
                 gesture = Gesture.Panning;
                 delta = position - pressedAt;
@@ -319,15 +334,25 @@ namespace Squadra
             }
         }
 
-        /// <summary>The button of the current gesture coming up. A press that never moved is a click.</summary>
+        /// <summary>
+        /// The button of the current gesture coming up. A press that never moved is a click: a left
+        /// click on empty space, or a right click that cancels.
+        /// </summary>
         public void PointerRelease(Vector2 position)
         {
             Gesture finished = gesture;
             EndGesture();
-            if (finished != Gesture.BackgroundPress || session == null) return;
+            if (session == null) return;
 
-            viewport.CanvasToMap(pressedAt, out double x, out double y);
-            session.ClickCanvas(viewport.Tidy(x), viewport.Tidy(y));
+            if (finished == Gesture.RightPress)
+            {
+                session.Cancel();
+            }
+            else if (finished == Gesture.BackgroundPress)
+            {
+                viewport.CanvasToMap(pressedAt, out double x, out double y);
+                session.ClickCanvas(viewport.Tidy(x), viewport.Tidy(y));
+            }
         }
 
         /// <summary>The mouse wheel at a canvas position: up zooms in, down zooms out, around the pointer.</summary>

@@ -269,7 +269,7 @@ namespace Squadra.Tests
 
             // Looking around is not editing.
             editor.Session.ArmAddNode();
-            editor.Session.CancelTool();
+            editor.Session.Cancel();
             editor.Session.ShowDistances = true;
             Assert.IsFalse(editor.Session.HasUnsavedChanges);
 
@@ -722,7 +722,7 @@ namespace Squadra.Tests
             Assert.IsNull(editor.Session.ConnectionSource);
 
             editor.Session.ArmAddConnection();
-            Assert.IsTrue(editor.Session.CancelTool());
+            Assert.IsTrue(editor.Session.Cancel());
             Assert.IsNull(editor.Session.ConnectionSource);
             editor.Session.ClickNode("N3");
             Assert.AreEqual(2, editor.Mission.Edges.Count, "nothing is connected once the tool is put away");
@@ -758,7 +758,7 @@ namespace Squadra.Tests
 
             editor.Connect("N1", "N2");
             StringAssert.Contains("already connected", editor.Session.Status);
-            editor.Session.CancelTool();
+            editor.Session.Cancel();
             editor.Connect("N2", "N1");
 
             Assert.AreEqual(1, editor.Mission.Edges.Count);
@@ -834,22 +834,23 @@ namespace Squadra.Tests
         }
 
         [Test]
-        public void Escape_cancels_a_pending_tool_or_connection()
+        public void Cancel_puts_a_pending_tool_or_connection_away()
         {
             var editor = new Editor();
             editor.AddNode(0, 0);
             editor.AddNode(5, 0);
+            editor.Session.Select(Selection.None);
 
-            Assert.IsFalse(editor.Session.CancelTool(), "nothing is pending");
+            Assert.IsFalse(editor.Session.Cancel(), "nothing is pending");
 
             editor.Session.ArmAddNode();
-            Assert.IsTrue(editor.Session.CancelTool());
+            Assert.IsTrue(editor.Session.Cancel());
             editor.Session.ClickCanvas(9, 9);
             Assert.AreEqual(2, editor.Mission.Nodes.Count, "the cancelled tool places nothing");
 
             editor.Session.ArmAddConnection();
             editor.Session.ClickNode("N1");
-            Assert.IsTrue(editor.Session.CancelTool());
+            Assert.IsTrue(editor.Session.Cancel());
             Assert.IsNull(editor.Session.ConnectionSource);
             editor.Session.ClickNode("N2");
             Assert.AreEqual(0, editor.Mission.Edges.Count, "the cancelled connection is not completed");
@@ -868,6 +869,173 @@ namespace Squadra.Tests
             editor.Session.ArmAddConnection();
             editor.Session.ArmAddNode();
             Assert.AreEqual(EditorTool.AddNode, editor.Session.Tool, "arming one tool replaces the other");
+        }
+
+        [Test]
+        public void Cancel_puts_the_tool_away_first_and_the_selection_next()
+        {
+            var editor = new Editor();
+            editor.AddNode(0, 0);
+            editor.Session.ArmAddNode();
+
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(EditorTool.Select, editor.Session.Tool);
+            Assert.AreEqual(Selection.Node("N1"), editor.Session.Selection, "putting the tool away keeps the selection");
+
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            int changes = editor.Changes;
+            Assert.IsFalse(editor.Session.Cancel(), "nothing is left to cancel");
+            Assert.AreEqual(changes, editor.Changes);
+            Assert.AreEqual(EditorTool.Select, editor.Session.Tool);
+            Assert.AreEqual(1, editor.Mission.Nodes.Count, "the cancelled tool placed nothing");
+        }
+
+        [Test]
+        public void Cancelling_Add_Connection_drops_the_half_made_route_and_keeps_the_selection()
+        {
+            var editor = new Editor();
+            editor.AddNode(0, 0);
+            editor.AddNode(5, 0);
+            editor.Session.Select(Selection.None);
+
+            // Before a first node is picked.
+            editor.Session.ArmAddConnection();
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(EditorTool.Select, editor.Session.Tool);
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            // After one is picked: the picked node stays selected until the next cancel.
+            editor.Session.ArmAddConnection();
+            editor.Session.ClickNode("N1");
+            Assert.AreEqual("N1", editor.Session.ConnectionSource);
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(EditorTool.Select, editor.Session.Tool);
+            Assert.IsNull(editor.Session.ConnectionSource);
+            Assert.AreEqual(Selection.Node("N1"), editor.Session.Selection);
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            // With the first node taken from the selection.
+            editor.Session.ClickNode("N2");
+            editor.Session.ArmAddConnection();
+            Assert.AreEqual("N2", editor.Session.ConnectionSource);
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.IsNull(editor.Session.ConnectionSource);
+            Assert.AreEqual(Selection.Node("N2"), editor.Session.Selection);
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            Assert.AreEqual(0, editor.Mission.Edges.Count, "no route was made");
+        }
+
+        [Test]
+        public void With_no_tool_armed_cancel_clears_a_selected_node_or_route()
+        {
+            Editor editor = Editor.WithSavedChain();
+
+            editor.Session.ClickNode("N1");
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            editor.Session.ClickEdge("N2", "N3");
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+
+            Assert.IsFalse(editor.Session.Cancel());
+            Assert.IsFalse(editor.Session.Cancel());
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+        }
+
+        [Test]
+        public void Cancel_asks_about_invalid_field_text_only_when_it_clears_the_selection()
+        {
+            Editor editor = Editor.WithSavedChain();
+            editor.Session.Select(Selection.Node("N2"));
+            editor.Session.ReportInvalidInput("node.size", "Size", true);
+            int discarded = 0;
+            editor.Session.InvalidInputDiscarded += () => discarded++;
+
+            // Putting a tool away leaves the selection, and so the typed text, where they are.
+            editor.Session.ArmAddNode();
+            Assert.IsTrue(editor.Session.Cancel());
+            editor.Session.ArmAddConnection();
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(0, editor.Prompts.InvalidAsked.Count);
+            Assert.AreEqual(Selection.Node("N2"), editor.Session.Selection);
+            Assert.IsTrue(editor.Session.IsInvalidInput("node.size"));
+
+            // Clearing the selection asks. Going back keeps both.
+            editor.Prompts.DiscardInput.Enqueue(false);
+            Assert.IsTrue(editor.Session.Cancel());
+            CollectionAssert.AreEqual(new[] { "Size" }, editor.Prompts.InvalidAsked);
+            Assert.AreEqual(Selection.Node("N2"), editor.Session.Selection);
+            Assert.IsTrue(editor.Session.IsInvalidInput("node.size"));
+            Assert.AreEqual(0, discarded);
+            Assert.IsFalse(editor.Session.Busy);
+
+            // Discarding gives the text up and clears the selection.
+            editor.Prompts.DiscardInput.Enqueue(true);
+            Assert.IsTrue(editor.Session.Cancel());
+            Assert.AreEqual(2, editor.Prompts.InvalidAsked.Count);
+            Assert.AreEqual(SelectionKind.None, editor.Session.Selection.Kind);
+            Assert.IsFalse(editor.Session.HasInvalidInput);
+            Assert.AreEqual(1, discarded);
+        }
+
+        [Test]
+        public void Cancel_changes_neither_the_mission_nor_its_unsaved_state()
+        {
+            Editor editor = Editor.WithSavedChain();
+            string saved = MissionJson.Write(editor.Mission);
+            int revision = editor.Document.Revision;
+
+            editor.Session.ClickNode("N1");
+            editor.Session.ArmAddConnection();
+            editor.Session.Cancel();
+            editor.Session.Cancel();
+            editor.Session.ArmAddNode();
+            editor.Session.Cancel();
+
+            Assert.AreEqual(saved, MissionJson.Write(editor.Mission));
+            Assert.AreEqual(revision, editor.Document.Revision);
+            Assert.IsFalse(editor.Session.HasUnsavedChanges, "cancelling is not an edit");
+
+            // Unsaved work stays unsaved.
+            editor.Document.SetName("Edited");
+            string edited = MissionJson.Write(editor.Mission);
+            revision = editor.Document.Revision;
+            editor.Session.ClickEdge("N1", "N2");
+            editor.Session.ArmAddNode();
+            editor.Session.Cancel();
+            editor.Session.Cancel();
+            editor.Session.Cancel();
+
+            Assert.AreEqual(edited, MissionJson.Write(editor.Mission));
+            Assert.AreEqual(revision, editor.Document.Revision);
+            Assert.IsTrue(editor.Session.HasUnsavedChanges);
+        }
+
+        [Test]
+        public void Cancel_does_nothing_while_a_question_is_open()
+        {
+            Editor editor = Editor.WithSavedChain();
+            editor.Document.SetName("Edited");
+            editor.Session.ClickNode("N1");
+            editor.Session.ArmAddNode();
+            editor.Prompts.HoldUnsaved = true;
+            editor.Session.RequestQuit();
+            Assert.IsTrue(editor.Session.Busy);
+
+            Assert.IsFalse(editor.Session.Cancel());
+            Assert.IsFalse(editor.Session.Cancel());
+            Assert.AreEqual(EditorTool.AddNode, editor.Session.Tool);
+            Assert.AreEqual(Selection.Node("N1"), editor.Session.Selection);
+
+            editor.Prompts.HeldUnsaved(UnsavedChoice.Cancel);
+            Assert.AreEqual(EditorTool.AddNode, editor.Session.Tool);
+            Assert.AreEqual(Selection.Node("N1"), editor.Session.Selection);
         }
 
         [Test]

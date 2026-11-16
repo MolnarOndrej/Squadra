@@ -168,8 +168,9 @@ namespace Squadra
         }
 
         /// <summary>
-        /// What Escape does: answers an open dialog with its safe choice, otherwise cancels a pending
-        /// tool or connection, otherwise leaves the field being typed in.
+        /// What Escape does: answers an open dialog with its safe choice, otherwise cancels as a
+        /// right-click on the canvas does (a pending tool or connection first, then the selection),
+        /// otherwise leaves the field being typed in.
         /// </summary>
         public void PressEscape(bool usedByControl = false)
         {
@@ -182,7 +183,7 @@ namespace Squadra
             }
 
             if (usedByControl) return;
-            if (!session.CancelTool() && TypingInField) canvas.Focus();
+            if (!session.Cancel() && TypingInField) canvas.Focus();
         }
 
         /// <summary>What the Delete key does: deletes the selected object, unless a dialog is open.</summary>
@@ -272,11 +273,11 @@ namespace Squadra
                 switch (session.Tool)
                 {
                     case EditorTool.AddNode:
-                        return "Click the canvas to place a node.  Esc cancels.";
+                        return "Click the canvas to place a node.  Esc or right-click cancels.";
                     case EditorTool.AddConnection:
                         return session.ConnectionSource == null
-                            ? "Click the first node of the route.  Esc cancels."
-                            : "Click the node to connect to " + session.ConnectionSource + ".  Esc cancels.";
+                            ? "Click the first node of the route.  Esc or right-click cancels."
+                            : "Click the node to connect to " + session.ConnectionSource + ".  Esc or right-click cancels.";
                     default:
                         return "Drag a node to move it.  Drag the background to pan.  Scroll to zoom.";
                 }
