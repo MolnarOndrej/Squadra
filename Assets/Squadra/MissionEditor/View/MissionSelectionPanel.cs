@@ -112,7 +112,6 @@ namespace Squadra
                     ? MissionTextEntry.Problem(session.Document.SetNodeSize(id, size))
                     : error,
                 text => MissionFields.TryParseSize(text, out double size, out _) && size == NodeOr(id).Size));
-            MissionEditorRows.RowNote(body, "The body's radius in game world units.");
 
             ownerField = MissionEditorRows.Dropdown(body, "Owner", OwnerChoices());
             ownerField.RegisterValueChangedCallback(changed =>

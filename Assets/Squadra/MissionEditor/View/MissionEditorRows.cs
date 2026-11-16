@@ -19,15 +19,6 @@ namespace Squadra
             return note;
         }
 
-        /// <summary>A note under a row, in line with the row's control: what the value above it means.</summary>
-        public static Label RowNote(VisualElement parent, string text)
-        {
-            Label note = Note(text);
-            note.AddToClassList("row__note");
-            parent.Add(note);
-            return note;
-        }
-
         public static VisualElement Row(VisualElement parent, string label)
         {
             var row = new VisualElement();

@@ -79,6 +79,7 @@ namespace Squadra
             var remove = new Button(() => session.RequestRemovePlayer(id)) { text = "Remove" };
             remove.AddToClassList("tool-button");
             remove.AddToClassList("small-button");
+            remove.AddToClassList("player__action");
             row.Add(remove);
             return row;
         }
@@ -110,6 +111,7 @@ namespace Squadra
             var button = new Button(AddPlayer) { name = "addPlayerButton", text = "Add Player" };
             button.AddToClassList("tool-button");
             button.AddToClassList("small-button");
+            button.AddToClassList("player__action");
             row.Add(button);
 
             newPlayerError = new Label();
