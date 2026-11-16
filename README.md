@@ -144,7 +144,7 @@ The builders add these menu items. **Squadra > Rebuild First Playable Scene** re
 
 Every feature's tests are in its `Tests` folder. Run them all from **Window > General > Test Runner** (EditMode).
 
-`AGENTS.md` holds the code conventions, the architecture boundaries, how to verify a change and the review checklist. `.editorconfig` holds the formatting rules; `dotnet format whitespace --folder Assets/Squadra --verify-no-changes` checks them.
+`AGENTS.md` holds the workflow, the architecture boundaries, the code conventions, the contracts a change must keep and how to verify and hand over a change. `.editorconfig` holds the formatting rules; `dotnet format whitespace --folder Assets/Squadra --verify-no-changes` checks them.
 
 The specifications are in `specifications/`. `dart-battle-spec.md` is the current word on the basic unit's name and on combat; the older specifications keep their original wording and carry a note where it replaces them.
 
