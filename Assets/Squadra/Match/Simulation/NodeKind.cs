@@ -4,5 +4,8 @@ namespace Squadra.Simulation
     {
         Planet,
         Moon,
+
+        /// <summary>A map object like the others that never produces Darts.</summary>
+        Asteroid,
     }
 }

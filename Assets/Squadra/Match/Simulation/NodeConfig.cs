@@ -40,5 +40,19 @@ namespace Squadra.Simulation
                 ProductionInterval = MoonProductionInterval,
             };
         }
+
+        /// <summary>An asteroid holds, receives and sends fleets like any object, but never produces Darts.</summary>
+        public static NodeConfig Asteroid(string name, MapPoint position, Faction owner = Faction.Neutral, int darts = 0)
+        {
+            return new NodeConfig
+            {
+                Name = name,
+                Kind = NodeKind.Asteroid,
+                Position = position,
+                Owner = owner,
+                Darts = darts,
+                ProductionInterval = 0,
+            };
+        }
     }
 }

@@ -44,6 +44,7 @@ Material:
     - _IceAmount: 0
     - _LavaAmount: 0
     - _LavaLevel: 0.35
+    - _Lumps: 0
     - _NoiseScale: 3.2
     - _SeaLevel: 0
     - _Seed: 5.1

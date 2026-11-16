@@ -510,6 +510,68 @@ namespace Squadra.Tests
             Assert.AreEqual(1, pages.ClampPage(2));
         }
 
+        // ------------------------------------------------------------ missions that failed to load
+
+        static MissionSlot[] WithBrokenSecond() => new[]
+        {
+            new MissionSlot("mission-1", true),
+            MissionSlot.Failed("mission-2", "mission-2: players: \"player2\" owns no node."),
+            new MissionSlot("mission-3", true),
+            new MissionSlot("mission-4", false),
+        };
+
+        [Test]
+        public void An_assigned_mission_that_failed_is_unavailable_with_its_reason_and_unlike_a_preview()
+        {
+            MissionSlot[] missions = WithBrokenSecond();
+            var progress = new CampaignProgress();
+            progress.Complete("mission-1");
+
+            CollectionAssert.AreEqual(
+                new[] { MissionState.Completed, MissionState.Unavailable, MissionState.Locked, MissionState.Preview },
+                States(missions, progress));
+            Assert.IsFalse(CampaignRules.CanLaunch(missions, progress, 1));
+            StringAssert.Contains("owns no node", missions[1].Problem);
+            Assert.IsNull(missions[3].Problem, "a preview has nothing wrong with it");
+            Assert.IsFalse(CampaignRules.NeedsReveal(missions, progress, 1), "nothing to unlock");
+        }
+
+        [Test]
+        public void A_failed_mission_never_unlocks_the_one_after_it()
+        {
+            MissionSlot[] missions = WithBrokenSecond();
+            var progress = new CampaignProgress();
+            progress.Complete("mission-1");
+
+            Assert.AreEqual(MissionState.Locked, CampaignRules.StateOf(missions, progress, 2));
+            Assert.AreEqual(-1, CampaignRules.NextMission(missions, progress));
+        }
+
+        [Test]
+        public void Winning_before_a_failed_mission_disables_Next_Mission_with_its_own_reason()
+        {
+            MissionSlot[] missions = WithBrokenSecond();
+            var progress = new CampaignProgress();
+
+            ResultsPlan plan = CampaignRules.ConcludeMission(missions, progress, "mission-1", true);
+
+            Assert.AreEqual(ResultsHeading.Victory, plan.Heading);
+            Assert.AreEqual(NextMissionState.Unavailable, plan.NextMission);
+            Assert.IsTrue(plan.ShowsNextMission);
+            Assert.IsFalse(plan.CanStartNextMission);
+            Assert.AreEqual("Next mission could not be loaded", plan.NextMissionReason);
+            Assert.AreEqual(ResultsAction.Restart, plan.InitialFocus);
+            Assert.IsTrue(progress.IsCompleted("mission-1"));
+        }
+
+        [Test]
+        public void Losing_before_a_failed_mission_still_asks_for_a_win()
+        {
+            ResultsPlan plan = CampaignRules.ConcludeMission(WithBrokenSecond(), new CampaignProgress(), "mission-1", false);
+
+            Assert.AreEqual(NextMissionState.WinRequired, plan.NextMission);
+        }
+
         [Test]
         public void An_empty_catalog_still_has_one_empty_page()
         {

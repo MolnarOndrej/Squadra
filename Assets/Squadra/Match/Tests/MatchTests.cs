@@ -30,6 +30,7 @@ namespace Squadra.Tests
         {
             var config = new MatchConfig { FleetSpeed = 2 };
             config.Nodes.AddRange(nodes);
+            config.ConnectAll();
             return new Match(config);
         }
 
@@ -605,7 +606,7 @@ namespace Squadra.Tests
         }
 
         [Test]
-        public void Red_fleet_in_transit_delays_victory_until_it_is_gone()
+        public void Red_Darts_in_transit_and_then_capturing_keep_Red_in_the_match()
         {
             // Red sends its garrison on a long trip to the far moon; Blue takes the emptied planet meanwhile.
             Match match = Custom(Idle(0, Faction.Blue, 10), Idle(4, Faction.Red, 6), MoonAt(34));
@@ -617,11 +618,13 @@ namespace Squadra.Tests
             Assert.AreEqual(Faction.Blue, match.Nodes[1].Owner);
             Assert.AreEqual(MatchStatus.InProgress, match.Status, "a Red fleet is still in flight");
 
-            match.Advance(6.9);
-            Assert.AreEqual(MatchStatus.InProgress, match.Status);
+            match.Advance(7); // t=15: the Red fleet lands on the moon and starts capturing
+            Assert.AreEqual(Faction.Red, match.Nodes[2].Captor);
+            Assert.AreEqual(MatchStatus.InProgress, match.Status, "capturing Darts keep Red in the match");
 
-            match.Advance(0.1); // the Red fleet lands on the moon and starts capturing: no Red fleet in transit
-            Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
+            match.Advance(10); // t=25: Red owns the moon
+            Assert.AreEqual(Faction.Red, match.Nodes[2].Owner);
+            Assert.AreEqual(MatchStatus.InProgress, match.Status, "a moon of its own keeps Red in the match");
         }
 
         [Test]

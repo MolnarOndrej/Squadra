@@ -19,6 +19,7 @@ namespace Squadra.Tests
         {
             var config = new MatchConfig { FleetSpeed = 2 };
             config.Nodes.AddRange(nodes);
+            config.ConnectAll();
             return new Match(config);
         }
 
@@ -135,6 +136,7 @@ namespace Squadra.Tests
             config.Nodes.Add(Idle(0, Faction.Blue, 40));
             config.Nodes.Add(Idle(2, Faction.Red, 2));
             config.Nodes.Add(Idle(500, Faction.Red, 1));
+            config.ConnectAll();
             var match = new Match(config);
 
             match.TryLaunch(Faction.Blue, Source, Target);
@@ -824,8 +826,9 @@ namespace Squadra.Tests
         [Test]
         public void A_battle_left_unresolved_when_the_match_ends_stays_as_it_was()
         {
-            // Blue takes Red's only planet while a second Blue fleet is still fighting Red's moon guards.
-            NodeConfig moon = MoonAt(-8, Faction.Red, 10);
+            // Blue takes Red's only world while a second Blue fleet is still fighting a neutral moon's
+            // guards, which do not stand in the way of victory.
+            NodeConfig moon = MoonAt(-8, Faction.Neutral, 10);
             moon.ProductionInterval = 0;
             Match match = Custom(Idle(0, Faction.Blue, 40), Idle(2, Faction.Red, 4), Idle(-20, Faction.Blue, 10), moon);
 
@@ -852,6 +855,7 @@ namespace Squadra.Tests
             config.Nodes.Add(Idle(0, Faction.Blue, 10));
             config.Nodes.Add(Idle(2, Faction.Red, 10));
 
+            config.ConnectAll();
             var first = new Match(config);
             first.TryLaunch(Faction.Blue, 0, 1);
             first.Advance(3);

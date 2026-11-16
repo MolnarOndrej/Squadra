@@ -15,6 +15,7 @@ namespace Squadra.Tests
         {
             var config = new MatchConfig { FleetSpeed = 2 };
             config.Nodes.AddRange(nodes);
+            config.ConnectAll();
             return new Match(config);
         }
 
@@ -26,7 +27,7 @@ namespace Squadra.Tests
             return node;
         }
 
-        /// <summary>A moon that never produces. Moons do not count toward victory.</summary>
+        /// <summary>A moon that never produces.</summary>
         static NodeConfig IdleMoon(float x, Faction owner = Faction.Neutral, int darts = 0)
         {
             NodeConfig node = NodeConfig.Moon("Moon", new MapPoint(x, 0), owner, darts);
@@ -354,6 +355,7 @@ namespace Squadra.Tests
             config.Players.Add(new MatchPlayer(Faction.Blue, "Commander"));
             config.Nodes.Add(Idle(0, Faction.Blue, 9));
             config.Nodes.Add(Idle(4, Faction.Red, 2));
+            config.ConnectAll();
             var match = new Match(config);
 
             match.TryLaunch(Faction.Blue, 0, 1);
@@ -370,11 +372,13 @@ namespace Squadra.Tests
         {
             var neutral = new MatchConfig();
             neutral.Players.Add(new MatchPlayer(Faction.Neutral));
+            neutral.ConnectAll();
             Assert.Throws<ArgumentException>(() => new Match(neutral));
 
             var twice = new MatchConfig();
             twice.Players.Add(new MatchPlayer(Faction.Blue));
             twice.Players.Add(new MatchPlayer(Faction.Blue));
+            twice.ConnectAll();
             Assert.Throws<ArgumentException>(() => new Match(twice));
         }
 
@@ -399,8 +403,8 @@ namespace Squadra.Tests
         [Test]
         public void A_six_player_result_keeps_every_player_in_roster_order_with_its_own_totals()
         {
-            // Blue (human) takes Red's planet and wins. Meanwhile Yellow wipes out Green, whose moon it
-            // captures; Purple and Orange never fight. Moons do not count toward Blue's victory.
+            // Red takes the planet of Blue (human), who loses. Meanwhile Yellow wipes out Green, whose moon
+            // it captures; Purple and Orange never fight.
             var config = new MatchConfig { FleetSpeed = 2, Human = Faction.Blue };
             config.Players.Add(new MatchPlayer(Faction.Red, "Crimson Pact"));
             config.Players.Add(new MatchPlayer(Faction.Green));
@@ -408,23 +412,24 @@ namespace Squadra.Tests
             config.Players.Add(new MatchPlayer(Faction.Yellow));
             config.Players.Add(new MatchPlayer(Faction.Purple));
             config.Players.Add(new MatchPlayer(Faction.Orange));
-            config.Nodes.Add(Idle(0, Faction.Blue, 20));       // 0
-            config.Nodes.Add(Idle(10, Faction.Red, 4));        // 1
+            config.Nodes.Add(Idle(0, Faction.Blue, 4));        // 0
+            config.Nodes.Add(Idle(10, Faction.Red, 20));       // 1
             config.Nodes.Add(IdleMoon(20, Faction.Green, 2));  // 2
             config.Nodes.Add(IdleMoon(24, Faction.Yellow, 6)); // 3
             config.Nodes.Add(IdleMoon(40, Faction.Purple, 9)); // 4
             config.Nodes.Add(IdleMoon(50, Faction.Orange, 0)); // 5
+            config.ConnectAll();
             var match = new Match(config);
 
             match.TryLaunch(Faction.Yellow, 3, 2); // t=2: 6 against Green's 2, captured five seconds after the battle
-            match.TryLaunch(Faction.Blue, 0, 1);   // t=5: 20 against Red's 4, captured five seconds after the battle
-            double victory = 5 + BattleSeconds(20, 4) + 5;
-            match.Advance(victory - 0.1);
+            match.TryLaunch(Faction.Red, 1, 0);    // t=5: 20 against Blue's 4, captured five seconds after the battle
+            double defeat = 5 + BattleSeconds(20, 4) + 5;
+            match.Advance(defeat - 0.1);
             Assert.AreEqual(MatchStatus.InProgress, match.Status);
             Assert.IsFalse(match.IsAlive(Faction.Green), "Green has lost everything");
 
             match.Advance(0.1);
-            Assert.AreEqual(MatchStatus.BlueVictory, match.Status);
+            Assert.AreEqual(MatchStatus.BlueDefeat, match.Status);
 
             MatchResults results = match.Results;
             Assert.AreEqual(6, results.Players.Count);

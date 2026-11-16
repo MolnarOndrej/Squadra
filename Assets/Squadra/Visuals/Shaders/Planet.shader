@@ -9,6 +9,7 @@ Shader "Squadra/Planet"
         _Seed ("Seed", Float) = 1
         _SpinSpeed ("Spin speed", Float) = 0.05
         _Tilt ("Axis tilt (radians)", Float) = 0.3
+        _Lumps ("Irregular outline (rocks)", Range(0, 0.35)) = 0
 
         [Header(Light)]
         _LightDir ("Light direction (xyz)", Vector) = (-0.55, 0.5, 0.67, 0)
@@ -98,6 +99,7 @@ Shader "Squadra/Planet"
                 float _Seed;
                 float _SpinSpeed;
                 float _Tilt;
+                float _Lumps;
                 float4 _LightDir;
                 float _Ambient;
                 float _Specular;
@@ -165,6 +167,15 @@ Shader "Squadra/Planet"
             half4 Frag(Varyings input) : SV_Target
             {
                 float2 p = (input.uv * 2.0 - 1.0) / _BodyRadius; // the body is the unit disc
+                if (_Lumps > 0.0001)
+                {
+                    // A rock rather than a ball: the outline dips in and out around the body, never past
+                    // the body radius. Whole-number frequencies keep it closed where the angle wraps.
+                    float angle = atan2(p.y, p.x);
+                    float lump = 0.5 + 0.24 * sin(angle * 3.0 + _Seed * 1.7) + 0.16 * sin(angle * 5.0 + _Seed * 3.1)
+                        + 0.1 * sin(angle * 7.0 + _Seed * 0.7);
+                    p /= 1.0 - _Lumps * lump;
+                }
                 float r = length(p);
                 float aa = max(fwidth(r), 1e-4);
                 float planarFootprint = max(length(ddx(p)), length(ddy(p)));

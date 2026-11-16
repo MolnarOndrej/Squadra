@@ -2,30 +2,22 @@ using System.Globalization;
 using Squadra.Simulation;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Squadra
 {
     /// <summary>
-    /// One planet or moon in the scene. Holds the object's starting rules (owner, Darts, production rate)
-    /// and shows its live state: ownership ring and aura, selection outline, fleet count and capture
+    /// One planet, moon or asteroid in the scene. It is a copy of the scene's world template, given its
+    /// name, place, size and surface when the mission's battlefield is built, and shows the world's live
+    /// state: ownership ring and aura in the owner's color, selection outline, fleet count and capture
     /// progress. While a battle is fought here it shows both sides' counts and that they are fighting,
-    /// and a capture that was running is shown held at the progress it had reached.
+    /// and a capture that was running is shown held at the progress it had reached. The surface is the
+    /// shared material of the world's look and is never changed by ownership.
     /// </summary>
     [ExecuteAlways]
     public sealed class WorldView : MonoBehaviour
     {
         static readonly int TintId = Shader.PropertyToID("_Tint");
         static readonly int BodyRadiusId = Shader.PropertyToID("_BodyRadius");
-
-        [Header("Rules")]
-        [SerializeField] string displayName = "World";
-        [SerializeField] NodeKind kind = NodeKind.Planet;
-        [SerializeField] Faction startingOwner = Faction.Neutral;
-        [FormerlySerializedAs("startingShips")]
-        [SerializeField] int startingDarts;
-        [Tooltip("Seconds per produced Dart while owned and outside capture.")]
-        [SerializeField] float productionInterval = 1f;
 
         [Header("Look")]
         [Tooltip("Radius of the body in world units.")]
@@ -38,6 +30,7 @@ namespace Squadra
         [SerializeField] TextMeshPro countLabel;
         [SerializeField] TextMeshPro captionLabel;
 
+        string displayName = "World";
         RingStyle owner;
         RingStyle capture;
         RingStyle selection;
@@ -61,6 +54,8 @@ namespace Squadra
             public int Darts;
             public float CaptureProgress;
             public float CaptureRemaining;
+
+            /// <summary>Seconds per produced Dart; zero for a world that never produces.</summary>
             public float Interval;
 
             /// <summary>True while a battle is fought here. <see cref="Darts"/> is then the stationed side's count.</summary>
@@ -84,17 +79,16 @@ namespace Squadra
         public float PickRadius => OrbitRadius + 0.3f;
         public Vector2 Position => transform.position;
 
-        public NodeConfig ToConfig()
+        /// <summary>
+        /// Makes this copy of the template one world of the mission. Call before the copy is first enabled.
+        /// </summary>
+        public void Setup(string worldName, Vector2 position, float radius, Material surfaceMaterial)
         {
-            return new NodeConfig
-            {
-                Name = displayName,
-                Kind = kind,
-                Position = new MapPoint(transform.position.x, transform.position.y),
-                Owner = startingOwner,
-                Darts = startingDarts,
-                ProductionInterval = productionInterval,
-            };
+            displayName = worldName ?? string.Empty;
+            transform.position = new Vector3(position.x, position.y, 0f);
+            bodyRadius = radius;
+            if (surface != null) surface.sharedMaterial = surfaceMaterial;
+            Layout();
         }
 
         /// <summary>Scale-pops the fleet count, e.g. when a Dart is built or a fleet arrives.</summary>
@@ -120,7 +114,7 @@ namespace Squadra
                 Darts = node.Darts,
                 CaptureProgress = node.CaptureProgress,
                 CaptureRemaining = (float)node.CaptureRemaining,
-                Interval = (float)node.ProductionInterval,
+                Interval = node.CanProduce ? (float)node.ProductionInterval : 0f,
                 Fighting = battle != null,
                 Arriving = battle != null ? battle.Arriving : Faction.Neutral,
                 ArrivingDarts = battle != null ? battle.ArrivingDarts : 0,
@@ -138,7 +132,7 @@ namespace Squadra
 
         void Update()
         {
-            // In the editor, mirror the starting rules so the scene reads correctly without pressing Play.
+            // In the editor, show the template as a neutral world so the scene reads without pressing Play.
             if (!Application.isPlaying) Preview();
         }
 
@@ -147,13 +141,7 @@ namespace Squadra
             if (surface == null || ownerRing == null) return;
             EnsureHandles();
             Layout();
-            Render(new State
-            {
-                Owner = startingOwner,
-                Occupant = startingOwner,
-                Darts = startingDarts,
-                Interval = productionInterval,
-            }, 1000f, false, false);
+            Render(new State { Interval = 1f }, 1000f, false, false);
         }
 
         void EnsureHandles()
@@ -343,6 +331,12 @@ namespace Squadra
                 else if (state.Owner == Faction.Neutral)
                 {
                     captionLabel.text = displayName.ToUpperInvariant() + "  -  NEUTRAL";
+                    captionLabel.color = Palette.TextDim;
+                }
+                else if (state.Interval <= 0f)
+                {
+                    // An asteroid: owned, but never a Dart to count down to.
+                    captionLabel.text = displayName.ToUpperInvariant() + "  -  NO PRODUCTION";
                     captionLabel.color = Palette.TextDim;
                 }
                 else

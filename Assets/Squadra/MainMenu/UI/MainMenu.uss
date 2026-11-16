@@ -306,8 +306,21 @@
 }
 
 .mission--preview > .mission__name,
-.mission--locked > .mission__name {
+.mission--locked > .mission__name,
+.mission--unavailable > .mission__name {
     color: var(--text-dim);
+}
+
+.mission--unavailable > .mission__dot {
+    border-color: rgba(255, 77, 94, 0.55);
+}
+
+.mission--unavailable > .mission__dot > .mission__icon {
+    --icon-color: rgba(255, 138, 149, 0.8);
+}
+
+.mission--unavailable > .mission__status {
+    color: #FF8A95;
 }
 
 .mission--available > .mission__dot {

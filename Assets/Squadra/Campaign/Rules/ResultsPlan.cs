@@ -8,6 +8,7 @@ namespace Squadra.Campaign
     {
         public const string ComingSoonReason = "Next mission coming soon";
         public const string WinRequiredReason = "Win this mission to continue";
+        public const string UnavailableReason = "Next mission could not be loaded";
 
         public readonly ResultsHeading Heading;
         public readonly NextMissionState NextMission;
@@ -42,6 +43,7 @@ namespace Squadra.Campaign
                 {
                     case NextMissionState.ComingSoon: return ComingSoonReason;
                     case NextMissionState.WinRequired: return WinRequiredReason;
+                    case NextMissionState.Unavailable: return UnavailableReason;
                     default: return null;
                 }
             }

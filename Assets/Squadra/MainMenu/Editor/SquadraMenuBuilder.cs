@@ -14,8 +14,8 @@ namespace Squadra.EditorTools
     /// <c>Squadra &gt; Rebuild Main Menu Scene</c>; it overwrites the scene and puts it first in the build.
     /// The layout and look live in <c>Assets/Squadra/MainMenu/UI</c> and the mission list in the catalog asset;
     /// those are created when missing and otherwise left alone. Materials and the post-processing
-    /// profile are shared with the first playable scene, so build that one first. The panel settings and
-    /// the catalog are shared the other way: the playable scene's results screen uses both.
+    /// profile are shared with the mission scene, so build that one first. The panel settings and the
+    /// catalog are shared the other way: the mission scene's results screen uses both.
     /// </summary>
     public static class SquadraMenuBuilder
     {
@@ -36,16 +36,16 @@ namespace Squadra.EditorTools
         [MenuItem("Squadra/Rebuild Main Menu Scene")]
         public static void Build()
         {
-            var space = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Space.mat");
-            var planet = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Thalassa.mat");
-            var moon = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Lune.mat");
+            var space = Load<Material>(SquadraAssetBuilder.BackdropFolder + "/Space.mat");
+            var planet = Load<Material>(SquadraAssetBuilder.PlanetFolder + "/Thalassa.mat");
+            var moon = Load<Material>(SquadraAssetBuilder.MoonFolder + "/Lune.mat");
             var ring = Load<Material>(SquadraAssetBuilder.MaterialFolder + "/Ring.mat");
             var profile = Load<VolumeProfile>(SquadraAssetBuilder.SettingsFolder + "/SpaceVolume.asset");
             var layout = Load<VisualTreeAsset>(LayoutPath);
             var theme = Load<ThemeStyleSheet>(ThemePath);
             if (space == null || planet == null || moon == null || ring == null || profile == null)
             {
-                Debug.LogError("Squadra: run Squadra > Rebuild First Playable Scene first; the menu shares its materials.");
+                Debug.LogError("Squadra: run Squadra > Rebuild Mission Scene first; the menu shares its materials.");
                 return;
             }
 
@@ -144,9 +144,9 @@ namespace Squadra.EditorTools
         }
 
         /// <summary>
-        /// The mission catalog, created when missing: Mission 1 is the first playable scenario and
-        /// Missions 2-5 are previews until their scenes exist. Mission 1 only gets its scene when that
-        /// scene has been saved, so create the catalog after the first playable scene.
+        /// The mission catalog, created when missing: Mission 1 is First Contact and Missions 2-5 are
+        /// previews until their mission files exist. The catalog only gets the mission scene once that
+        /// scene has been saved, so create the catalog after the mission scene.
         /// </summary>
         internal static MissionCatalog EnsureCatalog()
         {
@@ -155,8 +155,8 @@ namespace Squadra.EditorTools
 
             Directory.CreateDirectory(CampaignFolder);
             AssetDatabase.Refresh();
-            catalog = MissionCatalog.Create(
-                ("mission-01", SquadraSceneBuilder.ScenePath),
+            catalog = MissionCatalog.Create(SquadraSceneBuilder.ScenePath, null,
+                ("mission-01", Load<TextAsset>(SquadraSceneBuilder.FirstMissionPath)),
                 ("mission-02", null),
                 ("mission-03", null),
                 ("mission-04", null),
@@ -166,7 +166,20 @@ namespace Squadra.EditorTools
             return catalog;
         }
 
-        // The game opens on the menu, and a mission can only be launched when its scene is in the build.
+        /// <summary>
+        /// Points the catalog at the generated parts it relies on, the mission scene and the world looks,
+        /// and leaves its missions alone.
+        /// </summary>
+        internal static void WireCatalog(MissionCatalog catalog, WorldLooks looks)
+        {
+            SceneWiring.Wire(catalog, "looks", looks);
+            SceneWiring.Wire(catalog, "gameplayScene", Load<SceneAsset>(SquadraSceneBuilder.ScenePath));
+            SceneWiring.Wire(catalog, "gameplayScenePath", SquadraSceneBuilder.ScenePath);
+            EditorUtility.SetDirty(catalog);
+            AssetDatabase.SaveAssets();
+        }
+
+        // The game opens on the menu, and a mission can only be launched when the mission scene is in the build.
         static void PutFirstInBuild()
         {
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);

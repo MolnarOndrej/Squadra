@@ -5,43 +5,44 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// The dashed lines between worlds: an idle lane for every pair, and the preview of the order
-    /// the player is about to give. A lane that carries a fleet or the preview is hidden, because the
-    /// animated line drawn over it would fill its gaps.
+    /// The dashed lines between worlds: an idle lane for every route of the mission, and the preview of
+    /// the order the player is about to give, which only a route allows. A lane that carries a fleet or
+    /// the preview is hidden, because the animated line drawn over it would fill its gaps.
     /// </summary>
     sealed class RouteLanes
     {
         readonly IReadOnlyList<WorldView> worlds;
         readonly Faction player;
-        readonly LineStyle[,] idleLanes;
-        readonly bool[,] activeLanes;
+        readonly Dictionary<Route, int> laneOf = new Dictionary<Route, int>();
+        readonly LineStyle[] idleLanes;
+        readonly bool[] activeLanes;
         readonly LineStyle orderPreview;
 
-        /// <summary>Creates the lines as children of <paramref name="parent"/>.</summary>
-        public RouteLanes(IReadOnlyList<WorldView> worlds, Faction player, Transform parent, Material lineMaterial)
+        /// <summary>Creates the lines for the match's routes as children of <paramref name="parent"/>.</summary>
+        public RouteLanes(Match match, IReadOnlyList<WorldView> worlds, Faction player, Transform parent,
+            Material lineMaterial)
         {
             this.worlds = worlds;
             this.player = player;
 
-            // Every pair of worlds has a direct route. Keep the idle lanes readable under active orders.
-            idleLanes = new LineStyle[worlds.Count, worlds.Count];
-            activeLanes = new bool[worlds.Count, worlds.Count];
-            for (int a = 0; a < worlds.Count; a++)
+            // Keep the idle lanes readable under active orders.
+            IReadOnlyList<Route> routes = match.Routes;
+            idleLanes = new LineStyle[routes.Count];
+            activeLanes = new bool[routes.Count];
+            for (int i = 0; i < routes.Count; i++)
             {
-                for (int b = a + 1; b < worlds.Count; b++)
+                GetRoute(routes[i].A, routes[i].B, out Vector2 from, out Vector2 to);
+                var lane = new LineStyle(Shapes.CreateQuad("Lane", parent, lineMaterial, -50))
                 {
-                    GetRoute(a, b, out Vector2 from, out Vector2 to);
-                    var lane = new LineStyle(Shapes.CreateQuad("Lane", parent, lineMaterial, -50))
-                    {
-                        Tint = Palette.Hdr(Palette.Starlight, 0.66f, 0.53f),
-                        Width = 0.10f,
-                        Dash = 0.13f,
-                        Gap = 0.16f,
-                        EndFade = 0.04f,
-                    };
-                    lane.Set(from, to);
-                    idleLanes[a, b] = lane;
-                }
+                    Tint = Palette.Hdr(Palette.Starlight, 0.66f, 0.53f),
+                    Width = 0.10f,
+                    Dash = 0.13f,
+                    Gap = 0.16f,
+                    EndFade = 0.04f,
+                };
+                lane.Set(from, to);
+                idleLanes[i] = lane;
+                laneOf[routes[i]] = i;
             }
 
             orderPreview = new LineStyle(Shapes.CreateQuad("Order Preview", parent, lineMaterial, 8))
@@ -76,12 +77,12 @@ namespace Squadra
             foreach (Fleet fleet in match.Fleets)
                 MarkActive(fleet.SourceId, fleet.TargetId);
 
-            for (int a = 0; a < worlds.Count; a++)
-                for (int b = a + 1; b < worlds.Count; b++)
-                    idleLanes[a, b].Visible = !activeLanes[a, b];
+            for (int i = 0; i < idleLanes.Length; i++)
+                idleLanes[i].Visible = !activeLanes[i];
         }
 
-        // A route runs between the two orbits, not between the centers of the worlds.
+        // A route is drawn between the two orbits, not between the centers of the worlds. The rules still
+        // measure it from center to center.
         void GetRoute(int source, int target, out Vector2 from, out Vector2 to)
         {
             Vector2 delta = worlds[target].Position - worlds[source].Position;
@@ -92,7 +93,7 @@ namespace Squadra
 
         void MarkActive(int source, int target)
         {
-            activeLanes[Mathf.Min(source, target), Mathf.Max(source, target)] = true;
+            if (laneOf.TryGetValue(new Route(source, target), out int lane)) activeLanes[lane] = true;
         }
     }
 }

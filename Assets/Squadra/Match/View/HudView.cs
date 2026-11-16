@@ -22,6 +22,10 @@ namespace Squadra
         const float ResultFadeSeconds = 0.6f;
         const float PauseFadeSeconds = 0.2f;
 
+        // The view height the HUD's sizes are given for. A larger map shows more of the world, and the
+        // HUD grows with the view so that it keeps its size on screen.
+        const float ReferenceViewHeight = 10f;
+
         [SerializeField] CameraRig rig;
         [SerializeField] float margin = 0.45f;
 
@@ -58,6 +62,12 @@ namespace Squadra
 
         /// <summary>How dark the scrim over the battlefield is right now, from 0 to <see cref="DimOpacity"/>.</summary>
         public float ScrimOpacity => DimOpacity * Mathf.Max(ResultCover(), PauseCover());
+
+        /// <summary>The line under the title: which mission this is.</summary>
+        public void SetSubtitle(string text)
+        {
+            if (subtitle != null) subtitle.text = text;
+        }
 
         public void SetHint(string text)
         {
@@ -125,20 +135,21 @@ namespace Squadra
             if (rig == null) return;
 
             Rect view = rig.View;
-            float left = view.xMin + margin;
-            float right = view.xMax - margin;
-            float top = view.yMax - margin;
-            float bottom = view.yMin + margin;
+            float scale = Mathf.Max(0.01f, view.height / ReferenceViewHeight);
+            float left = view.xMin + margin * scale;
+            float right = view.xMax - margin * scale;
+            float top = view.yMax - margin * scale;
+            float bottom = view.yMin + margin * scale;
             float centerX = view.center.x;
 
-            Place(title, left, top);
-            Place(subtitle, left, top - 0.72f);
-            Place(blueTally, centerX - 0.55f, top + 0.05f);
-            Place(redTally, centerX + 0.55f, top + 0.05f);
-            Place(versus, centerX, top - 0.3f);
-            Place(clock, right, top);
-            Place(clockCaption, right, top - 0.62f);
-            Place(hint, centerX, bottom);
+            Place(title, left, top, scale);
+            Place(subtitle, left, top - 0.72f * scale, scale);
+            Place(blueTally, centerX - 0.55f * scale, top + 0.05f * scale, scale);
+            Place(redTally, centerX + 0.55f * scale, top + 0.05f * scale, scale);
+            Place(versus, centerX, top - 0.3f * scale, scale);
+            Place(clock, right, top, scale);
+            Place(clockCaption, right, top - 0.62f * scale, scale);
+            Place(hint, centerX, bottom, scale);
 
             if (resultRoot != null && resultRoot.activeSelf)
             {
@@ -179,9 +190,12 @@ namespace Squadra
             scrim.SetPropertyBlock(scrimBlock);
         }
 
-        static void Place(TextMeshPro text, float x, float y)
+        static void Place(TextMeshPro text, float x, float y, float scale)
         {
-            if (text != null) text.transform.position = new Vector3(x, y, 0f);
+            if (text == null) return;
+
+            text.transform.position = new Vector3(x, y, 0f);
+            text.transform.localScale = new Vector3(scale, scale, 1f);
         }
     }
 }

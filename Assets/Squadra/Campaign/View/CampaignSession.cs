@@ -34,8 +34,9 @@ namespace Squadra
 
         /// <summary>
         /// The campaign launch flow: starts the mission at <paramref name="index"/> of the catalog if the
-        /// campaign allows it, and hands back the scene to load. The map and the results screen's Next
-        /// Mission both launch through here, so the same rules apply to both.
+        /// campaign allows it, and hands back the scene to load: the shared gameplay scene, which builds
+        /// the active mission's battlefield. The map and the results screen's Next Mission both launch
+        /// through here, so the same rules apply to both.
         /// </summary>
         public static bool TryBeginMission(MissionCatalog catalog, int index, out string scenePath)
         {
@@ -43,7 +44,7 @@ namespace Squadra
             if (catalog == null || index < 0 || index >= catalog.Count) return false;
             if (!CampaignRules.CanLaunch(catalog.ToSlots(), Progress, index)) return false;
 
-            scenePath = catalog.ScenePathAt(index);
+            scenePath = catalog.GameplayScenePath;
             BeginMission(catalog.IdAt(index));
             return true;
         }

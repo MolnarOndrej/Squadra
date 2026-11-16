@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b51fbf9f74183843a840191d60e1d4c, type: 3}
+  m_Name: WorldLooks
+  m_EditorClassIdentifier: Assembly-CSharp::Squadra.WorldLooks
+  planets:
+  - id: ember
+    material: {fileID: 2100000, guid: c1ae2e4ad4b5d3743af5c847e04af73f, type: 2}
+  - id: thalassa
+    material: {fileID: 2100000, guid: f2b46c0e2372994489439d5dfd5c3845, type: 2}
+  moons:
+  - id: lune
+    material: {fileID: 2100000, guid: cb2c4a442be4c1e459013b9ba868a9ff, type: 2}
+  asteroids:
+  - id: cinder
+    material: {fileID: 2100000, guid: 29d7028615c08ad4087b2660073edc5b, type: 2}
+  - id: ferrite
+    material: {fileID: 2100000, guid: 40063bfe86a5a5049a99bd595a4d014a, type: 2}
+  planetNames: {fileID: 4900000, guid: dc814247e41280543b180ac46f9fb785, type: 3}
+  moonNames: {fileID: 4900000, guid: 38016a7b40cc6574a92f0fbb444a435a, type: 3}
+  asteroidNames: {fileID: 4900000, guid: fa38e5fcf5d77e64c980c1601d510efb, type: 3}
+  backdrops:
+  - id: space
+    material: {fileID: 2100000, guid: d340c18ee9030494d9f723d4e014cc52, type: 2}

@@ -8,11 +8,12 @@
 
 ## Architecture
 
-All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project layout describes each). A feature holds its rules, scripts, UI, editor tooling, scenes, tests and assets in fixed subfolders: a rules folder (`Rules`, `Simulation`, `Missions` or `Editing`), `View`, `UI`, `Editor`, `Scenes`, `Tests`. A feature without rules keeps scripts at its root. Shared things go to the feature that owns the idea (`Menus`, `Visuals`, `Audio`, `SceneBuilding`), never to kind-named folders (scripts, enums, helpers).
+All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project layout describes each). A feature holds its rules, scripts, UI, editor tooling, scenes, tests and assets in fixed subfolders: a rules folder (`Rules`, `Simulation`, `Preparation`, `Missions` or `Editing`), `View`, `UI`, `Editor`, `Scenes`, `Tests`. A feature without rules keeps scripts at its root. Shared things go to the feature that owns the idea (`Menus`, `Visuals`, `Audio`, `SceneBuilding`), never to kind-named folders (scripts, enums, helpers).
 
 | Assembly | Folder | Notes |
 | --- | --- | --- |
 | `Squadra.Simulation` | `Match/Simulation` | The match |
+| `Squadra.Preparation` | `Match/Preparation` | Mission file to playable mission and world looks; references `Squadra.Missions` and `Squadra.Simulation` |
 | `Squadra.Campaign` | `Campaign/Rules` | |
 | `Squadra.Pause` | `Pause/Rules` | Also holds `AudioMix`; leave it there |
 | `Squadra.Missions` | `MissionEditor/Missions` | Mission file format |
@@ -28,7 +29,7 @@ All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project l
 
 ## Code conventions
 
-- One top-level type per file, named like the file (enforced by `TypeFileConventionTests`). Nest only private helpers; the only public nested types are `GameController.RosterEntry` and `MissionCatalog.Entry`.
+- One top-level type per file, named like the file (enforced by `TypeFileConventionTests`). Nest only private helpers; the only public nested type is `MissionCatalog.Entry`.
 - No `partial` to split files; it exists only where a source generator needs it (`[UxmlElement]`, `[AutoStaticsCleanup]`).
 - Use the game's vocabulary (Darts, fleets, capture, battles, missions, campaign); no `Utils`/`Helpers`/`Types` names; don't rename agreed concepts.
 - One reason to change per type: separate rules, rendering, input, persistence and platform calls. Coordinators only coordinate; state changes stay with the owner (`Battle`, `Node`).
@@ -54,7 +55,7 @@ No hosted CI. Run what covers the change; run everything for a larger one. All t
 - **Tests:** `unity command test run -- --mode editor` (editor open), or Test Runner > EditMode > Run All.
 - **Compile:** let Unity compile; check the Console for runtime and editor errors.
 - **Format:** `dotnet format whitespace --folder Assets/Squadra --verify-no-changes` (drop the flag to fix).
-- **Presentation/UI** (not covered by tests): play the affected scenes, `MainMenu/Scenes/MainMenu.unity`, `Match/Scenes/SampleScene.unity`, `MissionEditor/Scenes/MissionEditor.unity`, and check missing scripts and lost serialized values after moves.
+- **Presentation/UI** (not covered by tests): play the affected scenes, `MainMenu/Scenes/MainMenu.unity`, `Match/Scenes/Mission.unity`, `MissionEditor/Scenes/MissionEditor.unity`, and check missing scripts and lost serialized values after moves.
 - **Builders:** run the changed builder's **Squadra** menu item; restore generated assets you didn't mean to change.
 
 **Handover:** report what ran and what it showed, which scenes were played, and what was not verified. Never present a failing or skipped check as passed. For refactors, also say what was hard to maintain and who owns what now.

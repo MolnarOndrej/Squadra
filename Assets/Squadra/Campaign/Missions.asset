@@ -14,17 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Squadra.MissionCatalog
   missions:
   - id: mission-01
-    scene: {fileID: 102900000, guid: 8c9cfa26abfee488c85f1582747f6a02, type: 3}
-    scenePath: Assets/Squadra/Match/Scenes/SampleScene.unity
+    definition: {fileID: 4900000, guid: 49a247430ac704a43bfedbb161c53fde, type: 3}
   - id: mission-02
-    scene: {fileID: 0}
-    scenePath: 
+    definition: {fileID: 0}
   - id: mission-03
-    scene: {fileID: 0}
-    scenePath: 
+    definition: {fileID: 0}
   - id: mission-04
-    scene: {fileID: 0}
-    scenePath: 
+    definition: {fileID: 0}
   - id: mission-05
-    scene: {fileID: 0}
-    scenePath: 
+    definition: {fileID: 0}
+  looks: {fileID: 11400000, guid: a451afc116aabe0478379d40be4c90c3, type: 2}
+  gameplayScene: {fileID: 102900000, guid: 8c9cfa26abfee488c85f1582747f6a02, type: 3}
+  gameplayScenePath: Assets/Squadra/Match/Scenes/Mission.unity

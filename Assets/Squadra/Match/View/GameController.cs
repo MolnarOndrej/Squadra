@@ -1,6 +1,7 @@
-using System;
+using System.Collections.Generic;
 using Squadra.Campaign;
 using Squadra.Pause;
+using Squadra.Preparation;
 using Squadra.Simulation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -8,31 +9,23 @@ using UnityEngine.SceneManagement;
 namespace Squadra
 {
     /// <summary>
-    /// Runs one match in the scene. Builds the <see cref="Match"/> from the worlds placed in the scene,
-    /// turns clicks into fleet orders for Blue, advances time and tells the views what to show: fleets
-    /// leaving and arriving, battles beginning, their casualties as they happen and how they end. When
-    /// the match ends it hands the results to the results screen and carries out the action picked there.
-    /// All game rules live in the match; nothing here decides an outcome. It also owns the pause: while
-    /// paused the match gets no time and no orders, the scene's animation and effects stand still, and
-    /// the match, the selection and any result are kept exactly as they were.
+    /// Runs one match in the shared mission scene. It builds the active campaign mission's battlefield
+    /// from the mission as it was prepared at startup, frames it, and only then starts the
+    /// <see cref="Match"/>. It turns clicks into fleet orders for Blue, advances time and tells the views
+    /// what to show: fleets leaving and arriving, battles beginning, their casualties as they happen and
+    /// how they end. When the match ends it hands the results to the results screen and carries out the
+    /// action picked there. All game rules live in the match; nothing here decides an outcome. It also
+    /// owns the pause: while paused the match gets no time and no orders, the scene's animation and
+    /// effects stand still, and the match, the selection and any result are kept exactly as they were.
     ///
-    /// The controller sets the match up, runs the frame, owns the pause and leaves the scene. The
-    /// player's selection and clicks are <see cref="PlayerOrders"/>, the lines between worlds are
-    /// <see cref="RouteLanes"/>, and what each match event looks and sounds like is
-    /// <see cref="MatchFeedback"/>.
+    /// The controller sets the match up, runs the frame, owns the pause and leaves the scene. The worlds
+    /// are built by <see cref="Battlefield"/>, the player's selection and clicks are
+    /// <see cref="PlayerOrders"/>, the lines between worlds are <see cref="RouteLanes"/>, and what each
+    /// match event looks and sounds like is <see cref="MatchFeedback"/>.
     /// </summary>
     public sealed class GameController : MonoBehaviour
     {
         const Faction Player = Faction.Blue;
-
-        /// <summary>One player of the mission, as listed on the results screen.</summary>
-        [Serializable]
-        public struct RosterEntry
-        {
-            public Faction faction;
-            [Tooltip("Shown on the results screen. Leave empty to use the faction's name.")]
-            public string displayName;
-        }
 
         [Header("Rules")]
         [Tooltip("Common fleet speed in world units per second.")]
@@ -51,20 +44,18 @@ namespace Squadra
         [SerializeField] AnimationCurve battleLengthCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
         [Header("Mission")]
-        [Tooltip("Who takes part, two to six players. Results list the human player (Blue) first and "
-            + "the others in this order.")]
-        [SerializeField]
-        RosterEntry[] players =
-        {
-            new RosterEntry { faction = Faction.Blue, displayName = "Blue" },
-            new RosterEntry { faction = Faction.Red, displayName = "Red" },
-        };
-        [Tooltip("The campaign this mission belongs to. It decides what Next Mission offers on the results screen.")]
+        [Tooltip("The campaign: which mission is played here, how its worlds look, and what Next Mission "
+            + "offers on the results screen.")]
         [SerializeField] MissionCatalog catalog;
+        [Tooltip("For development only: the mission played when this scene is opened on its own rather than "
+            + "launched from the mission map. It counts for no campaign mission.")]
+        [SerializeField] TextAsset standaloneMission;
 
         [Header("Scene")]
-        [Tooltip("Node ids follow this order.")]
-        [SerializeField] WorldView[] worlds;
+        [Tooltip("Copied once for every world of the mission. Kept inactive.")]
+        [SerializeField] WorldView worldTemplate;
+        [Tooltip("Shows the space backdrop the mission was given.")]
+        [SerializeField] Backdrop backdrop;
         [SerializeField] FleetLayer fleets;
         [SerializeField] EffectsLayer effects;
         [SerializeField] SoundLayer sounds;
@@ -73,6 +64,8 @@ namespace Squadra
         [SerializeField] CameraRig rig;
         [SerializeField] Material lineMaterial;
 
+        PreparedMission mission;
+        WorldView[] worlds;
         Match match;
         PlayerOrders orders;
         RouteLanes lanes;
@@ -81,6 +74,12 @@ namespace Squadra
         int inputHeldFrame = -1;
 
         public Match Match => match;
+
+        /// <summary>The mission being played, as it was prepared. Null when there was none to play.</summary>
+        public PreparedMission Mission => mission;
+
+        /// <summary>The worlds built for the mission, by match index.</summary>
+        public IReadOnlyList<WorldView> Worlds => worlds;
         public int SelectedWorld => orders.Selected;
         public ResultsScreen Results => results;
         public HudView Hud => hud;
@@ -109,30 +108,71 @@ namespace Squadra
             }
         }
 
+        // Everything is built and bound here, before the first frame: no frame ever sees a battlefield or
+        // a match half set up, and the match gets no time before it is complete.
         void Awake()
         {
+            mission = FindMission();
+            if (mission == null)
+            {
+                // Nothing to play: back to the map rather than an empty battlefield.
+                leaving = true;
+                enabled = false;
+                MainMenu.OpenCampaignMap();
+                return;
+            }
+
+            WorldLooks looks = catalog != null ? catalog.Looks : null;
+            worlds = Battlefield.Build(mission, worldTemplate, looks);
+            Battlefield.ShowBackdrop(mission, backdrop, looks);
+            rig.Fit(Battlefield.Frame(worlds));
+            hud.SetSubtitle(Subtitle());
+
             match = new Match(BuildConfig());
             new MatchFeedback(worlds, fleets, effects, sounds, rig).Attach(match);
             match.StatusChanged += OnStatusChanged;
 
             fleets.Bind(match, worlds, lineMaterial, sounds);
             orders = new PlayerOrders(match, worlds, Player);
-            lanes = new RouteLanes(worlds, Player, transform, lineMaterial);
+            lanes = new RouteLanes(match, worlds, Player, transform, lineMaterial);
         }
 
-        // The match's rules as set in the Inspector, and the worlds as placed in the scene.
+        // The mission launched from the map; a scene opened on its own plays its standalone mission,
+        // outside the campaign. It never falls back to another campaign entry.
+        PreparedMission FindMission()
+        {
+            string missionId = CampaignSession.ActiveMissionId;
+            if (missionId == null) return MissionLibrary.PrepareStandalone(standaloneMission, catalog != null ? catalog.Looks : null);
+
+            MissionLibrary.Prepare(catalog);
+            if (MissionLibrary.TryGet(missionId, out PreparedMission prepared)) return prepared;
+
+            Debug.LogError("Squadra: the mission " + missionId + " cannot be played here. "
+                + (MissionLibrary.ProblemOf(missionId) ?? "It is not in the mission catalog."));
+            return null;
+        }
+
+        // "SECTOR 01  -  FIRST CONTACT" for the catalog's first mission; just the name outside the campaign.
+        string Subtitle()
+        {
+            string name = mission.Name.ToUpperInvariant();
+            int index = catalog != null && CampaignSession.ActiveMissionId != null
+                ? catalog.IndexOf(CampaignSession.ActiveMissionId)
+                : -1;
+            return index < 0 ? name : "SECTOR " + (index + 1).ToString("00") + "  -  " + name;
+        }
+
+        // The mission's players, worlds and routes, with the match's rules as set in the Inspector.
         MatchConfig BuildConfig()
         {
-            var config = new MatchConfig { FleetSpeed = fleetSpeed, CaptureDuration = captureSeconds, Human = Player };
+            MatchConfig config = mission.CreateConfig();
+            config.FleetSpeed = fleetSpeed;
+            config.CaptureDuration = captureSeconds;
             config.BattleTiming.ShortestDuration = shortestBattleSeconds;
             config.BattleTiming.LongestDuration = longestBattleSeconds;
             config.BattleTiming.DecisiveFraction = 1.0 / Mathf.Max(1f, decisiveRatio);
             if (battleLengthCurve != null && battleLengthCurve.length > 0)
                 config.BattleTiming.Curve = balance => battleLengthCurve.Evaluate((float)balance);
-            foreach (RosterEntry entry in players)
-                config.Players.Add(new MatchPlayer(entry.faction, entry.displayName));
-            foreach (WorldView world in worlds)
-                config.Nodes.Add(world.ToConfig());
             return config;
         }
 
