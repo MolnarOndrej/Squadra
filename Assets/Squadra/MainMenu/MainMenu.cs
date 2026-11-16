@@ -46,8 +46,8 @@ namespace Squadra
         public MenuScreen CurrentScreen => screen;
 
         /// <summary>
-        /// True while the keyboard is the input in use: the focused control is highlighted. False while
-        /// the mouse is: only the control under the pointer is, and it stops when the pointer leaves.
+        /// True while the keyboard is the input in use, false while the mouse is. The focused control is
+        /// highlighted either way; the mouse moves the focus to the control it points at.
         /// </summary>
         public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
         public bool DialogOpen => dialog != null && dialog.IsOpen;
@@ -255,8 +255,11 @@ namespace Squadra
             inputMode.Attach(menuRoot);
             inputMode.Set(false);
             root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerDownEvent>(_ => inputMode.Set(false), TrickleDown.TrickleDown);
+            foreach (VisualElement field in settings.Fields)
+                inputMode.FollowPointer(field);
+            root.RegisterCallback<PointerDownEvent>(inputMode.OnPointerPressed, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
 
             Show(CampaignSession.ConsumeMapRequest() ? MenuScreen.Map : MenuScreen.Main);
             root.schedule.Execute(() => fade.RemoveFromClassList(FadeClass)).StartingIn(50);

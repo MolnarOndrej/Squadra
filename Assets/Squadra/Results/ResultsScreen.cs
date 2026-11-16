@@ -90,7 +90,7 @@ namespace Squadra
         /// <summary>True from the moment an action is picked until its scene replaces this one.</summary>
         public bool Leaving => leaving;
 
-        /// <summary>True while the keyboard is the input in use and the focused action is highlighted.</summary>
+        /// <summary>True while the keyboard is the input in use; the focused action is highlighted either way.</summary>
         public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
 
         /// <summary>What the campaign offers on this screen.</summary>
@@ -314,6 +314,8 @@ namespace Squadra
         {
             var button = (Button)pointer.currentTarget;
             if (!ready || leaving || suspended || inputMode.Keyboard || !button.enabledInHierarchy) return;
+            // The cue marks the highlight moving; the action that already has it stays silent.
+            if (root.focusController?.focusedElement == button) return;
 
             if (sounds != null) sounds.Hover();
             button.Focus();
@@ -366,13 +368,14 @@ namespace Squadra
             foreach (Button button in new[] { nextButton, restartButton, backButton })
                 button.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
 
-            // As in the menu: the hovered action is highlighted in pointer mode, the focused one in
-            // keyboard mode. The mode outlives a tree the document builds anew.
+            // As in the menu: the focused action is highlighted, and pointing at an action gives it the
+            // focus. The mode outlives a tree the document builds anew.
             if (inputMode == null) inputMode = new MenuInputMode(sounds);
             inputMode.Attach(root);
             root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
             return true;
         }
 

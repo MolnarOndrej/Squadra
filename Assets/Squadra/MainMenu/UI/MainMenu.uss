@@ -24,10 +24,11 @@
 }
 
 /*
- * Highlighting. The menu root carries menu-root--pointer while the mouse is in use and menu-root--keys
- * while the keyboard is. A control is highlighted when the pointer is over it in pointer mode, or when
- * it has the focus in keyboard mode, so a highlight never lingers after the pointer has left. For each
- * control the first rule keeps the resting look in every state and the second adds the highlight.
+ * Highlighting. The control with the focus is highlighted, whichever input is in use. Pointing at a
+ * control gives it the focus, so the highlight stays on the last control pointed at until the pointer
+ * reaches another one. For each control the first rule keeps the resting look in every state and the
+ * second adds the highlight. The menu root carries menu-root--pointer while the mouse is in use and
+ * menu-root--keys while the keyboard is; only the pressed look depends on them.
  */
 
 /* ------------------------------------------------------------------ screens */
@@ -113,8 +114,7 @@
     background-color: var(--panel);
 }
 
-.menu-root--pointer .menu-button:hover,
-.menu-root--keys .menu-button:focus {
+.menu-root .menu-button:focus {
     color: var(--accent);
     border-color: var(--accent);
     background-color: var(--accent-wash);
@@ -170,8 +170,7 @@
     background-color: var(--panel);
 }
 
-.menu-root--pointer .page-arrow:hover,
-.menu-root--keys .page-arrow:focus {
+.menu-root .page-arrow:focus {
     border-color: var(--accent);
     background-color: var(--accent-wash);
     scale: 1.06;
@@ -188,8 +187,7 @@
     --icon-color: #E6ECFF;
 }
 
-.menu-root--pointer .page-arrow:hover > .page-arrow__icon,
-.menu-root--keys .page-arrow:focus > .page-arrow__icon {
+.menu-root .page-arrow:focus > .page-arrow__icon {
     --icon-color: #FFD166;
 }
 
@@ -347,15 +345,13 @@
     color: var(--blue);
 }
 
-.menu-root--pointer .mission:hover > .mission__dot,
-.menu-root--keys .mission:focus > .mission__dot {
+.menu-root .mission:focus > .mission__dot {
     scale: 1.12;
     border-color: #FFFFFF;
     background-color: #1A2040;
 }
 
-.menu-root--pointer .mission:hover > .mission__name,
-.menu-root--keys .mission:focus > .mission__name {
+.menu-root .mission:focus > .mission__name {
     color: var(--accent);
 }
 
@@ -444,8 +440,7 @@
     border-color: rgba(0, 0, 0, 0);
 }
 
-.menu-root--pointer .tab:hover,
-.menu-root--keys .tab:focus {
+.menu-root .tab:focus {
     color: var(--text);
     background-color: rgba(255, 209, 102, 0.07);
 }
@@ -502,8 +497,7 @@
     background-color: var(--panel-solid);
 }
 
-.menu-root--pointer .setting-row__control:hover .unity-base-popup-field__input,
-.menu-root--keys .setting-row__control:focus .unity-base-popup-field__input {
+.menu-root .setting-row__control:focus .unity-base-popup-field__input {
     border-color: var(--accent);
     background-color: #1A2040;
 }
@@ -556,8 +550,7 @@
     background-color: var(--text);
 }
 
-.menu-root--pointer .setting-row__control:hover .unity-base-slider__dragger,
-.menu-root--keys .setting-row__control:focus .unity-base-slider__dragger {
+.menu-root .setting-row__control:focus .unity-base-slider__dragger {
     background-color: var(--accent);
     scale: 1.15;
 }
@@ -585,8 +578,7 @@
     background-color: var(--panel-solid);
 }
 
-.menu-root--pointer .setting-row__toggle:hover .unity-toggle__checkmark,
-.menu-root--keys .setting-row__toggle:focus .unity-toggle__checkmark {
+.menu-root .setting-row__toggle:focus .unity-toggle__checkmark {
     border-color: var(--accent);
     background-color: #1A2040;
 }

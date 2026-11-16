@@ -27,6 +27,7 @@ namespace Squadra
         readonly Slider musicSlider;
         readonly Slider sfxSlider;
         readonly Toggle muteToggle;
+        readonly VisualElement[] fields;
 
         List<DisplayMode> modes = new List<DisplayMode>();
         List<Vector2Int> sizes = new List<Vector2Int>();
@@ -78,8 +79,16 @@ namespace Squadra
                 GameSettings.Save();
             });
 
+            fields = new VisualElement[]
+            {
+                language, displayModeField, resolutionField, vsyncToggle, masterSlider, musicSlider, sfxSlider,
+                muteToggle,
+            };
             SelectTab(0);
         }
+
+        /// <summary>The value controls of every category: dropdowns, sliders and checkboxes, not the tabs.</summary>
+        public IReadOnlyList<VisualElement> Fields => fields;
 
         /// <summary>The tab that should get keyboard focus when the screen opens.</summary>
         public Focusable DefaultFocus => tabs[tab];
