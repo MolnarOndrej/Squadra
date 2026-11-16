@@ -13,7 +13,7 @@ In the menu:
 - **Single Player** opens the mission map. Mission 1 is First Contact; Missions 2–5 are locked previews until their mission files exist.
 - **Settings** has General (language), Graphics (display mode, resolution, VSync) and Sound (master, music and effects volume, and **Mute in Background**). Settings are saved on this computer. A display change must be confirmed within 12 seconds or it is reverted.
 - **Quit** asks for confirmation.
-- Esc goes back, or cancels a dialog. On the mission map, A/D or the left/right arrow keys turn pages when there is more than one.
+- Esc goes back, or cancels a dialog. On the mission map, the left/right arrow keys or A/D move around the row of missions that can be played and, when there is more than one page, the page arrows, which turn the page when activated; up/down go to Back and from there return to the mission.
 
 Campaign progress lasts for one session: winning a mission marks it completed until the game is closed. A mission returns to the mission map from its results screen, or at any time from the pause menu's Quit to Menu.
 

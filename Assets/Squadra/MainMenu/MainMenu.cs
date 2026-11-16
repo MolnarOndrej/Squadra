@@ -281,10 +281,9 @@ namespace Squadra
                 }
                 else if (screen == MenuScreen.Map && !DialogOpen)
                 {
-                    if (keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame)
-                        map.PreviousPage();
-                    else if (keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
-                        map.NextPage();
+                    // A and D do what Left and Right do on the map.
+                    if (keyboard.aKey.wasPressedThisFrame) map.StepAlongRow(-1);
+                    else if (keyboard.dKey.wasPressedThisFrame) map.StepAlongRow(1);
                 }
             }
 
