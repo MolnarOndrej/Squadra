@@ -13,6 +13,7 @@ namespace Squadra.MissionEditing
         public const string CoordinateRule = "Enter a number between -1000000000 and 1000000000, such as 12 or -3.5.";
         public const string DistanceScaleRule = "Enter a number greater than 0 and at most 1000000000.";
         public const string DartsRule = "Enter a whole number from 0 to 2147483647.";
+        public const string SizeRule = "Enter a number from 0.1 to 5, such as 1 or 0.35.";
 
         /// <summary>A number as an editable field shows it: in full, so no digit is lost by editing.</summary>
         public static string Format(double value)
@@ -56,6 +57,15 @@ namespace Squadra.MissionEditing
             if (int.TryParse(Trimmed(text), NumberStyles.None, CultureInfo.InvariantCulture, out value)) return true;
 
             error = DartsRule;
+            return false;
+        }
+
+        public static bool TryParseSize(string text, out double value, out string error)
+        {
+            error = null;
+            if (MissionNumbers.TryParse(Trimmed(text), out value) && MissionRules.IsValidNodeSize(value)) return true;
+
+            error = SizeRule;
             return false;
         }
 

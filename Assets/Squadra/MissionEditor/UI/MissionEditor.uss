@@ -224,9 +224,14 @@
 
 /* Text fields and dropdowns */
 
+/*
+ * The margin is set because the default theme gives a dropdown's box a left margin that a text
+ * field's box does not have: without this a dropdown starts further right than the fields around it.
+ */
 .row__control .unity-base-text-field__input,
 .row__control .unity-base-popup-field__input {
     height: 26px;
+    margin: 0;
     padding: 0 6px;
     font-size: 13px;
     color: var(--text);
@@ -289,10 +294,15 @@
     overflow: hidden;
 }
 
+/*
+ * A player's row and the row that adds a player end in the same two columns, a color and a button
+ * of fixed widths, so that the colors and the buttons stand in line under each other.
+ */
 .player__color {
     flex-grow: 0;
     flex-shrink: 0;
     width: 104px;
+    margin-left: 6px;
 }
 
 .player__add-id {
@@ -306,6 +316,13 @@
     margin: 0 0 0 6px;
     padding: 0 8px;
     font-size: 12px;
+}
+
+.player__action,
+.player__action:focus {
+    flex-shrink: 0;
+    width: 82px;
+    padding: 0;
 }
 
 .players__add {

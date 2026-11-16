@@ -5,5 +5,8 @@ namespace Squadra.Missions
     {
         Planet,
         Moon,
+
+        /// <summary>A fleet location like the others that never produces Darts.</summary>
+        Asteroid,
     }
 }

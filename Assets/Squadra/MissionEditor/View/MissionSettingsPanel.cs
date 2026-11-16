@@ -35,7 +35,7 @@ namespace Squadra
                 text => MissionTextEntry.Problem(session.Document.SetName(text)),
                 text => text == session.Document.Mission.Name));
 
-            entries.Add(new MissionTextEntry(session, body, "mission.scale", "Distance scale", false,
+            entries.Add(new MissionTextEntry(session, body, "mission.scale", "Distance Scale", false,
                 () => MissionFields.Format(session.Document.Mission.DistanceScale),
                 text => MissionFields.TryParseDistanceScale(text, out double scale, out string error)
                     ? MissionTextEntry.Problem(session.Document.SetDistanceScale(scale))

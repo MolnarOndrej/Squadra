@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using NUnit.Framework;
 using Squadra.Missions;
 
@@ -22,9 +23,9 @@ namespace Squadra.Tests
     { ""id"": ""player2"", ""color"": ""red"" }
   ],
   ""nodes"": [
-    { ""id"": ""N1"", ""type"": ""planet"", ""position"": { ""x"": 0, ""y"": 0 }, ""owner"": ""player1"", ""darts"": 30 },
-    { ""id"": ""N2"", ""type"": ""moon"", ""position"": { ""x"": 3, ""y"": 4 }, ""owner"": null, ""darts"": 0 },
-    { ""id"": ""N3"", ""type"": ""planet"", ""position"": { ""x"": -6.5, ""y"": 0.25 }, ""owner"": ""player2"", ""darts"": 30 }
+    { ""id"": ""N1"", ""type"": ""planet"", ""size"": 1, ""position"": { ""x"": 0, ""y"": 0 }, ""owner"": ""player1"", ""darts"": 30 },
+    { ""id"": ""N2"", ""type"": ""moon"", ""size"": 0.5, ""position"": { ""x"": 3, ""y"": 4 }, ""owner"": null, ""darts"": 0 },
+    { ""id"": ""N3"", ""type"": ""planet"", ""size"": 1.75, ""position"": { ""x"": -6.5, ""y"": 0.25 }, ""owner"": ""player2"", ""darts"": 30 }
   ],
   ""edges"": [
     { ""source"": ""N1"", ""target"": ""N2"" },
@@ -97,10 +98,12 @@ namespace Squadra.Tests
             MissionNode moon = mission.Nodes[1];
             Assert.AreEqual("N2", moon.Id);
             Assert.AreEqual(MissionNodeType.Moon, moon.Type);
+            Assert.AreEqual(0.5, moon.Size);
             Assert.AreEqual(3d, moon.X);
             Assert.AreEqual(4d, moon.Y);
             Assert.IsNull(moon.Owner, "null ownership is neutral");
             Assert.AreEqual(0, moon.Darts);
+            Assert.AreEqual(1.75, mission.Nodes[2].Size);
             Assert.AreEqual(-6.5, mission.Nodes[2].X);
             Assert.AreEqual(0.25, mission.Nodes[2].Y);
             Assert.AreEqual("player2", mission.Nodes[2].Owner);
@@ -134,6 +137,7 @@ namespace Squadra.Tests
             {
                 Assert.AreEqual(original.Nodes[i].Id, copy.Nodes[i].Id);
                 Assert.AreEqual(original.Nodes[i].Type, copy.Nodes[i].Type);
+                Assert.AreEqual(original.Nodes[i].Size, copy.Nodes[i].Size);
                 Assert.AreEqual(original.Nodes[i].X, copy.Nodes[i].X);
                 Assert.AreEqual(original.Nodes[i].Y, copy.Nodes[i].Y);
                 Assert.AreEqual(original.Nodes[i].Owner, copy.Nodes[i].Owner);
@@ -177,6 +181,107 @@ namespace Squadra.Tests
         }
 
         [Test]
+        public void Planets_moons_and_asteroids_keep_their_types_and_sizes_through_a_file()
+        {
+            // Every type at its default size and at a size of the author's own.
+            var mission = new MissionDefinition { Id = "sizes", Name = "Sizes", DistanceScale = 2 };
+            mission.Players.Add(new MissionPlayer("player1", PlayerColor.Blue));
+            (MissionNodeType type, double size)[] bodies =
+            {
+                (MissionNodeType.Planet, 1), (MissionNodeType.Moon, 0.5), (MissionNodeType.Asteroid, 0.3),
+                (MissionNodeType.Planet, 4.999999999999999), (MissionNodeType.Moon, 0.1 + 0.2),
+                (MissionNodeType.Asteroid, 1d / 3d),
+            };
+            for (int i = 0; i < bodies.Length; i++)
+                mission.Nodes.Add(new MissionNode
+                {
+                    Id = "N" + (i + 1),
+                    Type = bodies[i].type,
+                    Size = bodies[i].size,
+                    X = i * 2.5,
+                    Y = -i,
+                    Owner = i == 2 ? "player1" : null,
+                    Darts = i * 7,
+                });
+            mission.Edges.Add(new MissionEdge("N1", "N3"));
+
+            CultureInfo before = CultureInfo.CurrentCulture;
+            try
+            {
+                string first = null;
+                foreach (string culture in new[] { "en-US", "cs-CZ", "de-DE", "fr-FR", "ar-SA" })
+                {
+                    CultureInfo.CurrentCulture = new CultureInfo(culture);
+
+                    string text = MissionJson.Write(mission.Clone());
+                    first = first ?? text;
+                    Assert.AreEqual(first, text, "the file is the same whatever the language, here " + culture);
+
+                    MissionDefinition copy = Read(text);
+                    Assert.AreEqual(2d, copy.DistanceScale);
+                    Assert.AreEqual(bodies.Length, copy.Nodes.Count);
+                    for (int i = 0; i < bodies.Length; i++)
+                    {
+                        Assert.AreEqual(bodies[i].type, copy.Nodes[i].Type, culture);
+                        Assert.AreEqual(bodies[i].size, copy.Nodes[i].Size, "the size of " + copy.Nodes[i].Id + " under " + culture);
+                        Assert.AreEqual(i * 2.5, copy.Nodes[i].X);
+                        Assert.AreEqual(-i, copy.Nodes[i].Y);
+                        Assert.AreEqual(i * 7, copy.Nodes[i].Darts);
+                    }
+
+                    Assert.AreEqual("player1", copy.Nodes[2].Owner, "an asteroid can be owned");
+                    Assert.IsNotNull(copy.FindEdge("N3", "N1"), "and connected");
+                    Assert.AreEqual(text, MissionJson.Write(copy), "saving the reopened file changes nothing");
+                }
+
+                StringAssert.Contains("\"schemaVersion\": 1", first);
+                StringAssert.Contains("\"type\": \"asteroid\", \"size\": 0.3,", first, "the default is written as typed, not as 0.30000001");
+                StringAssert.Contains("\"type\": \"moon\", \"size\": 0.5,", first);
+                StringAssert.Contains("\"type\": \"planet\", \"size\": 1,", first);
+                StringAssert.Contains("\"size\": 0.30000000000000004,", first, "a size is written in full, not as displayed");
+                int sizes = first.Split(new[] { "\"size\": " }, StringSplitOptions.None).Length - 1;
+                Assert.AreEqual(bodies.Length, sizes, "every node states its size, a default one too");
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = before;
+            }
+        }
+
+        [Test]
+        public void A_copy_of_a_mission_keeps_sizes_of_its_own()
+        {
+            MissionDefinition original = Read(Sample);
+
+            MissionDefinition copy = original.Clone();
+            copy.Nodes[1].Size = 2.25;
+
+            Assert.AreEqual(0.5, original.Nodes[1].Size);
+            Assert.AreEqual(1.75, copy.Nodes[2].Size);
+            Assert.AreEqual(MissionNodeType.Moon, copy.Nodes[1].Type);
+        }
+
+        [Test]
+        public void Each_node_type_has_its_default_size_and_one_range_serves_them_all()
+        {
+            Assert.AreEqual(1d, MissionRules.DefaultSize(MissionNodeType.Planet));
+            Assert.AreEqual(0.5, MissionRules.DefaultSize(MissionNodeType.Moon));
+            Assert.AreEqual(0.3, MissionRules.DefaultSize(MissionNodeType.Asteroid));
+            Assert.Throws<ArgumentOutOfRangeException>(() => MissionRules.DefaultSize((MissionNodeType)3));
+
+            Assert.AreEqual("planet", MissionRules.NameOf(MissionNodeType.Planet));
+            Assert.AreEqual("moon", MissionRules.NameOf(MissionNodeType.Moon));
+            Assert.AreEqual("asteroid", MissionRules.NameOf(MissionNodeType.Asteroid));
+
+            var planet = new MissionNode();
+            Assert.AreEqual(MissionNodeType.Planet, planet.Type);
+            Assert.AreEqual(1d, planet.Size, "a node made from nothing is a planet of a planet's size");
+
+            foreach (MissionNodeType type in new[] { MissionNodeType.Planet, MissionNodeType.Moon, MissionNodeType.Asteroid })
+                Assert.IsTrue(MissionRules.IsValidNodeSize(MissionRules.DefaultSize(type)));
+        }
+
+        [Test]
         public void A_file_holds_the_mission_and_nothing_derived_from_it()
         {
             string text = MissionJson.Write(Read(Sample));
@@ -184,6 +289,8 @@ namespace Squadra.Tests
             StringAssert.Contains("\"schemaVersion\": 1", text);
             StringAssert.Contains("\"owner\": null", text);
             StringAssert.DoesNotContain("distance\"", text, "route distances are calculated, never stored");
+            StringAssert.DoesNotContain("production", text, "what a node produces follows from its type");
+            StringAssert.DoesNotContain("radius", text, "the body radius is the size, stored once");
             StringAssert.DoesNotContain("neutral", text);
             StringAssert.DoesNotContain("selection", text);
             StringAssert.DoesNotContain("zoom", text);
@@ -222,6 +329,13 @@ namespace Squadra.Tests
             mission = Mission(("N1", 0, 0));
             mission.Nodes[0].Type = (MissionNodeType)7;
             Assert.Throws<InvalidOperationException>(() => MissionJson.Write(mission));
+
+            foreach (double size in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+            {
+                mission = Mission(("N1", 0, 0));
+                mission.Nodes[0].Size = size;
+                Assert.Throws<InvalidOperationException>(() => MissionJson.Write(mission));
+            }
         }
 
         // ------------------------------------------------------------ files that are not mission documents
@@ -256,6 +370,10 @@ namespace Squadra.Tests
             MissionIssue nested = Rejected(With("{ \"x\": 3, \"y\": 4 }", "{ \"x\": 3, \"y\": 4, \"x\": 5 }"),
                 IssueCode.DuplicateProperty);
             StringAssert.Contains("\"x\"", nested.Message);
+
+            // Even when both say the same.
+            MissionIssue size = Rejected(With("\"size\": 0.5,", "\"size\": 0.5, \"size\": 0.5,"), IssueCode.DuplicateProperty);
+            StringAssert.Contains("\"size\"", size.Message);
         }
 
         [Test]
@@ -276,6 +394,8 @@ namespace Squadra.Tests
         [TestCase("{ \"id\": \"player1\", \"color\": \"blue\" }", "{ \"color\": \"blue\" }", "players[0].id")]
         [TestCase("\"id\": \"N2\", ", "", "nodes[1].id")]
         [TestCase("\"type\": \"moon\", ", "", "nodes[1].type")]
+        [TestCase("\"size\": 0.5, ", "", "nodes[1].size")]
+        [TestCase("\"size\": 1, ", "", "nodes[0].size")]
         [TestCase("\"position\": { \"x\": 3, \"y\": 4 }, ", "", "nodes[1].position")]
         [TestCase("{ \"x\": 3, \"y\": 4 }", "{ \"x\": 3 }", "nodes[1].position.y")]
         [TestCase("\"owner\": null, ", "", "nodes[1].owner")]
@@ -305,6 +425,10 @@ namespace Squadra.Tests
         [TestCase("{ \"distanceScale\": 2.5 }", "{ \"distanceScale\": 2.5, \"width\": 10 }", "map.width")]
         [TestCase("\"color\": \"red\" }", "\"color\": \"red\", \"human\": true }", "players[1].human")]
         [TestCase("\"owner\": null, ", "\"owner\": null, \"name\": \"Luna\", ", "nodes[1].name")]
+        [TestCase("\"owner\": null, ", "\"owner\": null, \"production\": 0, ", "nodes[1].production")]
+        [TestCase("\"owner\": null, ", "\"owner\": null, \"productionInterval\": 2.5, ", "nodes[1].productionInterval")]
+        [TestCase("\"size\": 0.5, ", "\"size\": 0.5, \"Size\": 0.5, ", "nodes[1].Size")]
+        [TestCase("\"size\": 0.5, ", "\"size\": 0.5, \"radius\": 0.5, ", "nodes[1].radius")]
         [TestCase("{ \"x\": 3, \"y\": 4 }", "{ \"x\": 3, \"y\": 4, \"z\": 0 }", "nodes[1].position.z")]
         [TestCase("\"target\": \"N2\" }", "\"target\": \"N2\", \"distance\": 5 }", "edges[0].distance")]
         [TestCase("\"schemaVersion\": 1,", "\"schemaVersion\": 1, \"SchemaVersion\": 1,", "SchemaVersion")]
@@ -319,6 +443,10 @@ namespace Squadra.Tests
         [TestCase("\"map\": { \"distanceScale\": 2.5 }", "\"map\": 2.5", "map")]
         [TestCase("\"distanceScale\": 2.5", "\"distanceScale\": \"2.5\"", "map.distanceScale")]
         [TestCase("\"type\": \"moon\"", "\"type\": 1", "nodes[1].type")]
+        [TestCase("\"size\": 0.5", "\"size\": \"0.5\"", "nodes[1].size")]
+        [TestCase("\"size\": 0.5", "\"size\": null", "nodes[1].size")]
+        [TestCase("\"size\": 0.5", "\"size\": true", "nodes[1].size")]
+        [TestCase("\"size\": 0.5", "\"size\": { \"radius\": 0.5 }", "nodes[1].size")]
         [TestCase("\"position\": { \"x\": 3, \"y\": 4 }", "\"position\": [3, 4]", "nodes[1].position")]
         [TestCase("\"x\": 3", "\"x\": \"3\"", "nodes[1].position.x")]
         [TestCase("\"owner\": null", "\"owner\": 0", "nodes[1].owner")]
@@ -374,14 +502,119 @@ namespace Squadra.Tests
             StringAssert.Contains("orange", issue.Message, "the message lists the colors that can be used");
         }
 
-        [TestCase("asteroid")]
+        [TestCase("comet")]
         [TestCase("Planet")]
+        [TestCase("Asteroid")]
+        [TestCase("ASTEROID")]
         [TestCase("")]
-        public void A_node_type_other_than_planet_or_moon_is_refused(string type)
+        public void A_node_type_other_than_planet_moon_or_asteroid_is_refused(string type)
         {
             MissionIssue issue = Rejected(With("\"type\": \"moon\"", "\"type\": \"" + type + "\""),
                 IssueCode.UnsupportedNodeType);
             Assert.AreEqual("nodes[1].type", issue.Location);
+            StringAssert.Contains("asteroid", issue.Message, "the message lists the types that can be used");
+        }
+
+        [Test]
+        public void An_asteroid_is_a_node_like_the_others()
+        {
+            MissionDefinition mission = Read(With("\"type\": \"moon\", \"size\": 0.5", "\"type\": \"asteroid\", \"size\": 0.3")
+                .Replace("\"owner\": null, \"darts\": 0", "\"owner\": \"player2\", \"darts\": 12"));
+
+            MissionNode asteroid = mission.Nodes[1];
+            Assert.AreEqual(MissionNodeType.Asteroid, asteroid.Type);
+            Assert.AreEqual(0.3, asteroid.Size);
+            Assert.AreEqual("player2", asteroid.Owner);
+            Assert.AreEqual(12, asteroid.Darts);
+            Assert.IsNotNull(mission.FindEdge("N1", "N2"));
+        }
+
+        [TestCase("planet")]
+        [TestCase("moon")]
+        [TestCase("asteroid")]
+        public void Every_node_type_takes_a_size_from_a_tenth_to_five(string type)
+        {
+            foreach ((string written, double size) in new[]
+                     {
+                         ("0.1", 0.1), ("5", 5d), ("5.0", 5d), ("1e-1", 0.1), ("0.35", 0.35), ("2.125", 2.125),
+                         ("4.999999999999999", 4.999999999999999), ("0.10000000000000002", 0.10000000000000002),
+                     })
+            {
+                MissionDefinition mission = Read(With("\"type\": \"moon\", \"size\": 0.5",
+                    "\"type\": \"" + type + "\", \"size\": " + written));
+                Assert.AreEqual(size, mission.Nodes[1].Size, written + " for a " + type);
+            }
+        }
+
+        [TestCase("0")]
+        [TestCase("-0")]
+        [TestCase("-1")]
+        [TestCase("-0.5")]
+        [TestCase("0.05")]
+        [TestCase("0.09999999999999999")]
+        [TestCase("5.000000000000001")]
+        [TestCase("5.5")]
+        [TestCase("100")]
+        [TestCase("1e300")]
+        public void A_size_outside_the_range_is_refused_for_every_node_type(string size)
+        {
+            foreach (string type in new[] { "planet", "moon", "asteroid" })
+            {
+                MissionIssue issue = Rejected(With("\"type\": \"moon\", \"size\": 0.5",
+                    "\"type\": \"" + type + "\", \"size\": " + size), IssueCode.InvalidSize);
+                Assert.AreEqual("nodes[1].size", issue.Location);
+                Assert.AreEqual("N2", issue.NodeId);
+                StringAssert.Contains("0.1 to 5", issue.Message);
+            }
+        }
+
+        [Test]
+        public void A_size_is_judged_the_same_in_a_mission_built_in_memory()
+        {
+            foreach (double size in new[] { 0.1, 0.3, 1d, 5d })
+            {
+                MissionDefinition sound = Mission(("N1", 0, 0));
+                sound.Nodes[0].Size = size;
+                Assert.AreEqual(0, MissionValidator.Validate(sound).Issues.Count, "size " + size);
+            }
+
+            foreach (double size in new[]
+                     {
+                         0d, -1d, 0.0999, 5.0001, double.NaN, double.PositiveInfinity, double.NegativeInfinity,
+                         double.Epsilon, double.MaxValue,
+                     })
+            {
+                MissionDefinition mission = Mission(("N1", 0, 0), ("N2", 1, 0));
+                mission.Nodes[1].Size = size;
+
+                MissionValidation validation = MissionValidator.Validate(mission);
+
+                CollectionAssert.AreEqual(new[] { IssueCode.InvalidSize }, Codes(validation), "size " + size);
+                Assert.AreEqual("nodes[1].size", validation.Issues[0].Location);
+                Assert.AreEqual("N2", validation.Issues[0].NodeId);
+            }
+        }
+
+        [Test]
+        public void Bodies_may_overlap_and_only_nodes_on_one_spot_earn_a_warning()
+        {
+            // Two planets of radius 5 a single unit apart, and an asteroid inside both.
+            MissionDefinition mission = Mission(("N1", 0, 0), ("N2", 1, 0), ("N3", 0.5, 0.25));
+            mission.Nodes[0].Size = 5;
+            mission.Nodes[1].Size = 5;
+            mission.Nodes[2].Type = MissionNodeType.Asteroid;
+            mission.Nodes[2].Size = 0.3;
+            mission.Edges.Add(new MissionEdge("N1", "N2"));
+            mission.Edges.Add(new MissionEdge("N2", "N3"));
+
+            Assert.AreEqual(0, MissionValidator.Validate(mission).Issues.Count, "size adds no rule about placement");
+            Assert.AreEqual(1d, mission.MapDistance(mission.Edges[0]), "a route runs from middle to middle, whatever the sizes");
+            Assert.AreEqual(mission.Nodes.Count, Read(MissionJson.Write(mission)).Nodes.Count);
+
+            mission.Nodes[2].X = 1;
+            mission.Nodes[2].Y = 0;
+            CollectionAssert.AreEquivalent(new[] { IssueCode.CoincidentNodes, IssueCode.ZeroLengthRoute },
+                Codes(MissionValidator.Validate(mission)));
         }
 
         [TestCase("-1")]
@@ -419,6 +652,9 @@ namespace Squadra.Tests
             MissionIssue scale = Rejected(With("\"distanceScale\": 2.5", "\"distanceScale\": " + number),
                 IssueCode.UnrepresentableNumber);
             Assert.AreEqual("map.distanceScale", scale.Location);
+
+            MissionIssue size = Rejected(With("\"size\": 0.5", "\"size\": " + number), IssueCode.UnrepresentableNumber);
+            Assert.AreEqual("nodes[1].size", size.Location);
         }
 
         [TestCase("1000000000.5")]
@@ -583,22 +819,26 @@ namespace Squadra.Tests
         {
             string json = With("\"darts\": 0", "\"darts\": 1.5")
                 .Replace("\"color\": \"red\"", "\"color\": \"pink\"")
+                .Replace("\"size\": 1.75, ", "")
                 .Replace("\"y\": 0.25 }", "\"y\": 0.25, \"z\": 1 }");
             MissionReadResult result = MissionJson.Read(json);
 
             Assert.IsFalse(result.Ok);
             Assert.IsTrue(Has(result, IssueCode.InvalidDarts));
             Assert.IsTrue(Has(result, IssueCode.UnsupportedColor));
+            Assert.IsTrue(Has(result, IssueCode.MissingField));
             Assert.IsTrue(Has(result, IssueCode.UnknownField));
 
             // So are the errors of a file that has the right shape and wrong values.
             json = With("\"darts\": 0", "\"darts\": -4")
                 .Replace("\"owner\": \"player2\"", "\"owner\": \"ghost\"")
+                .Replace("\"size\": 1.75", "\"size\": 17.5")
                 .Replace("\"target\": \"N2\"", "\"target\": \"N1\"");
             result = MissionJson.Read(json);
 
             Assert.IsFalse(result.Ok);
             Assert.IsTrue(Has(result, IssueCode.InvalidDarts));
+            Assert.IsTrue(Has(result, IssueCode.InvalidSize));
             Assert.IsTrue(Has(result, IssueCode.UnknownOwner));
             Assert.IsTrue(Has(result, IssueCode.SelfConnection));
         }
@@ -613,6 +853,7 @@ namespace Squadra.Tests
             mission.Nodes[0].Darts = -1;
             mission.Nodes[1].Type = (MissionNodeType)9;
             mission.Nodes[1].Owner = "ghost";
+            mission.Nodes[2].Size = 0;
             mission.Players.Add(new MissionPlayer("p", (PlayerColor)42));
             mission.Edges.Add(new MissionEdge("N1", null));
 
@@ -623,7 +864,7 @@ namespace Squadra.Tests
             foreach (IssueCode code in new[]
                      {
                          IssueCode.InvalidId, IssueCode.InvalidName, IssueCode.InvalidDistanceScale, IssueCode.InvalidCoordinate,
-                         IssueCode.InvalidDarts, IssueCode.UnsupportedNodeType, IssueCode.UnknownOwner,
+                         IssueCode.InvalidDarts, IssueCode.UnsupportedNodeType, IssueCode.InvalidSize, IssueCode.UnknownOwner,
                          IssueCode.UnsupportedColor, IssueCode.DanglingEdge,
                      })
                 Assert.IsTrue(validation.Has(code), code + " should be reported");

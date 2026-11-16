@@ -19,6 +19,11 @@ namespace Squadra.Missions
 
         public const double MaxDistanceScale = 1e9;
 
+        /// <summary>The smallest and the largest body radius a node of any type can have, both allowed.</summary>
+        public const double MinNodeSize = 0.1;
+
+        public const double MaxNodeSize = 5d;
+
         static readonly PlayerColor[] Colors =
         {
             PlayerColor.Blue, PlayerColor.Red, PlayerColor.Green,
@@ -26,7 +31,11 @@ namespace Squadra.Missions
         };
 
         static readonly string[] ColorNames = { "blue", "red", "green", "yellow", "purple", "orange" };
-        static readonly string[] TypeNames = { "planet", "moon" };
+        static readonly string[] TypeNames = { "planet", "moon", "asteroid" };
+
+        // The size a node gets when it is made or its type is changed, by type. A file never gets
+        // one of these in place of a size it does not state.
+        static readonly double[] DefaultSizes = { 1d, 0.5, 0.3 };
 
         /// <summary>Every color, in the order new players are offered them.</summary>
         public static IReadOnlyList<PlayerColor> AllColors => Colors;
@@ -79,6 +88,16 @@ namespace Squadra.Missions
             return IsDefined(type) ? TypeNames[(int)type] : null;
         }
 
+        /// <summary>The node types as the file spells them, for a message that lists them.</summary>
+        public const string TypeNameList = "\"planet\", \"moon\" or \"asteroid\"";
+
+        /// <summary>The size a node of this type starts with. Throws for an unknown type.</summary>
+        public static double DefaultSize(MissionNodeType type)
+        {
+            if (!IsDefined(type)) throw new ArgumentOutOfRangeException(nameof(type));
+            return DefaultSizes[(int)type];
+        }
+
         public static bool TryParseColor(string name, out PlayerColor color)
         {
             int index = Array.IndexOf(ColorNames, name);
@@ -106,6 +125,11 @@ namespace Squadra.Missions
         public static bool IsValidDistanceScale(double value)
         {
             return IsFinite(value) && value > 0d && value <= MaxDistanceScale;
+        }
+
+        public static bool IsValidNodeSize(double value)
+        {
+            return IsFinite(value) && value >= MinNodeSize && value <= MaxNodeSize;
         }
 
         /// <summary>The straight-line distance between two map positions.</summary>

@@ -180,8 +180,8 @@ namespace Squadra.MissionEditing
         }
 
         /// <summary>
-        /// Removes a player. Its nodes become neutral and keep everything else: position, type, Darts
-        /// and routes. Its color is free again.
+        /// Removes a player. Its nodes become neutral and keep everything else: position, type, size,
+        /// Darts and routes. Its color is free again.
         /// </summary>
         public EditResult RemovePlayer(string playerId)
         {
@@ -205,10 +205,10 @@ namespace Squadra.MissionEditing
         // ------------------------------------------------------------------ nodes
 
         /// <summary>
-        /// Adds a neutral planet with no Darts at a map position. Its ID is the next of N1, N2, ...:
-        /// one above the highest such number in the mission, and never one this document has already
-        /// handed out, so no surviving node is ever renamed and a deleted node's ID is not reused
-        /// while the mission stays open.
+        /// Adds a neutral planet with no Darts and a planet's default size at a map position. Its ID is
+        /// the next of N1, N2, ...: one above the highest such number in the mission, and never one this
+        /// document has already handed out, so no surviving node is ever renamed and a deleted node's
+        /// ID is not reused while the mission stays open.
         /// </summary>
         public EditResult AddNode(double x, double y)
         {
@@ -216,7 +216,16 @@ namespace Squadra.MissionEditing
                 return EditResult.Refused(MissionFields.CoordinateRule);
 
             string id = NextNodeId();
-            mission.Nodes.Add(new MissionNode { Id = id, Type = MissionNodeType.Planet, X = x, Y = y, Owner = null, Darts = 0 });
+            mission.Nodes.Add(new MissionNode
+            {
+                Id = id,
+                Type = MissionNodeType.Planet,
+                Size = MissionRules.DefaultSize(MissionNodeType.Planet),
+                X = x,
+                Y = y,
+                Owner = null,
+                Darts = 0,
+            });
             Touch();
             return EditResult.Done(id);
         }
@@ -271,14 +280,33 @@ namespace Squadra.MissionEditing
             return EditResult.Done();
         }
 
+        /// <summary>
+        /// Changes what a node is. Its size becomes the new type's default in the same edit, whatever
+        /// it was before, so every change of type starts from a known size. Choosing the type the node
+        /// already has changes nothing, its size included.
+        /// </summary>
         public EditResult SetNodeType(string nodeId, MissionNodeType type)
         {
             MissionNode node = mission.FindNode(nodeId);
             if (node == null) return NoSuchNode(nodeId);
-            if (!MissionRules.IsDefined(type)) return EditResult.Refused("A node is a planet or a moon.");
+            if (!MissionRules.IsDefined(type)) return EditResult.Refused("A node is a planet, a moon or an asteroid.");
             if (node.Type == type) return EditResult.NoChange;
 
             node.Type = type;
+            node.Size = MissionRules.DefaultSize(type);
+            Touch();
+            return EditResult.Done();
+        }
+
+        /// <summary>Sets a node's body radius in game world units. Nothing is rounded or clamped.</summary>
+        public EditResult SetNodeSize(string nodeId, double size)
+        {
+            MissionNode node = mission.FindNode(nodeId);
+            if (node == null) return NoSuchNode(nodeId);
+            if (!MissionRules.IsValidNodeSize(size)) return EditResult.Refused(MissionFields.SizeRule);
+            if (node.Size == size) return EditResult.NoChange;
+
+            node.Size = size;
             Touch();
             return EditResult.Done();
         }

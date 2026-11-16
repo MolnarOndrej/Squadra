@@ -8,9 +8,10 @@ namespace Squadra
 {
     /// <summary>
     /// Which part of the map the mission canvas shows: the map point in the middle and how many
-    /// pixels a map unit takes. It converts between map and canvas coordinates and does the
-    /// arithmetic of panning, zooming and fitting. Map X runs to the right and map Y up, so the
-    /// conversion flips Y on the way to the screen. It changes only the view, never the mission.
+    /// pixels a map unit takes. It converts between map and canvas coordinates, projects a node's
+    /// body onto the canvas and does the arithmetic of panning, zooming and fitting. Map X runs to
+    /// the right and map Y up, so the conversion flips Y on the way to the screen. It changes only
+    /// the view, never the mission.
     /// </summary>
     sealed class MapViewport
     {
@@ -22,6 +23,10 @@ namespace Squadra
 
         const double MaxFitZoom = DefaultZoom * 4d;
         const float FitMargin = 90f;
+
+        // The most of a body, in map units, that Fit to Map tries to frame. A larger one cannot be
+        // shown whole even at the smallest zoom. This limits the view only, never a stored size.
+        const double MaxFittedBody = 1e12;
 
         // The canvas's content rectangle. It is asked for each time, because layout can change it
         // between two uses.
@@ -51,15 +56,27 @@ namespace Squadra
             }
         }
 
-        /// <summary>How much larger or smaller than usual symbols are drawn at this zoom.</summary>
-        public float SymbolScale => Mathf.Clamp(Mathf.Sqrt((float)(Zoom / DefaultZoom)), 0.65f, 1.5f);
-
         public Vector2 MapToCanvas(double x, double y)
         {
             Rect box = canvasBox();
             return new Vector2(
                 (float)(box.width * 0.5 + (x - CenterX) * Zoom),
                 (float)(box.height * 0.5 - (y - CenterY) * Zoom));
+        }
+
+        /// <summary>
+        /// Where a node's body is on the canvas and how large. The node's size is a radius in game
+        /// world units; dividing by the mission's distance scale gives map units and the zoom gives
+        /// pixels. So a body is drawn to the same measure as the distances between nodes: twice the
+        /// zoom doubles it and twice the distance scale halves it, and neither touches the stored size.
+        /// </summary>
+        public NodeFootprint FootprintOf(MissionNode node, double distanceScale)
+        {
+            Rect box = canvasBox();
+            return new NodeFootprint(
+                box.width * 0.5 + (node.X - CenterX) * Zoom,
+                box.height * 0.5 - (node.Y - CenterY) * Zoom,
+                node.Size / distanceScale * Zoom);
         }
 
         public void CanvasToMap(Vector2 point, out double x, out double y)
@@ -113,10 +130,10 @@ namespace Squadra
         }
 
         /// <summary>
-        /// Frames every node with a margin around them. A mission without nodes gets the view a new
-        /// mission opens with: the origin in the middle at 100%.
+        /// Frames every node, the whole of its body included, with a margin around them. A mission
+        /// without nodes gets the view a new mission opens with: the origin in the middle at 100%.
         /// </summary>
-        public void Fit(List<MissionNode> nodes)
+        public void Fit(List<MissionNode> nodes, double distanceScale)
         {
             if (nodes.Count == 0)
             {
@@ -130,10 +147,12 @@ namespace Squadra
             double maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
             foreach (MissionNode node in nodes)
             {
-                minX = Math.Min(minX, node.X);
-                maxX = Math.Max(maxX, node.X);
-                minY = Math.Min(minY, node.Y);
-                maxY = Math.Max(maxY, node.Y);
+                double body = node.Size / distanceScale;
+                body = body > 0d ? Math.Min(body, MaxFittedBody) : 0d;
+                minX = Math.Min(minX, node.X - body);
+                maxX = Math.Max(maxX, node.X + body);
+                minY = Math.Min(minY, node.Y - body);
+                maxY = Math.Max(maxY, node.Y + body);
             }
 
             CenterX = (minX + maxX) * 0.5;

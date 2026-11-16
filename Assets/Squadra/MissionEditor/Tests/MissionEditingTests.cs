@@ -363,6 +363,7 @@ namespace Squadra.Tests
             MissionNode node = editor.Mission.FindNode(id);
             Assert.AreEqual("N1", node.Id);
             Assert.AreEqual(MissionNodeType.Planet, node.Type);
+            Assert.AreEqual(1d, node.Size, "a planet's default size");
             Assert.IsNull(node.Owner);
             Assert.AreEqual(0, node.Darts);
             Assert.AreEqual(-2.5, node.X);
@@ -465,6 +466,176 @@ namespace Squadra.Tests
 
             Assert.IsTrue(editor.Document.SetNodeOwner(id, null).Applied);
             Assert.IsNull(node.Owner, "no owner is neutral");
+        }
+
+        [TestCase(MissionNodeType.Planet, MissionNodeType.Moon, 0.5)]
+        [TestCase(MissionNodeType.Planet, MissionNodeType.Asteroid, 0.3)]
+        [TestCase(MissionNodeType.Moon, MissionNodeType.Planet, 1d)]
+        [TestCase(MissionNodeType.Moon, MissionNodeType.Asteroid, 0.3)]
+        [TestCase(MissionNodeType.Asteroid, MissionNodeType.Planet, 1d)]
+        [TestCase(MissionNodeType.Asteroid, MissionNodeType.Moon, 0.5)]
+        public void Changing_a_nodes_type_sets_its_size_to_the_new_types_default(MissionNodeType from, MissionNodeType to,
+            double expected)
+        {
+            // Once from the old type's default size, and once from sizes the author chose.
+            foreach (double? custom in new double?[] { null, 0.1, 2d, 5d, expected })
+            {
+                Editor editor = Editor.WithSavedChain();
+                MissionDocument document = editor.Document;
+                document.SetNodeType("N2", from);
+                document.SetNodeOwner("N2", "player2");
+                document.SetNodeDarts("N2", 17);
+                if (custom.HasValue) document.SetNodeSize("N2", custom.Value);
+                editor.Session.Save();
+                MissionNode node = editor.Mission.FindNode("N2");
+                int revision = document.Revision;
+                int changes = editor.Changes;
+
+                Assert.IsTrue(document.SetNodeType("N2", to).Applied);
+
+                Assert.AreEqual(to, node.Type);
+                Assert.AreEqual(expected, node.Size, from + " of size " + custom + " to " + to);
+                Assert.AreEqual(revision + 1, document.Revision, "the type and the size change as one edit");
+                Assert.AreEqual(changes + 1, editor.Changes);
+                Assert.IsTrue(editor.Session.HasUnsavedChanges);
+
+                Assert.AreSame(node, editor.Mission.FindNode("N2"));
+                Assert.AreEqual("N2", node.Id);
+                Assert.AreEqual("player2", node.Owner);
+                Assert.AreEqual(17, node.Darts);
+                Assert.AreEqual(3d, node.X);
+                Assert.AreEqual(4d, node.Y);
+                CollectionAssert.AreEqual(new[] { "N1", "N2", "N3" }, NodeIds(editor.Mission));
+                CollectionAssert.AreEqual(new[] { "N1>N2", "N2>N3" }, Routes(editor.Mission));
+                Assert.AreEqual(1d, editor.Mission.FindNode("N1").Size, "no other node is touched");
+                Assert.IsFalse(editor.Session.Validation.HasErrors);
+
+                // The default is only where the new type starts.
+                Assert.IsTrue(document.SetNodeSize("N2", 3.25).Applied);
+                Assert.AreEqual(3.25, node.Size);
+                Assert.AreEqual(to, node.Type);
+
+                // Choosing the type the node already has is no change of type.
+                Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeType("N2", to).Outcome);
+                Assert.AreEqual(3.25, node.Size);
+            }
+        }
+
+        [Test]
+        public void The_examples_of_a_type_change_come_out_as_specified()
+        {
+            var editor = new Editor();
+            string id = editor.AddNode(0, 0);
+            MissionDocument document = editor.Document;
+            MissionNode node = editor.Mission.FindNode(id);
+
+            document.SetNodeSize(id, 2);
+            document.SetNodeType(id, MissionNodeType.Moon);
+            Assert.AreEqual(0.5, node.Size, "planet 2 becomes moon 0.5");
+
+            document.SetNodeSize(id, 5);
+            document.SetNodeType(id, MissionNodeType.Asteroid);
+            Assert.AreEqual(0.3, node.Size, "moon 5 becomes asteroid 0.3");
+
+            document.SetNodeSize(id, 0.1);
+            document.SetNodeType(id, MissionNodeType.Planet);
+            Assert.AreEqual(1d, node.Size, "asteroid 0.1 becomes planet 1");
+
+            Assert.IsTrue(document.SetNodeType(id, (MissionNodeType)3).Rejected);
+            Assert.AreEqual(MissionNodeType.Planet, node.Type);
+            Assert.AreEqual(1d, node.Size, "a refused type changes nothing");
+        }
+
+        [TestCase(MissionNodeType.Planet)]
+        [TestCase(MissionNodeType.Moon)]
+        [TestCase(MissionNodeType.Asteroid)]
+        public void A_nodes_size_is_taken_exactly_from_a_tenth_to_five_or_refused(MissionNodeType type)
+        {
+            Editor editor = Editor.WithSavedChain();
+            MissionDocument document = editor.Document;
+            document.SetNodeType("N2", type);
+            MissionNode node = editor.Mission.FindNode("N2");
+
+            foreach (double size in new[] { 0.1, 5d, 0.35, 0.1 + 0.2, 1d / 3d, 4.999999999999999, 2.5 })
+            {
+                Assert.IsTrue(document.SetNodeSize("N2", size).Applied, size + " for a " + type);
+                Assert.AreEqual(size, node.Size, "kept exactly, not rounded");
+            }
+
+            editor.Session.Save();
+            foreach (double size in new[]
+                     {
+                         0d, -0.5, -5d, 0.09999999999999999, 5.000000000000001, 6d, double.NaN, double.PositiveInfinity,
+                         double.NegativeInfinity, double.Epsilon, double.MaxValue,
+                     })
+            {
+                EditResult result = document.SetNodeSize("N2", size);
+                Assert.IsTrue(result.Rejected, size + " for a " + type);
+                Assert.AreEqual(MissionFields.SizeRule, result.Message);
+                Assert.AreEqual(2.5, node.Size, "a refused size changes nothing: it is not brought into range");
+            }
+
+            Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeSize("N2", 2.5).Outcome);
+            Assert.IsFalse(editor.Session.HasUnsavedChanges, "nothing was edited since the save");
+            Assert.IsTrue(document.SetNodeSize("missing", 1).Rejected);
+            Assert.AreEqual(type, node.Type, "a size never changes the type");
+        }
+
+        [Test]
+        public void An_asteroid_takes_an_owner_Darts_a_position_and_routes_like_any_node()
+        {
+            var editor = new Editor();
+            string planet = editor.AddNode(0, 0);
+            string asteroid = editor.AddNode(4, 3);
+            MissionDocument document = editor.Document;
+
+            Assert.IsTrue(document.SetNodeType(asteroid, MissionNodeType.Asteroid).Applied);
+            Assert.IsTrue(document.SetNodeOwner(asteroid, "player1").Applied);
+            Assert.IsTrue(document.SetNodeDarts(asteroid, 12).Applied);
+            Assert.IsTrue(document.MoveNode(asteroid, -4, 3).Applied);
+            editor.Connect(planet, asteroid);
+
+            MissionNode node = editor.Mission.FindNode(asteroid);
+            Assert.AreEqual(MissionNodeType.Asteroid, node.Type);
+            Assert.AreEqual(0.3, node.Size);
+            Assert.AreEqual("player1", node.Owner);
+            Assert.AreEqual(12, node.Darts);
+            CollectionAssert.AreEqual(new[] { "N1>N2" }, Routes(editor.Mission));
+            Assert.AreEqual(0, editor.Session.Validation.Issues.Count);
+
+            Assert.IsTrue(document.SetNodeOwner(asteroid, null).Applied, "and may be neutral");
+            editor.SaveAs("rock.json");
+            StringAssert.Contains("\"type\": \"asteroid\", \"size\": 0.3,", editor.Files.Files["rock.json"]);
+            StringAssert.DoesNotContain("production", editor.Files.Files["rock.json"]);
+        }
+
+        [Test]
+        public void Overlapping_bodies_are_left_where_they_are_and_can_be_saved()
+        {
+            Editor editor = Editor.WithSavedChain();
+            MissionDocument document = editor.Document;
+            MissionEdge route = editor.Mission.FindEdge("N1", "N2");
+            double before = editor.Mission.GameDistance(route);
+
+            // N1 and N2 are five apart; these bodies reach far over each other and over N3.
+            Assert.IsTrue(document.SetNodeSize("N1", 5).Applied);
+            Assert.IsTrue(document.SetNodeSize("N2", 5).Applied);
+            Assert.IsTrue(document.MoveNode("N3", 3.5, 4).Applied);
+
+            Assert.AreEqual(0, editor.Session.Validation.Issues.Count, "an overlap is neither an error nor a warning");
+            Assert.AreEqual(0d, editor.Mission.FindNode("N1").X);
+            Assert.AreEqual(3d, editor.Mission.FindNode("N2").X);
+            Assert.AreEqual(4d, editor.Mission.FindNode("N2").Y);
+            Assert.AreEqual(before, editor.Mission.GameDistance(route), "a route is measured between the middles of its nodes");
+            Assert.AreEqual(5d, editor.Mission.MapDistance(route));
+
+            editor.Session.Save();
+            Assert.IsFalse(editor.Session.HasUnsavedChanges);
+            Assert.AreEqual(0, editor.Prompts.Errors.Count);
+
+            document.SetDistanceScale(4);
+            Assert.AreEqual(5d, editor.Mission.FindNode("N1").Size, "the distance scale never changes a stored size");
+            Assert.AreEqual(20d, editor.Mission.GameDistance(route));
         }
 
         // ------------------------------------------------------------ routes
@@ -813,6 +984,7 @@ namespace Squadra.Tests
             editor.Document.SetNodeOwner("N2", "player1");
             editor.Document.SetNodeOwner("N3", "player2");
             editor.Document.SetNodeType("N2", MissionNodeType.Moon);
+            editor.Document.SetNodeSize("N2", 0.75);
             editor.Document.SetNodeDarts("N2", 25);
             editor.Prompts.RemovePlayer.Enqueue(true);
 
@@ -824,6 +996,7 @@ namespace Squadra.Tests
             MissionNode moon = editor.Mission.FindNode("N2");
             Assert.IsNull(moon.Owner);
             Assert.AreEqual(MissionNodeType.Moon, moon.Type);
+            Assert.AreEqual(0.75, moon.Size);
             Assert.AreEqual(25, moon.Darts);
             Assert.AreEqual(3d, moon.X);
             Assert.AreEqual(4d, moon.Y);
@@ -961,6 +1134,7 @@ namespace Squadra.Tests
             Assert.AreEqual(EditOutcome.Unchanged, document.SetDistanceScale(1).Outcome);
             Assert.AreEqual(EditOutcome.Unchanged, document.MoveNode("N2", 3, 4).Outcome);
             Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeType("N2", MissionNodeType.Planet).Outcome);
+            Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeSize("N2", 1).Outcome);
             Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeOwner("N2", null).Outcome);
             Assert.AreEqual(EditOutcome.Unchanged, document.SetNodeDarts("N2", 0).Outcome);
             Assert.AreEqual(EditOutcome.Unchanged, document.SetPlayerColor("player1", PlayerColor.Blue).Outcome);
@@ -972,6 +1146,8 @@ namespace Squadra.Tests
                 () => document.SetDistanceScale(3),
                 () => document.MoveNode("N2", 3, 4.5),
                 () => document.SetNodeType("N2", MissionNodeType.Moon),
+                () => document.SetNodeSize("N2", 0.6),
+                () => document.SetNodeType("N2", MissionNodeType.Asteroid),
                 () => document.SetNodeOwner("N2", "player1"),
                 () => document.SetNodeDarts("N2", 1),
                 () => document.SetPlayerColor("player1", PlayerColor.Green),
@@ -1158,7 +1334,14 @@ namespace Squadra.Tests
             editor.AddNode(0.1 + 0.2, -1d / 3d);
             editor.AddNode(123456.789012345, 1e-7);
             editor.AddNode(-4, 2);
+            editor.AddNode(7.5, -2.25);
+            editor.AddNode(8, 8);
             editor.Document.SetNodeType("N2", MissionNodeType.Moon);
+            editor.Document.SetNodeType("N4", MissionNodeType.Asteroid);
+            editor.Document.SetNodeType("N5", MissionNodeType.Asteroid);
+            editor.Document.SetNodeSize("N3", 0.1 + 0.2);
+            editor.Document.SetNodeSize("N5", 4.999999999999999);
+            editor.Document.SetNodeOwner("N4", "player1");
             editor.Document.SetNodeOwner("N1", "third");
             editor.Document.SetNodeOwner("N3", "player2");
             editor.Document.SetNodeDarts("N1", 30);
@@ -1185,6 +1368,14 @@ namespace Squadra.Tests
             Assert.AreEqual(123456.789012345, mission.FindNode("N2").X);
             Assert.AreEqual(1e-7, mission.FindNode("N2").Y);
             Assert.AreEqual(MissionNodeType.Moon, mission.FindNode("N2").Type);
+            Assert.AreEqual(MissionNodeType.Planet, mission.FindNode("N1").Type);
+            Assert.AreEqual(MissionNodeType.Asteroid, mission.FindNode("N4").Type);
+            Assert.AreEqual(1d, mission.FindNode("N1").Size);
+            Assert.AreEqual(0.5, mission.FindNode("N2").Size);
+            Assert.AreEqual(0.1 + 0.2, mission.FindNode("N3").Size, "a size is kept exactly, like a coordinate");
+            Assert.AreEqual(0.3, mission.FindNode("N4").Size);
+            Assert.AreEqual(4.999999999999999, mission.FindNode("N5").Size);
+            Assert.AreEqual("player1", mission.FindNode("N4").Owner);
             Assert.AreEqual("third", mission.FindNode("N1").Owner);
             Assert.AreEqual(2147483647, mission.FindNode("N3").Darts);
             CollectionAssert.AreEqual(new[] { "N3>N1", "N1>N2" }, Routes(mission));
@@ -1228,6 +1419,13 @@ namespace Squadra.Tests
                 ["twice.json"] = good.Replace("\"name\":", "\"id\": \"again\", \"name\":"),
                 ["future.json"] = good.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2"),
                 ["extra.json"] = good.Replace("\"darts\": 0 }", "\"darts\": 0, \"production\": 2 }"),
+                ["nosize.json"] = good.Replace("\"type\": \"planet\", \"size\": 1, ", "\"type\": \"planet\", "),
+                ["nullsize.json"] = good.Replace("\"size\": 1,", "\"size\": null,"),
+                ["textsize.json"] = good.Replace("\"size\": 1,", "\"size\": \"1\","),
+                ["bigsize.json"] = good.Replace("\"size\": 1,", "\"size\": 5.5,"),
+                ["smallsize.json"] = good.Replace("\"size\": 1,", "\"size\": 0.05,"),
+                ["twosizes.json"] = good.Replace("\"size\": 1,", "\"size\": 1, \"size\": 1,"),
+                ["type.json"] = good.Replace("\"planet\"", "\"comet\""),
                 ["color.json"] = good.Replace("\"red\"", "\"teal\""),
                 ["darts.json"] = good.Replace("\"darts\": 0", "\"darts\": 1.5"),
                 ["dangling.json"] = good.Replace("\"target\": \"N3\"", "\"target\": \"N33\""),
@@ -1623,7 +1821,69 @@ namespace Squadra.Tests
                 StringAssert.Contains("2147483647", error);
             }
 
+            foreach ((string text, double value) in new[]
+                     {
+                         ("0.1", 0.1), ("5", 5d), (" 0.35 ", 0.35), ("1e0", 1d), ("5.0", 5d), ("0.30000000000000004", 0.1 + 0.2),
+                     })
+            {
+                Assert.IsTrue(MissionFields.TryParseSize(text, out double size, out string error), "\"" + text + "\" is a size");
+                Assert.AreEqual(value, size);
+                Assert.IsNull(error);
+            }
+
+            foreach (string text in new[]
+                     {
+                         "", "big", "0", "-1", "0.09", "0.09999999999999999", "5.000000000000001", "5.1", "50", "1,5", "0.5.1",
+                         "NaN", "Infinity", "1e999", "1 2", "0.5 units",
+                     })
+            {
+                Assert.IsFalse(MissionFields.TryParseSize(text, out _, out string error), "\"" + text + "\" is not a size");
+                StringAssert.Contains("0.1 to 5", error, "the reason says what can be typed");
+            }
+
             Assert.AreEqual("0.30000000000000004", MissionFields.Format(0.1 + 0.2), "a field shows the whole value");
+            Assert.AreEqual("0.3", MissionFields.Format(MissionRules.DefaultSize(MissionNodeType.Asteroid)));
+        }
+
+        [Test]
+        public void Size_text_that_is_not_a_size_keeps_the_last_valid_size_and_holds_up_a_save()
+        {
+            Editor editor = Editor.WithSavedChain();
+            editor.Session.Select(Selection.Node("N2"));
+            editor.Document.SetNodeSize("N2", 2.5);
+
+            // What the Size field does with text the mission cannot take: nothing reaches the mission.
+            foreach (string typed in new[] { "7", "0", "0.05", "two" })
+            {
+                Assert.IsFalse(MissionFields.TryParseSize(typed, out _, out _));
+                editor.Session.ReportInvalidInput("node.size", "Size", true);
+            }
+
+            Assert.AreEqual(2.5, editor.Mission.FindNode("N2").Size, "not clamped to 5 or 0.1, and not reset to a default");
+
+            // Save asks first. Going back writes nothing.
+            editor.Prompts.DiscardInput.Enqueue(false);
+            editor.Session.Save();
+            Assert.AreEqual("Size", editor.Prompts.InvalidAsked[0]);
+            Assert.AreEqual(1, editor.Files.Writes);
+            Assert.IsTrue(editor.Session.IsInvalidInput("node.size"));
+
+            // So does selecting another node, and leaving the mission.
+            editor.Prompts.DiscardInput.Enqueue(false);
+            editor.Session.ClickNode("N3");
+            Assert.IsTrue(editor.Session.Selection.IsNode("N2"));
+
+            editor.Prompts.DiscardInput.Enqueue(false);
+            editor.Session.New();
+            Assert.AreEqual(3, editor.Mission.Nodes.Count);
+            Assert.AreEqual(3, editor.Prompts.InvalidAsked.Count);
+
+            // Giving the text up saves the size the mission had all along.
+            editor.Prompts.DiscardInput.Enqueue(true);
+            editor.Session.Save();
+            Assert.IsFalse(editor.Session.HasInvalidInput);
+            Assert.AreEqual(2, editor.Files.Writes);
+            Assert.AreEqual(2.5, MissionJson.Read(editor.Files.Files["chain.json"]).Mission.FindNode("N2").Size);
         }
 
         [Test]

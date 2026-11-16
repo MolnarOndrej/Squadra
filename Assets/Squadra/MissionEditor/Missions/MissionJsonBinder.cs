@@ -99,6 +99,7 @@ namespace Squadra.Missions
             var fields = new ObjectFields(value, at, issues);
             JsonValue id = fields.Take("id", JsonKind.String);
             JsonValue type = fields.Take("type", JsonKind.String);
+            JsonValue size = fields.Take("size", JsonKind.Number);
             JsonValue position = fields.Take("position", JsonKind.Object);
             JsonValue owner = fields.Take("owner", JsonKind.String, JsonKind.Null);
             JsonValue darts = fields.Take("darts", JsonKind.Number);
@@ -111,8 +112,12 @@ namespace Squadra.Missions
                 else
                     issues.Add(Error(IssueCode.UnsupportedNodeType, at + ".type",
                         "The node type \"" + type.Text + "\" is not one this version knows. "
-                        + "Use \"planet\" or \"moon\" (lower case).", node.Id));
+                        + "Use " + MissionRules.TypeNameList + " (lower case).", node.Id));
             }
+
+            // Whether the size is in range is the validator's to say. A type's default never stands in
+            // for a size the file does not state: the missing field has already refused the file.
+            if (size != null && TryNumber(size, at + ".size", issues, out double sizeValue)) node.Size = sizeValue;
 
             if (position != null)
             {

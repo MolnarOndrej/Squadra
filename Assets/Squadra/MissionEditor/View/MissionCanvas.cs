@@ -8,10 +8,11 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// The mission editor's schematic graph: a grid, routes as straight lines, a disc for each planet
-    /// and a crescent for each moon in its owner's color, node IDs and, when asked for, route
-    /// distances. It shows the session's mission and turns clicks and drags into the session's
-    /// commands; it holds no mission data of its own.
+    /// The mission editor's schematic graph: a grid, routes as straight lines, a disc for each planet,
+    /// a crescent for each moon and a rock for each asteroid in its owner's color and at the size of
+    /// its body on the map, node IDs and, when asked for, route distances. It shows the session's
+    /// mission and turns clicks and drags into the session's commands; it holds no mission data of
+    /// its own.
     ///
     /// The element itself reads the pointer: which gesture is under way and what lies under it. The
     /// view it owns, which map point is in the middle and at what zoom, is a <see cref="MapViewport"/>;
@@ -33,6 +34,10 @@ namespace Squadra
         const float DragThreshold = 4f;
         const float EdgeReach = 6f;
         const float NodeReach = 4f;
+
+        // A body can be drawn smaller than a pixel. It can still be picked within this distance of
+        // its middle, which makes it no larger on screen or in the mission.
+        const float SmallestNodeReach = 10f;
 
         enum Gesture
         {
@@ -140,8 +145,8 @@ namespace Squadra
         }
 
         /// <summary>
-        /// Frames every node with a margin around them. A mission without nodes gets the view a new
-        /// mission opens with: the origin in the middle at 100%.
+        /// Frames every node and its body with a margin around them. A mission without nodes gets the
+        /// view a new mission opens with: the origin in the middle at 100%.
         /// </summary>
         public void FitToMap()
         {
@@ -153,7 +158,8 @@ namespace Squadra
             }
 
             fitWhenLaidOut = false;
-            viewport.Fit(session.Document.Mission.Nodes);
+            MissionDefinition mission = session.Document.Mission;
+            viewport.Fit(mission.Nodes, mission.DistanceScale);
             OnViewChanged();
         }
 
@@ -353,16 +359,20 @@ namespace Squadra
 
         // ------------------------------------------------------------------ what is where
 
-        /// <summary>The node drawn at a canvas position, the topmost when several overlap; null for none.</summary>
+        /// <summary>
+        /// The node whose body is at a canvas position, the topmost when several overlap; null for
+        /// none. A node is hit anywhere on the disc of its body, whatever its symbol.
+        /// </summary>
         public MissionNode NodeAt(Vector2 position)
         {
             if (session == null) return null;
 
-            List<MissionNode> nodes = session.Document.Mission.Nodes;
+            MissionDefinition mission = session.Document.Mission;
+            List<MissionNode> nodes = mission.Nodes;
             for (int i = nodes.Count - 1; i >= 0; i--)
             {
-                float reach = MissionCanvasPainter.RadiusOf(nodes[i], viewport) + NodeReach;
-                if ((viewport.MapToCanvas(nodes[i].X, nodes[i].Y) - position).sqrMagnitude <= reach * reach) return nodes[i];
+                NodeFootprint body = viewport.FootprintOf(nodes[i], mission.DistanceScale);
+                if (body.DistanceTo(position) <= Math.Max(body.Radius + NodeReach, SmallestNodeReach)) return nodes[i];
             }
 
             return null;

@@ -7,7 +7,8 @@ namespace Squadra.Missions
     /// The mission file format, version 1: one human-readable JSON document that holds a whole mission.
     /// Reading is strict. Every field is required, and an unknown field, a wrong type, a repeated
     /// property name, an unknown color or node type or another format version rejects the file, so
-    /// nothing in it is ever dropped or guessed. A file that has the right shape is then judged by
+    /// nothing in it is ever dropped or guessed: a node without a size is refused, not given its
+    /// type's default. A file that has the right shape is then judged by
     /// <see cref="MissionValidator"/>, the same as a mission being edited.
     ///
     /// Reading is three steps, each in its own type: <see cref="JsonParser"/> turns text into JSON
