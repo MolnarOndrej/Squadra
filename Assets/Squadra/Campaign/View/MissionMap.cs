@@ -28,7 +28,7 @@ namespace Squadra
 
         static readonly string[] StateClasses =
         {
-            "mission--preview", "mission--locked", "mission--available", "mission--completed",
+            "mission--preview", "mission--locked", "mission--available", "mission--completed", "mission--unavailable",
         };
 
         [SerializeField] MissionCatalog catalog;
@@ -283,6 +283,7 @@ namespace Squadra
 
             slot.Name.text = MissionCatalog.LabelFor(index).ToUpperInvariant();
             slot.Icon.Kind = state == MissionState.Completed ? MenuIconKind.Check : MenuIconKind.Lock;
+            slot.Root.tooltip = state == MissionState.Unavailable ? missions[index].Problem : string.Empty;
             switch (state)
             {
                 case MissionState.Completed:
@@ -293,6 +294,10 @@ namespace Squadra
                     break;
                 case MissionState.Locked:
                     slot.Status.text = "LOCKED\nComplete " + MissionCatalog.LabelFor(index - 1);
+                    break;
+                case MissionState.Unavailable:
+                    // The full reason is in the log, written when the mission was prepared.
+                    slot.Status.text = "UNAVAILABLE\nCould not be loaded";
                     break;
                 default:
                     slot.Status.text = "COMING SOON";

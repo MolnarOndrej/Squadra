@@ -14,5 +14,8 @@ namespace Squadra.Campaign
 
         /// <summary>This attempt was lost. Shown disabled whether or not the following mission is open.</summary>
         WinRequired,
+
+        /// <summary>This mission was won, but the following one could not be prepared and cannot be played.</summary>
+        Unavailable,
     }
 }

@@ -1,5 +1,4 @@
 using System.IO;
-using Squadra.Simulation;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -12,20 +11,26 @@ using static Squadra.EditorTools.SceneWiring;
 namespace Squadra.EditorTools
 {
     /// <summary>
-    /// Assembles the first playable scene from code: materials, post-processing profile, backdrop, the two
-    /// planets and the moon, fleet and effect layers, HUD, results screen, pause menu and the game
-    /// controller. Run it again from <c>Squadra &gt; Rebuild First Playable Scene</c> to regenerate everything;
-    /// it overwrites the scene and the generated materials, so tweak values here rather than in the
-    /// generated assets if they must survive. The layout and look of the results screen and the pause menu
-    /// live in <c>Assets/Squadra/Results/UI</c> and <c>Assets/Squadra/Pause/UI</c> and are left alone.
+    /// Assembles the shared mission scene from code: materials, world looks, post-processing profile,
+    /// backdrop, the world template, fleet and effect layers, HUD, results screen, pause menu and the game
+    /// controller. The scene has no worlds of its own: every mission builds its battlefield from its
+    /// mission file when it is played. Run it again from <c>Squadra &gt; Rebuild Mission Scene</c> to
+    /// regenerate everything; it overwrites the scene and the generated materials, so tweak values here
+    /// rather than in the generated assets if they must survive. The layout and look of the results
+    /// screen and the pause menu live in <c>Assets/Squadra/Results/UI</c> and <c>Assets/Squadra/Pause/UI</c>,
+    /// and the world name dictionaries in <c>Assets/Squadra/Visuals/WorldNames</c>; those are left alone.
     ///
-    /// The materials and the post-processing profile come from <see cref="SquadraAssetBuilder"/>, and
-    /// serialized fields are set through <see cref="SceneWiring"/>. What is here is the composition of
+    /// The materials, world looks and post-processing profile come from <see cref="SquadraAssetBuilder"/>,
+    /// and serialized fields are set through <see cref="SceneWiring"/>. What is here is the composition of
     /// the scene itself.
     /// </summary>
     public static class SquadraSceneBuilder
     {
-        internal const string ScenePath = ProjectFolders.Root + "/Match/Scenes/SampleScene.unity";
+        internal const string ScenePath = ProjectFolders.Root + "/Match/Scenes/Mission.unity";
+
+        /// <summary>First Contact: Mission 1, and the mission the scene plays when opened on its own.</summary>
+        internal const string FirstMissionPath = ProjectFolders.Root + "/Match/Scenes/mission-01.json";
+
         const string ResultsLayoutPath = ProjectFolders.Root + "/Results/UI/MissionResults.uxml";
         const string PauseLayoutPath = ProjectFolders.Root + "/Pause/UI/PauseMenu.uxml";
 
@@ -44,7 +49,7 @@ namespace Squadra.EditorTools
         const int OrderText = 20;
         const int OrderScrim = 50;
 
-        [MenuItem("Squadra/Rebuild First Playable Scene")]
+        [MenuItem("Squadra/Rebuild Mission Scene")]
         public static void Build()
         {
             if (TMP_Settings.defaultFontAsset == null)
@@ -58,24 +63,21 @@ namespace Squadra.EditorTools
             AssetDatabase.Refresh();
 
             SceneMaterials materials = SquadraAssetBuilder.BuildMaterials();
+            SquadraAssetBuilder.BuildWorldLooks();
             VolumeProfile profile = SquadraAssetBuilder.BuildVolumeProfile();
+            AssetDatabase.SaveAssets();
             SquadraMenuBuilder.EnsurePanel(); // before the new scene: opening it drops assets created just now
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             CameraRig rig = BuildCamera();
             BuildVolume(profile);
-            BuildBackdrop(materials, rig);
+            Backdrop backdrop = BuildBackdrop(materials, rig);
 
+            // The mission's worlds are copies of this template, made when the mission starts.
             var worldsRoot = new GameObject("Worlds").transform;
-            WorldView thalassa = BuildWorld(worldsRoot, "Thalassa", NodeKind.Planet, Faction.Blue,
-                MatchConfig.StartingDarts, NodeConfig.PlanetProductionInterval, new Vector2(-5.5f, -0.75f), 1.15f,
-                materials.Thalassa, materials);
-            WorldView ember = BuildWorld(worldsRoot, "Ember", NodeKind.Planet, Faction.Red,
-                MatchConfig.StartingDarts, NodeConfig.PlanetProductionInterval, new Vector2(5.5f, 0.45f), 1.2f,
-                materials.Ember, materials);
-            WorldView lune = BuildWorld(worldsRoot, "Lune", NodeKind.Moon, Faction.Neutral, 0,
-                NodeConfig.MoonProductionInterval, new Vector2(-1f, 1.6f), 0.55f, materials.Lune, materials);
+            WorldView template = BuildWorld(worldsRoot, "World Template", 1f, materials.Thalassa, materials);
+            template.gameObject.SetActive(false);
 
             FleetLayer fleets = BuildFleets(materials);
             EffectsLayer effects = BuildEffects(materials);
@@ -85,7 +87,9 @@ namespace Squadra.EditorTools
             BuildMusic();
 
             var game = new GameObject("Game").AddComponent<GameController>();
-            Wire(game, "worlds", new Object[] { thalassa, ember, lune });
+            Wire(game, "worldTemplate", template);
+            Wire(game, "backdrop", backdrop);
+            Wire(game, "standaloneMission", AssetDatabase.LoadAssetAtPath<TextAsset>(FirstMissionPath));
             Wire(game, "fleets", fleets);
             Wire(game, "effects", effects);
             Wire(game, "sounds", sounds);
@@ -97,8 +101,12 @@ namespace Squadra.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
 
-            // The catalog's first mission is this scene, so a missing catalog can only be created now.
-            Wire(game, "catalog", SquadraMenuBuilder.EnsureCatalog());
+            // The catalog plays its missions in this scene, so a missing catalog can only be created now.
+            MissionCatalog catalog = SquadraMenuBuilder.EnsureCatalog();
+            // Loaded again here: opening the new scene leaves a reference taken before it stale.
+            SquadraMenuBuilder.WireCatalog(catalog,
+                AssetDatabase.LoadAssetAtPath<WorldLooks>(SquadraAssetBuilder.WorldLooksPath));
+            Wire(game, "catalog", catalog);
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("Squadra: rebuilt " + ScenePath);
@@ -223,21 +231,22 @@ namespace Squadra.EditorTools
             volume.sharedProfile = profile;
         }
 
-        static void BuildBackdrop(SceneMaterials materials, CameraRig rig)
+        // The mission's own backdrop replaces this material when the mission starts.
+        static Backdrop BuildBackdrop(SceneMaterials materials, CameraRig rig)
         {
             MeshRenderer quad = Shapes.CreateQuad("Space Backdrop", null, materials.Space, OrderBackdrop);
             quad.transform.localScale = new Vector3(21f, 13f, 1f);
             var backdrop = quad.gameObject.AddComponent<Backdrop>();
             Wire(backdrop, "rig", rig);
             Relayout(backdrop);
+            return backdrop;
         }
 
-        static WorldView BuildWorld(Transform parent, string name, NodeKind kind, Faction owner, int darts,
-            double productionInterval, Vector2 position, float radius, Material surfaceMaterial, SceneMaterials materials)
+        static WorldView BuildWorld(Transform parent, string name, float radius, Material surfaceMaterial,
+            SceneMaterials materials)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            go.transform.position = position;
 
             MeshRenderer aura = Shapes.CreateQuad("Aura", go.transform, materials.Glow, OrderAura);
             MeshRenderer surface = Shapes.CreateQuad("Surface", go.transform, surfaceMaterial, OrderSurface);
@@ -245,18 +254,13 @@ namespace Squadra.EditorTools
             MeshRenderer captureRing = Shapes.CreateQuad("Capture Ring", go.transform, materials.Ring, OrderCaptureRing);
             MeshRenderer selectionRing = Shapes.CreateQuad("Selection Ring", go.transform, materials.Ring, OrderSelectionRing);
 
-            TextMeshPro count = Text("Fleet Count", go.transform, darts.ToString(), 5.4f, Palette.Text,
+            TextMeshPro count = Text("Fleet Count", go.transform, string.Empty, 5.4f, Palette.Text,
                 TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(4f, 1f), OrderText, FontStyles.Bold);
             TextMeshPro caption = Text("Caption", go.transform, name.ToUpperInvariant(), 1.75f, Palette.TextDim,
                 TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(6f, 0.5f), OrderText,
                 FontStyles.Normal, 14f);
 
             var view = go.AddComponent<WorldView>();
-            Wire(view, "displayName", name);
-            WireEnum(view, "kind", (int)kind);
-            WireEnum(view, "startingOwner", (int)owner);
-            WireInt(view, "startingDarts", darts);
-            WireFloat(view, "productionInterval", (float)productionInterval);
             WireFloat(view, "bodyRadius", radius);
             Wire(view, "surface", surface);
             Wire(view, "aura", aura);

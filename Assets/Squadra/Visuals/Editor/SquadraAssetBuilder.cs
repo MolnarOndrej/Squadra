@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -6,13 +8,23 @@ using UnityEngine.Rendering.Universal;
 namespace Squadra.EditorTools
 {
     /// <summary>
-    /// Generates the assets the scenes are built from: the materials of the backdrop, the worlds and
-    /// the effects, and the post-processing profile. The look of each world is decided here.
+    /// Generates the assets the scenes are built from: the materials of the backdrop, the world surfaces
+    /// and the effects, the post-processing profile, and the world looks that list which surfaces each
+    /// type of world can be given and which space backdrops a mission can be shown against. The look of
+    /// each surface is decided here. World surfaces live in their type's folder (Planets, Moons,
+    /// Asteroids) and backdrops in Backdrops, and nothing else does, so a material added there is offered
+    /// the next time the looks are built.
     /// </summary>
     static class SquadraAssetBuilder
     {
         public const string MaterialFolder = ProjectFolders.Root + "/Visuals/Materials";
+        public const string PlanetFolder = MaterialFolder + "/Planets";
+        public const string MoonFolder = MaterialFolder + "/Moons";
+        public const string AsteroidFolder = MaterialFolder + "/Asteroids";
+        public const string BackdropFolder = MaterialFolder + "/Backdrops";
         public const string SettingsFolder = ProjectFolders.Root + "/Visuals/PostProcessing";
+        public const string NamesFolder = ProjectFolders.Root + "/Visuals/WorldNames";
+        public const string WorldLooksPath = ProjectFolders.Root + "/Visuals/WorldLooks.asset";
 
         // The sun sits just outside the top-left of the frame; planets are lit from there.
         static readonly Vector2 SunPosition = new Vector2(-12f, 7.5f);
@@ -24,17 +36,23 @@ namespace Squadra.EditorTools
         /// </summary>
         public static SceneMaterials BuildMaterials()
         {
+            foreach (string folder in new[] { MaterialFolder, PlanetFolder, MoonFolder, AsteroidFolder, BackdropFolder })
+                Directory.CreateDirectory(folder);
+            AssetDatabase.Refresh();
+
             var m = new SceneMaterials
             {
-                Space = LoadMaterial("Space", "Squadra/Space"),
-                Thalassa = LoadMaterial("Thalassa", "Squadra/Planet"),
-                Ember = LoadMaterial("Ember", "Squadra/Planet"),
-                Lune = LoadMaterial("Lune", "Squadra/Planet"),
-                Ring = LoadMaterial("Ring", "Squadra/Ring"),
-                Glow = LoadMaterial("Glow", "Squadra/Glow"),
-                Dot = LoadMaterial("Dot", "Squadra/Dot"),
-                Line = LoadMaterial("Line", "Squadra/Line"),
-                Scrim = LoadMaterial("Scrim", "Squadra/Scrim"),
+                Space = LoadMaterial(BackdropFolder, "Space", "Squadra/Space"),
+                Thalassa = LoadMaterial(PlanetFolder, "Thalassa", "Squadra/Planet"),
+                Ember = LoadMaterial(PlanetFolder, "Ember", "Squadra/Planet"),
+                Lune = LoadMaterial(MoonFolder, "Lune", "Squadra/Planet"),
+                Cinder = LoadMaterial(AsteroidFolder, "Cinder", "Squadra/Planet"),
+                Ferrite = LoadMaterial(AsteroidFolder, "Ferrite", "Squadra/Planet"),
+                Ring = LoadMaterial(MaterialFolder, "Ring", "Squadra/Ring"),
+                Glow = LoadMaterial(MaterialFolder, "Glow", "Squadra/Glow"),
+                Dot = LoadMaterial(MaterialFolder, "Dot", "Squadra/Dot"),
+                Line = LoadMaterial(MaterialFolder, "Line", "Squadra/Line"),
+                Scrim = LoadMaterial(MaterialFolder, "Scrim", "Squadra/Scrim"),
             };
 
             // Backdrop
@@ -110,13 +128,46 @@ namespace Squadra.EditorTools
             m.Lune.SetFloat("_AtmoRim", 0.25f);
             m.Lune.SetFloat("_AtmoHalo", 0.18f);
 
+            // Cinder: a dark basalt rock, pocked with craters, its outline uneven.
+            PlanetDefaults(m.Cinder, seed: 2.3f, spin: 0.012f, tilt: 0.5f, noiseScale: 3.8f, warp: 1.1f);
+            m.Cinder.SetFloat("_Lumps", 0.22f);
+            m.Cinder.SetFloat("_SeaLevel", 0f);
+            m.Cinder.SetColor("_ColorLow", Hex(0x2B2723));
+            m.Cinder.SetColor("_ColorMid", Hex(0x5E554B));
+            m.Cinder.SetColor("_ColorHigh", Hex(0x9A8F80));
+            m.Cinder.SetFloat("_IceAmount", 0f);
+            m.Cinder.SetFloat("_CloudAmount", 0f);
+            m.Cinder.SetFloat("_CraterAmount", 1f);
+            m.Cinder.SetFloat("_CraterScale", 6f);
+            m.Cinder.SetFloat("_Specular", 0f);
+            m.Cinder.SetColor("_AtmoColor", Hex(0x8A8070));
+            m.Cinder.SetFloat("_AtmoRim", 0.1f);
+            m.Cinder.SetFloat("_AtmoHalo", 0f);
+
+            // Ferrite: a rust-brown iron rock, more lopsided than Cinder.
+            PlanetDefaults(m.Ferrite, seed: 6.6f, spin: 0.016f, tilt: -0.4f, noiseScale: 4.2f, warp: 0.9f);
+            m.Ferrite.SetFloat("_Lumps", 0.28f);
+            m.Ferrite.SetFloat("_SeaLevel", 0f);
+            m.Ferrite.SetColor("_ColorLow", Hex(0x3A2418));
+            m.Ferrite.SetColor("_ColorMid", Hex(0x7A4A2E));
+            m.Ferrite.SetColor("_ColorHigh", Hex(0xB88A62));
+            m.Ferrite.SetFloat("_IceAmount", 0f);
+            m.Ferrite.SetFloat("_CloudAmount", 0f);
+            m.Ferrite.SetFloat("_CraterAmount", 0.8f);
+            m.Ferrite.SetFloat("_CraterScale", 5f);
+            m.Ferrite.SetFloat("_Specular", 0f);
+            m.Ferrite.SetColor("_AtmoColor", Hex(0x9A7A60));
+            m.Ferrite.SetFloat("_AtmoRim", 0.08f);
+            m.Ferrite.SetFloat("_AtmoHalo", 0f);
+
             // Shared effect materials: per-renderer values come from property blocks at runtime.
             m.Glow.SetFloat("_Power", 2.4f);
             m.Dot.SetFloat("_Core", 0.5f);
             m.Dot.SetFloat("_Halo", 0.55f);
             m.Dot.SetFloat("_Additive", 0.7f);
 
-            foreach (Material material in new[] { m.Space, m.Thalassa, m.Ember, m.Lune, m.Ring, m.Glow, m.Dot, m.Line, m.Scrim })
+            foreach (Material material in new[]
+                { m.Space, m.Thalassa, m.Ember, m.Lune, m.Cinder, m.Ferrite, m.Ring, m.Glow, m.Dot, m.Line, m.Scrim })
                 EditorUtility.SetDirty(material);
 
             return m;
@@ -128,6 +179,7 @@ namespace Squadra.EditorTools
             material.SetFloat("_Seed", seed);
             material.SetFloat("_SpinSpeed", spin);
             material.SetFloat("_Tilt", tilt);
+            material.SetFloat("_Lumps", 0f);
             material.SetFloat("_NoiseScale", noiseScale);
             material.SetFloat("_Warp", warp);
             material.SetVector("_LightDir", LightDirection);
@@ -138,12 +190,12 @@ namespace Squadra.EditorTools
             material.SetFloat("_LavaAmount", 0f);
         }
 
-        static Material LoadMaterial(string name, string shaderName)
+        static Material LoadMaterial(string folder, string name, string shaderName)
         {
             Shader shader = Shader.Find(shaderName);
             if (shader == null) throw new System.InvalidOperationException("Missing shader " + shaderName);
 
-            string path = MaterialFolder + "/" + name + ".mat";
+            string path = folder + "/" + name + ".mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
@@ -156,6 +208,74 @@ namespace Squadra.EditorTools
             }
 
             return material;
+        }
+
+        /// <summary>
+        /// Loads or creates the world looks and fills their surface lists from the three surface folders and
+        /// the backdrop list from the backdrop folder. A material that was listed before keeps its ID; a new
+        /// one gets its file name in lower case. The
+        /// name dictionaries are the text files in the names folder, which are edited by hand.
+        /// </summary>
+        public static WorldLooks BuildWorldLooks()
+        {
+            var looks = AssetDatabase.LoadAssetAtPath<WorldLooks>(WorldLooksPath);
+            if (looks == null)
+            {
+                looks = ScriptableObject.CreateInstance<WorldLooks>();
+                AssetDatabase.CreateAsset(looks, WorldLooksPath);
+            }
+
+            var serialized = new SerializedObject(looks);
+            FillSurfaces(SceneWiring.Property(serialized, "planets"), PlanetFolder);
+            FillSurfaces(SceneWiring.Property(serialized, "moons"), MoonFolder);
+            FillSurfaces(SceneWiring.Property(serialized, "asteroids"), AsteroidFolder);
+            FillSurfaces(SceneWiring.Property(serialized, "backdrops"), BackdropFolder);
+            SceneWiring.Property(serialized, "planetNames").objectReferenceValue = LoadNames("Planets");
+            SceneWiring.Property(serialized, "moonNames").objectReferenceValue = LoadNames("Moons");
+            SceneWiring.Property(serialized, "asteroidNames").objectReferenceValue = LoadNames("Asteroids");
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(looks);
+            return looks;
+        }
+
+        static void FillSurfaces(SerializedProperty list, string folder)
+        {
+            var known = new Dictionary<Material, string>();
+            for (int i = 0; i < list.arraySize; i++)
+            {
+                SerializedProperty entry = list.GetArrayElementAtIndex(i);
+                var material = entry.FindPropertyRelative("material").objectReferenceValue as Material;
+                string id = entry.FindPropertyRelative("id").stringValue;
+                if (material != null && !string.IsNullOrEmpty(id)) known[material] = id;
+            }
+
+            // Only the folder itself: a subfolder is not part of the pool.
+            var surfaces = new List<Material>();
+            foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (Path.GetDirectoryName(path)?.Replace('\\', '/') != folder) continue;
+                var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material != null) surfaces.Add(material);
+            }
+
+            surfaces.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            list.arraySize = surfaces.Count;
+            for (int i = 0; i < surfaces.Count; i++)
+            {
+                SerializedProperty entry = list.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("id").stringValue =
+                    known.TryGetValue(surfaces[i], out string id) ? id : surfaces[i].name.ToLowerInvariant();
+                entry.FindPropertyRelative("material").objectReferenceValue = surfaces[i];
+            }
+        }
+
+        static TextAsset LoadNames(string type)
+        {
+            string path = NamesFolder + "/" + type + ".txt";
+            var names = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+            if (names == null) Debug.LogWarning("Squadra: the name dictionary " + path + " is missing.");
+            return names;
         }
 
         /// <summary>Recreates the post-processing profile the scenes share.</summary>

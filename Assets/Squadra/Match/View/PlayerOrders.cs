@@ -112,7 +112,11 @@ namespace Squadra
             }
             else if (IsSelectable(index))
             {
-                Selected = index; // the first world had nothing to send: treat the click as a new selection
+                Selected = index; // the first world could not send there: treat the click as a new selection
+            }
+            else if (!match.AreConnected(Selected, index))
+            {
+                Notify("No route from " + worlds[Selected].DisplayName + " to " + worlds[index].DisplayName);
             }
             else
             {

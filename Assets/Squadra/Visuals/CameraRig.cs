@@ -4,7 +4,8 @@ namespace Squadra
 {
     /// <summary>
     /// Keeps the whole map on one screen at any aspect ratio, and adds a short shake on impacts. The
-    /// shake runs on game time, so it holds still while the mission is paused.
+    /// shake runs on game time, so it holds still while the mission is paused. A mission sets the area to
+    /// show once its worlds are built.
     /// </summary>
     [ExecuteAlways]
     [RequireComponent(typeof(Camera))]
@@ -37,6 +38,16 @@ namespace Squadra
                 Vector2 center = content.center;
                 return new Rect(center.x - halfWidth, center.y - halfHeight, halfWidth * 2f, halfHeight * 2f);
             }
+        }
+
+        /// <summary>
+        /// Shows <paramref name="area"/> from now on, centered and fitted to the window at whatever aspect
+        /// ratio it has or is resized to. Nothing in the scene moves.
+        /// </summary>
+        public void Fit(Rect area)
+        {
+            content = area;
+            LateUpdate();
         }
 
         public void Shake(float amplitude)

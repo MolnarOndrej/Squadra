@@ -3,7 +3,7 @@ namespace Squadra.Campaign
     /// <summary>How one mission appears on the map.</summary>
     public enum MissionState
     {
-        /// <summary>No playable scenario yet: shown locked, as "coming soon".</summary>
+        /// <summary>No mission definition assigned yet: shown locked, as "coming soon".</summary>
         Preview,
 
         /// <summary>Playable, but the mission before it is not completed.</summary>
@@ -14,5 +14,8 @@ namespace Squadra.Campaign
 
         /// <summary>Won this session. Still playable.</summary>
         Completed,
+
+        /// <summary>A definition is assigned but could not be prepared: never playable, with the reason.</summary>
+        Unavailable,
     }
 }

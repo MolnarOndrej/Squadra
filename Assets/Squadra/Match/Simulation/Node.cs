@@ -1,6 +1,8 @@
 namespace Squadra.Simulation
 {
-    /// <summary>A stationary map object: a planet or a moon. State is read-only outside the simulation.</summary>
+    /// <summary>
+    /// A stationary map object: a planet, a moon or an asteroid. State is read-only outside the simulation.
+    /// </summary>
     public sealed class Node
     {
         internal Node(int id, NodeConfig config, double captureDuration)
@@ -54,10 +56,14 @@ namespace Squadra.Simulation
         /// <summary>Intervals shorter than this count as "no production".</summary>
         public const double MinProductionInterval = 0.001;
 
+        /// <summary>
+        /// True for an object that builds Darts while owned. An asteroid never does, whatever its interval:
+        /// that follows from its kind.
+        /// </summary>
+        public bool CanProduce => Kind != NodeKind.Asteroid && ProductionInterval >= MinProductionInterval;
+
         /// <summary>True while the production clock runs: owned, outside capture and not fought over.</summary>
-        public bool IsProducing =>
-            Owner != Faction.Neutral && !IsBeingCaptured && !IsContested
-            && ProductionInterval >= MinProductionInterval;
+        public bool IsProducing => CanProduce && Owner != Faction.Neutral && !IsBeingCaptured && !IsContested;
 
         /// <summary>
         /// Capture progress from 0 to 1. Zero when no capture is running. It stands still, and is kept,

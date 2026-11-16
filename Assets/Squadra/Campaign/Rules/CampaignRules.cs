@@ -11,6 +11,7 @@ namespace Squadra.Campaign
         public static MissionState StateOf(IReadOnlyList<MissionSlot> missions, CampaignProgress progress, int index)
         {
             MissionSlot mission = missions[index];
+            if (mission.HasFailed) return MissionState.Unavailable;
             if (!mission.Ready) return MissionState.Preview;
             if (progress.IsCompleted(mission.Id)) return MissionState.Completed;
             if (index == 0 || progress.IsCompleted(missions[index - 1].Id)) return MissionState.Available;
@@ -101,9 +102,13 @@ namespace Squadra.Campaign
             if (!victory)
                 return new ResultsPlan(heading, NextMissionState.WinRequired, next, ResultsAction.Restart);
 
-            return CanLaunch(missions, progress, next)
-                ? new ResultsPlan(heading, NextMissionState.Enabled, next, ResultsAction.NextMission)
-                : new ResultsPlan(heading, NextMissionState.ComingSoon, next, ResultsAction.Restart);
+            if (CanLaunch(missions, progress, next))
+                return new ResultsPlan(heading, NextMissionState.Enabled, next, ResultsAction.NextMission);
+
+            NextMissionState blocked = StateOf(missions, progress, next) == MissionState.Unavailable
+                ? NextMissionState.Unavailable
+                : NextMissionState.ComingSoon;
+            return new ResultsPlan(heading, blocked, next, ResultsAction.Restart);
         }
     }
 }

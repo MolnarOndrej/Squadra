@@ -208,6 +208,10 @@ namespace Squadra
         {
             Time.timeScale = 1f;
             CampaignSession.EndMission();
+
+            // Every assigned mission is prepared before the menu takes input, so the map knows which can
+            // be played. Missions already prepared this session are kept as they are.
+            MissionLibrary.Prepare(map.Catalog);
         }
 
         void Start()

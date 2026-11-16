@@ -22,6 +22,8 @@ namespace Squadra.Simulation
         readonly List<Fleet> fleets = new List<Fleet>();
         readonly List<Fleet> arrivals = new List<Fleet>();
         readonly List<Battle> battles = new List<Battle>();
+        readonly List<Route> routes = new List<Route>();
+        readonly HashSet<Route> routeSet = new HashSet<Route>();
         readonly MatchRoster roster;
         int nextFleetId = 1;
 
@@ -36,12 +38,22 @@ namespace Squadra.Simulation
             for (int i = 0; i < config.Nodes.Count; i++)
                 nodes.Add(new Node(i, config.Nodes[i], CaptureDuration));
 
+            foreach (Route route in config.Routes)
+            {
+                if (!IsNode(route.A) || !IsNode(route.B) || route.A == route.B)
+                    throw new ArgumentException("The route " + route + " does not join two objects of this map.", nameof(config));
+                if (routeSet.Add(route)) routes.Add(route);
+            }
+
             Human = config.Human;
             roster = new MatchRoster(config, nodes);
         }
 
         public IReadOnlyList<Node> Nodes => nodes;
         public IReadOnlyList<Fleet> Fleets => fleets;
+
+        /// <summary>The routes fleets may travel, each once, in the order the configuration listed them.</summary>
+        public IReadOnlyList<Route> Routes => routes;
 
         /// <summary>The battles being fought right now, at most one per map object.</summary>
         public IReadOnlyList<Battle> Battles => battles;
@@ -115,16 +127,20 @@ namespace Squadra.Simulation
             return MapPoint.Distance(nodes[sourceId].Position, nodes[targetId].Position) / FleetSpeed;
         }
 
+        /// <summary>True when a route joins the two objects directly, in either direction.</summary>
+        public bool AreConnected(int a, int b) => routeSet.Contains(new Route(a, b));
+
         /// <summary>
         /// True when <paramref name="issuer"/> may send the fleet stationed at the source to the target:
         /// the issuer owns the source, the source holds Darts that are neither mid-capture nor committed
-        /// to a battle, and the target differs.
+        /// to a battle, and a route joins the source directly to a different target.
         /// </summary>
         public bool CanLaunch(Faction issuer, int sourceId, int targetId)
         {
             if (Status != MatchStatus.InProgress) return false;
             if (issuer == Faction.Neutral) return false;
             if (!IsNode(sourceId) || !IsNode(targetId) || sourceId == targetId) return false;
+            if (!AreConnected(sourceId, targetId)) return false;
 
             Node source = nodes[sourceId];
             return source.Owner == issuer && !source.IsBeingCaptured && !source.IsContested && source.Darts > 0;
@@ -362,17 +378,18 @@ namespace Squadra.Simulation
         // ------------------------------------------------------------------ result
 
         /// <summary>
-        /// A side stays alive while it owns an object, has a fleet in transit, is capturing, or has
-        /// Darts fighting in a battle.
+        /// A side stays in the match while it owns any planet, moon or asteroid, an empty one included, or
+        /// has Darts anywhere: stationed, capturing, fighting on either side of a battle or in transit.
+        /// Darts count for the side they belong to, whoever formally owns the object they are at.
         /// </summary>
         public bool IsAlive(Faction faction)
         {
             foreach (Node node in nodes)
             {
-                if (node.Owner == faction || node.Captor == faction) return true;
+                if (node.Owner == faction) return true;
             }
 
-            return HasFleetInTransit(faction) || IsAttacking(faction);
+            return TotalDarts(faction) > 0;
         }
 
         public bool HasFleetInTransit(Faction faction)
@@ -391,18 +408,6 @@ namespace Squadra.Simulation
             foreach (Battle battle in battles)
             {
                 if (battle.Involves(faction)) return true;
-            }
-
-            return false;
-        }
-
-        // True while a fleet of this faction that arrived somewhere is still fighting there. Such a force
-        // is no longer in transit, but it has not been beaten either.
-        bool IsAttacking(Faction faction)
-        {
-            foreach (Battle battle in battles)
-            {
-                if (battle.Arriving == faction) return true;
             }
 
             return false;
@@ -430,25 +435,28 @@ namespace Squadra.Simulation
             return total;
         }
 
+        // One elimination rule for every mission: the human wins once no other player is left in the match
+        // (see IsAlive) and loses once the human is not. Neutral is nobody's enemy, so neutral objects and
+        // guards never stand in the way. Should the human and the last opponent go out at the same instant,
+        // the human has not survived to win: that is a defeat.
         void EvaluateStatus()
         {
             if (Status != MatchStatus.InProgress) return;
 
-            int planets = 0;
-            int bluePlanets = 0;
-            foreach (Node node in nodes)
+            if (!IsAlive(Human))
+                SetStatus(MatchStatus.BlueDefeat);
+            else if (!AnyOpponentAlive())
+                SetStatus(MatchStatus.BlueVictory);
+        }
+
+        bool AnyOpponentAlive()
+        {
+            foreach (MatchPlayer player in roster.Players)
             {
-                if (node.Kind != NodeKind.Planet) continue;
-                planets++;
-                if (node.Owner == Faction.Blue) bluePlanets++;
+                if (player.Faction != Human && IsAlive(player.Faction)) return true;
             }
 
-            // Moon ownership is deliberately not part of the victory check. A Red fleet that has arrived
-            // and is still fighting counts like one in transit: its battle is not over.
-            if (planets > 0 && bluePlanets == planets && !HasFleetInTransit(Faction.Red) && !IsAttacking(Faction.Red))
-                SetStatus(MatchStatus.BlueVictory);
-            else if (!IsAlive(Faction.Blue))
-                SetStatus(MatchStatus.BlueDefeat);
+            return false;
         }
 
         // Runs after the events of the deciding moment are resolved, so the casualties that end the match
