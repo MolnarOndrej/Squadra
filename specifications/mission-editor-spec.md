@@ -1,5 +1,7 @@
 # Squadra Mission Editor
 
+> **Superseded in part by [Escape and right-click cancellation](mission-editor-cancel-spec.md).** Escape, and now a right-click on the canvas, cancel one step at a time: a pending tool or connection first, keeping the selection, then the selection itself. A right-drag still pans. The text below is kept as written.
+
 ## Problem Statement
 
 Mission authors need to create and change Squadra maps without editing configuration files or using the Unity development environment. They need to see worlds and their permitted fleet routes, place worlds precisely, configure their starting state, and exchange the complete mission as one file.

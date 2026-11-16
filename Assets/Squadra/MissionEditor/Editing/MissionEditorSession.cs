@@ -492,15 +492,28 @@ namespace Squadra.MissionEditing
             RaiseChanged();
         }
 
-        /// <summary>What Escape does: puts a pending tool or connection away. False when there was none.</summary>
-        public bool CancelTool()
+        /// <summary>
+        /// What Escape and a right-click on the canvas do, one step at a time: an armed tool is put
+        /// away first, with its half-made connection, and the selection stays; only with no tool armed
+        /// is the selection cleared, asking first when its fields hold invalid text. Changes nothing in
+        /// the mission. False when there was nothing to cancel.
+        /// </summary>
+        public bool Cancel()
         {
-            if (Busy || Tool == EditorTool.Select) return false;
+            if (Busy) return false;
 
-            Tool = EditorTool.Select;
-            ConnectionSource = null;
-            Status = "";
-            RaiseChanged();
+            if (Tool != EditorTool.Select)
+            {
+                Tool = EditorTool.Select;
+                ConnectionSource = null;
+                Status = "";
+                RaiseChanged();
+                return true;
+            }
+
+            if (Selection.Kind == SelectionKind.None) return false;
+
+            Select(Selection.None);
             return true;
         }
 
