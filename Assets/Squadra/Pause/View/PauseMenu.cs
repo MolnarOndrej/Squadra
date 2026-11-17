@@ -1,4 +1,5 @@
 using System;
+using Squadra.Menus;
 using Squadra.Pause;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -44,7 +45,7 @@ namespace Squadra
         MenuDialog dialog;
 
         bool popupWasOpen;
-        MenuInputMode inputMode;
+        MenuNavigation navigation;
 
         /// <summary>The pause screen in front, or <see cref="PauseScreen.Closed"/> while the mission runs.</summary>
         public PauseScreen Screen => flow.Screen;
@@ -64,7 +65,7 @@ namespace Squadra
         /// True while the keyboard is the input in use, false while the mouse is. The focused control is
         /// highlighted either way; the mouse moves the focus to the control it points at.
         /// </summary>
-        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
+        public bool KeyboardMode => navigation != null && navigation.Keyboard;
 
         /// <summary>The root menu action that has the keyboard focus, or null when none has.</summary>
         public PauseAction? FocusedAction
@@ -108,7 +109,7 @@ namespace Squadra
             {
                 case EscapeStep.Open:
                     game.SetPaused(true);
-                    inputMode.Set(true);
+                    navigation.SetKeyboard(true);
                     Refresh();
                     MenuFocus.Soon(root, ButtonOf(PauseFlow.InitialFocus));
                     break;
@@ -335,19 +336,14 @@ namespace Squadra
             root.Q<Button>("settingsBackButton").clicked += Back;
             dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
             settings = new SettingsScreen(settingsScreen, this, sounds);
-            root.Query<Button>().ForEach(sounds.AttachHover);
 
             // As in the main menu: the focused control is highlighted, and pointing at a control gives
             // it the focus.
-            inputMode = new MenuInputMode(sounds);
-            inputMode.Attach(root);
-            inputMode.Set(false);
-            foreach (VisualElement field in settings.Fields)
-                inputMode.FollowPointer(field);
-            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerDownEvent>(inputMode.OnPointerPressed, TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
+            navigation = new MenuNavigation(sounds);
+            navigation.Attach(root, root);
+            navigation.SetKeyboard(false);
+            navigation.AddLine(MenuAxis.Column, true, buttons);
+            navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
             Refresh();
         }
 
@@ -357,12 +353,9 @@ namespace Squadra
 
             // Escape also closes an open dropdown list; that press must not leave the screen as well.
             bool popupOpen = root.panel != null && root.panel.visualTree.Q(className: PopupClass) != null;
+            if (flow.IsOpen) navigation.NoticeKeys();
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null)
-            {
-                if (flow.IsOpen && !inputMode.Keyboard && keyboard.anyKey.wasPressedThisFrame) inputMode.Set(true);
-                if (keyboard.escapeKey.wasPressedThisFrame) PressEscape(popupOpen || popupWasOpen);
-            }
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) PressEscape(popupOpen || popupWasOpen);
 
             popupWasOpen = popupOpen;
             dialog.Tick();
