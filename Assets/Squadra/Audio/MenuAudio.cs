@@ -4,8 +4,9 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// Plays the menu's interface cues: one when the pointer enters a button, one when a button or tab is
-    /// activated or the map page changes, and a different one for going back or cancelling a dialog.
+    /// Plays the menu's interface cues: one when the pointer enters a button or a keyboard move reaches a
+    /// control, one when a button or tab is activated or the map page changes, and a different one for
+    /// going back or cancelling a dialog.
     /// The screens decide which cue an action gets; this component only plays it.
     /// </summary>
     public sealed class MenuAudio : MonoBehaviour
@@ -60,7 +61,9 @@ namespace Squadra
         void OnPointerEnter(PointerEnterEvent pointer)
         {
             var element = (VisualElement)pointer.currentTarget;
-            if (!PointerActive || !element.enabledInHierarchy) return;
+            // The cue marks the highlight moving; a button that already has it stays silent.
+            if (!PointerActive || !element.enabledInHierarchy || element.focusController?.focusedElement == element)
+                return;
 
             Hover();
             element.Focus();

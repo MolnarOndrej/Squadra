@@ -61,8 +61,8 @@ namespace Squadra
         public string HeadingText => heading != null ? heading.text : string.Empty;
 
         /// <summary>
-        /// True while the keyboard is the input in use: the focused control is highlighted. False while
-        /// the mouse is: only the control under the pointer is.
+        /// True while the keyboard is the input in use, false while the mouse is. The focused control is
+        /// highlighted either way; the mouse moves the focus to the control it points at.
         /// </summary>
         public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
 
@@ -337,14 +337,17 @@ namespace Squadra
             settings = new SettingsScreen(settingsScreen, this, sounds);
             root.Query<Button>().ForEach(sounds.AttachHover);
 
-            // As in the main menu: hovered controls are highlighted in pointer mode, the focused one
-            // in keyboard mode.
+            // As in the main menu: the focused control is highlighted, and pointing at a control gives
+            // it the focus.
             inputMode = new MenuInputMode(sounds);
             inputMode.Attach(root);
             inputMode.Set(false);
+            foreach (VisualElement field in settings.Fields)
+                inputMode.FollowPointer(field);
             root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerDownEvent>(_ => inputMode.Set(false), TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerDownEvent>(inputMode.OnPointerPressed, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
             Refresh();
         }
 
