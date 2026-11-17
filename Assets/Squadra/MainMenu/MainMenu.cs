@@ -9,9 +9,8 @@ namespace Squadra
 {
     /// <summary>
     /// Runs the menu scene: the main menu, the mission map, Settings and the confirmation dialog over
-    /// them. It moves between screens, keeps keyboard focus on something sensible, turns Escape and the
-    /// page keys into the same actions as the on-screen buttons, and loads a mission when the map
-    /// launches one.
+    /// them. It moves between screens, keeps keyboard focus on something sensible, turns Escape into the
+    /// same action as the on-screen Back buttons, and loads a mission when the map launches one.
     /// </summary>
     public sealed class MainMenu : MonoBehaviour, IDialogHost
     {
@@ -268,19 +267,10 @@ namespace Squadra
             bool popupOpen = root.panel != null && root.panel.visualTree.Q(className: PopupClass) != null;
             Keyboard keyboard = Keyboard.current;
             navigation.NoticeKeys();
-            if (keyboard != null && !loading)
-            {
-                if (keyboard.escapeKey.wasPressedThisFrame)
-                {
-                    if (!popupOpen && !popupWasOpen) Back();
-                }
-                else if (screen == MenuScreen.Map && !DialogOpen)
-                {
-                    // A and D do what Left and Right do on the map.
-                    if (keyboard.aKey.wasPressedThisFrame) map.StepAlongRow(-1);
-                    else if (keyboard.dKey.wasPressedThisFrame) map.StepAlongRow(1);
-                }
-            }
+            // W, A, S and D reach the screens as navigation moves, through the UI actions of the
+            // project-wide input actions, so they need nothing here.
+            if (keyboard != null && !loading && keyboard.escapeKey.wasPressedThisFrame && !popupOpen && !popupWasOpen)
+                Back();
 
             popupWasOpen = popupOpen;
             dialog.Tick();

@@ -145,22 +145,6 @@ namespace Squadra
 
         // ------------------------------------------------------------------ keyboard
 
-        /// <summary>
-        /// What A and D do on the map, the same as Left and Right: move the focus along the row of the
-        /// previous-page arrow, the missions that can be played and the next-page arrow, wrapping around
-        /// at both ends. From Back it does nothing, as Back is not in the row.
-        /// </summary>
-        public void StepAlongRow(int direction)
-        {
-            var focused = slotRow.focusController?.focusedElement as VisualElement;
-            List<Button> row = Row();
-            int place = row.IndexOf(focused as Button);
-            if (place < 0 || row.Count < 2) return;
-
-            row[(place + direction + row.Count) % row.Count].Focus();
-            if (sounds != null) sounds.Hover();
-        }
-
         // Left and Right walk the row of the previous-page arrow, the missions and the next-page arrow,
         // wrapping around; hidden or disabled arrows and missions that cannot be played are passed over,
         // and a page turns only when an arrow is activated. Up and Down go from the row to Back, and from
@@ -187,17 +171,6 @@ namespace Squadra
         {
             if (lastFocusedSlot != null && lastFocusedSlot.canGrabFocus) return lastFocusedSlot;
             return DefaultFocus() as VisualElement ?? FirstUsable(nextButton, previousButton);
-        }
-
-        // The stops of the row, left to right, that can take the focus now.
-        List<Button> Row()
-        {
-            var row = new List<Button>();
-            if (previousButton.canGrabFocus) row.Add(previousButton);
-            foreach (Slot slot in slots)
-                if (slot.Mission >= 0 && slot.Root.canGrabFocus) row.Add(slot.Root);
-            if (nextButton.canGrabFocus) row.Add(nextButton);
-            return row;
         }
 
         static Button FirstUsable(params Button[] buttons)
