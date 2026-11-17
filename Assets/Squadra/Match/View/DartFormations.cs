@@ -17,13 +17,18 @@ namespace Squadra
         const float WidestFront = 2.3f; // radians of a world's circumference a formation may cover
         const float LaneSlowdown = 0.075f; // radians per second each orbit lane turns slower than the one inside it
 
-        /// <summary>How many dots stand for a fleet. One per Dart at first, then growing slowly.</summary>
+        /// <summary>
+        /// How many dots stand for a fleet. One per Dart at first, then growing slowly, and never more than
+        /// the most a fleet is drawn with, even when that is below the one-dot-per-Dart threshold.
+        /// </summary>
         public static int DotCount(int darts, DartDisplay display)
         {
             int oneEach = display.OneDotPerDartUpTo;
             if (darts <= 0) return 0;
-            if (darts <= oneEach) return darts;
-            return Mathf.Min(display.MostDots, oneEach + Mathf.RoundToInt(Mathf.Sqrt(darts - oneEach) * 2.5f));
+            int dots = darts <= oneEach
+                ? darts
+                : oneEach + Mathf.RoundToInt(Mathf.Sqrt(darts - oneEach) * 2.5f);
+            return Mathf.Min(display.MostDots, dots);
         }
 
         /// <summary>
