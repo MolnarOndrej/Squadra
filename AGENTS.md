@@ -16,6 +16,7 @@ All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project l
 | `Squadra.Preparation` | `Match/Preparation` | Mission file to playable mission and world looks; references `Squadra.Missions` and `Squadra.Simulation` |
 | `Squadra.Campaign` | `Campaign/Rules` | |
 | `Squadra.Pause` | `Pause/Rules` | Also holds `AudioMix`; leave it there |
+| `Squadra.Menus` | `Menus/Rules` | Where a keyboard move goes along a declared line of menu controls |
 | `Squadra.Missions` | `MissionEditor/Missions` | Mission file format |
 | `Squadra.MissionEditing` | `MissionEditor/Editing` | References `Squadra.Missions` only |
 | `Assembly-CSharp` (ns `Squadra`) | everything else | Unity, UI Toolkit, audio, `PlayerPrefs`, OS dialogs |

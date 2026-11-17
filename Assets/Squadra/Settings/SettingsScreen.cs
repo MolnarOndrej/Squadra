@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Squadra.Menus;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -34,7 +35,8 @@ namespace Squadra
         List<Vector2Int> sizes = new List<Vector2Int>();
         int tab;
 
-        public SettingsScreen(VisualElement screen, IDialogHost host, MenuAudio sounds)
+        /// <param name="navigation">The host document's navigation, which this screen declares its layout to.</param>
+        public SettingsScreen(VisualElement screen, IDialogHost host, MenuAudio sounds, MenuNavigation navigation)
         {
             this.host = host;
             this.sounds = sounds;
@@ -86,12 +88,9 @@ namespace Squadra
                 muteToggle,
             };
             backButton = screen.Q<Button>("settingsBackButton");
-            screen.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
+            DeclareLayout(navigation);
             SelectTab(0);
         }
-
-        /// <summary>The value controls of every category: dropdowns, sliders and checkboxes, not the tabs.</summary>
-        public IReadOnlyList<VisualElement> Fields => fields;
 
         /// <summary>The tab that should get keyboard focus when the screen opens.</summary>
         public Focusable DefaultFocus => tabs[tab];
@@ -131,49 +130,28 @@ namespace Squadra
 
         // ------------------------------------------------------------------ keyboard
 
-        // Up and Down walk one column: the tabs, the rows of the category showing, then Back, wrapping
-        // around at both ends. From Back or the first row they return to the selected tab. Left and Right
-        // stay with the controls (between tabs, slider values). The panel's own choice goes by position,
-        // which skips the rows from a tab at the edge, so the screen takes these moves over and gives the
-        // hover cue itself.
-        void OnNavigationMove(NavigationMoveEvent move)
+        // Up and Down walk one column: the tab bar, the rows of the category showing, then Back,
+        // wrapping around at both ends. The tab bar counts as one place, so Up and Down from any tab
+        // leave it, and coming back to it lands on the selected tab. Left and Right walk the tabs,
+        // wrapping, and change a focused slider's value; on the other rows and on Back they do nothing.
+        void DeclareLayout(MenuNavigation navigation)
         {
-            int step = move.direction == NavigationMoveEvent.Direction.Down ? 1
-                : move.direction == NavigationMoveEvent.Direction.Up ? -1 : 0;
-            if (step == 0) return;
-
-            List<VisualElement> column = Column();
-            int at = PlaceOfFocus(column);
-            if (at < 0) return;
-
-            move.StopPropagation();
-            backButton.focusController.IgnoreEvent(move);
-            column[(at + step + column.Count) % column.Count].Focus();
-            sounds.Hover();
+            VisualElement tabBar = tabs[0].parent;
+            navigation.AddLine(MenuAxis.Row, true, tabs);
+            navigation.AddLine(MenuAxis.Column, true, () => Column(tabBar));
+            navigation.AddGroup(tabBar, () => tabs[tab]);
+            navigation.KeepAcross(masterSlider);
+            navigation.KeepAcross(musicSlider);
+            navigation.KeepAcross(sfxSlider);
         }
 
-        // Where the focus is in the column, any tab counting as the first place; -1 outside it. A field
-        // passes the focus on to its input, so the field is found among the focused element's ancestors.
-        int PlaceOfFocus(List<VisualElement> column)
+        // The tab bar, the rows of the category showing, and Back. Hidden rows cannot take the focus and
+        // are passed over.
+        List<VisualElement> Column(VisualElement tabBar)
         {
-            for (var element = backButton.focusController?.focusedElement as VisualElement;
-                 element != null;
-                 element = element.parent)
-            {
-                if (System.Array.IndexOf(tabs, element) >= 0) return 0;
-                int place = column.IndexOf(element);
-                if (place >= 0) return place;
-            }
-
-            return -1;
-        }
-
-        // The selected tab, the rows of its category that can take the focus, and Back.
-        List<VisualElement> Column()
-        {
-            var column = new List<VisualElement> { tabs[tab] };
+            var column = new List<VisualElement> { tabBar };
             foreach (VisualElement field in fields)
-                if (panels[tab].Contains(field) && field.canGrabFocus) column.Add(field);
+                if (panels[tab].Contains(field)) column.Add(field);
             column.Add(backButton);
             return column;
         }

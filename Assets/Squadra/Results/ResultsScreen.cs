@@ -1,9 +1,9 @@
 using System;
 using System.Globalization;
 using Squadra.Campaign;
+using Squadra.Menus;
 using Squadra.Simulation;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace Squadra
@@ -73,7 +73,7 @@ namespace Squadra
         bool suspended;
         float guard;
         ResultsAction? focusBeforeSuspend;
-        MenuInputMode inputMode;
+        MenuNavigation navigation;
 
         /// <summary>True once <see cref="Show"/> has put the results on screen.</summary>
         public bool Visible => visible;
@@ -91,7 +91,7 @@ namespace Squadra
         public bool Leaving => leaving;
 
         /// <summary>True while the keyboard is the input in use; the focused action is highlighted either way.</summary>
-        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
+        public bool KeyboardMode => navigation != null && navigation.Keyboard;
 
         /// <summary>What the campaign offers on this screen.</summary>
         public ResultsPlan Plan => plan;
@@ -173,7 +173,7 @@ namespace Squadra
             panel.RemoveFromClassList(ShownClass);
             panel.SetEnabled(!suspended);
             root.EnableInClassList(HiddenClass, suspended);
-            inputMode.Set(false);
+            navigation.SetKeyboard(false);
         }
 
         /// <summary>
@@ -199,7 +199,6 @@ namespace Squadra
             guard = ResumeGuardSeconds;
             panel.SetEnabled(true);
             root.RemoveFromClassList(HiddenClass);
-            if (sounds != null) sounds.PointerActive = !KeyboardMode;
             if (!ready) return;
 
             // Focus only takes once the panel is displayed again, a frame after its class changes.
@@ -294,42 +293,14 @@ namespace Squadra
 
         void FocusDefault()
         {
-            Button target = ButtonOf(plan.InitialFocus);
-            if (!target.canGrabFocus) target = restartButton;
+            Button target = DefaultButton();
             if (target.canGrabFocus) target.Focus();
         }
 
-        // ------------------------------------------------------------------ input in use
-
-        // A click beside the buttons does nothing at all: it must not even take the focus away from the
-        // action the keyboard would activate.
-        void OnPointerDown(PointerDownEvent pressed)
+        Button DefaultButton()
         {
-            if (inputMode.Keyboard) inputMode.Set(false);
-            if (!(pressed.target is Button)) root.focusController?.IgnoreEvent(pressed);
-        }
-
-        // Pointing at an action gives it the focus, so switching to the keyboard carries on from there.
-        void OnPointerEnter(PointerEnterEvent pointer)
-        {
-            var button = (Button)pointer.currentTarget;
-            if (!ready || leaving || suspended || inputMode.Keyboard || !button.enabledInHierarchy) return;
-            // The cue marks the highlight moving; the action that already has it stays silent.
-            if (root.focusController?.focusedElement == button) return;
-
-            if (sounds != null) sounds.Hover();
-            button.Focus();
-        }
-
-        // Should the focus ever be lost, the first arrow or Tab press brings it back to the default action.
-        void OnNavigationMove(NavigationMoveEvent move)
-        {
-            if (!inputMode.Keyboard) inputMode.Set(true);
-            if (!ready || leaving || FocusedAction != null) return;
-
-            move.StopPropagation();
-            root.focusController?.IgnoreEvent(move);
-            FocusDefault();
+            Button target = ButtonOf(plan.InitialFocus);
+            return target.canGrabFocus ? target : restartButton;
         }
 
         // ------------------------------------------------------------------ lifecycle
@@ -365,17 +336,27 @@ namespace Squadra
             nextButton.clicked += () => Activate(ResultsAction.NextMission);
             restartButton.clicked += () => Activate(ResultsAction.Restart);
             backButton.clicked += () => Activate(ResultsAction.BackToMenu);
-            foreach (Button button in new[] { nextButton, restartButton, backButton })
-                button.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
 
             // As in the menu: the focused action is highlighted, and pointing at an action gives it the
             // focus. The mode outlives a tree the document builds anew.
-            if (inputMode == null) inputMode = new MenuInputMode(sounds);
-            inputMode.Attach(root);
-            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
+            if (navigation == null)
+            {
+                navigation = new MenuNavigation(sounds)
+                {
+                    // Nothing is pointed at before the results are ready, once an action is picked, or
+                    // while the panel is put away under the pause menu.
+                    Accepting = () => ready && !leaving && !suspended,
+                    // Should the focus ever be lost, the first arrow press brings it back to the
+                    // default action.
+                    WhenLost = DefaultButton,
+                    // A click beside the buttons does nothing at all: it must not even take the focus
+                    // away from the action the keyboard would activate.
+                    PressMovesFocus = target => target is Button,
+                };
+            }
+
+            navigation.Attach(root, root);
+            navigation.AddLine(MenuAxis.Row, true, nextButton, restartButton, backButton);
             return true;
         }
 
@@ -403,7 +384,7 @@ namespace Squadra
                 // The default action starts out highlighted, so it is plain what Enter would do. Moving
                 // the mouse hands the highlight over to whatever is under the pointer.
                 ready = true;
-                inputMode.Set(true);
+                navigation.SetKeyboard(true);
                 FocusDefault();
             }
 
@@ -420,9 +401,7 @@ namespace Squadra
                 return;
             }
 
-            Keyboard keyboard = Keyboard.current;
-            if (ready && !inputMode.Keyboard && keyboard != null && keyboard.anyKey.wasPressedThisFrame)
-                inputMode.Set(true);
+            if (ready) navigation.NoticeKeys();
         }
     }
 }

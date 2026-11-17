@@ -1,4 +1,5 @@
 using System;
+using Squadra.Menus;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -8,9 +9,8 @@ namespace Squadra
 {
     /// <summary>
     /// Runs the menu scene: the main menu, the mission map, Settings and the confirmation dialog over
-    /// them. It moves between screens, keeps keyboard focus on something sensible, turns Escape and the
-    /// page keys into the same actions as the on-screen buttons, and loads a mission when the map
-    /// launches one.
+    /// them. It moves between screens, keeps keyboard focus on something sensible, turns Escape into the
+    /// same action as the on-screen Back buttons, and loads a mission when the map launches one.
     /// </summary>
     public sealed class MainMenu : MonoBehaviour, IDialogHost
     {
@@ -41,7 +41,7 @@ namespace Squadra
         MenuScreen screen;
         bool loading;
         bool popupWasOpen;
-        MenuInputMode inputMode;
+        MenuNavigation navigation;
 
         public MenuScreen CurrentScreen => screen;
 
@@ -49,7 +49,7 @@ namespace Squadra
         /// True while the keyboard is the input in use, false while the mouse is. The focused control is
         /// highlighted either way; the mouse moves the focus to the control it points at.
         /// </summary>
-        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
+        public bool KeyboardMode => navigation != null && navigation.Keyboard;
         public bool DialogOpen => dialog != null && dialog.IsOpen;
 
         /// <summary>True from the moment a mission is launched until its scene replaces the menu.</summary>
@@ -225,7 +225,8 @@ namespace Squadra
             settingsButton = root.Q<Button>("settingsButton");
             quitButton = root.Q<Button>("quitButton");
             mapBackButton = root.Q<Button>("mapBackButton");
-            root.Q<Button>("multiPlayerButton").SetEnabled(false);
+            Button multiPlayerButton = root.Q<Button>("multiPlayerButton");
+            multiPlayerButton.SetEnabled(false);
 
             singlePlayerButton.clicked += () =>
             {
@@ -246,20 +247,13 @@ namespace Squadra
             root.Q<Button>("settingsBackButton").clicked += Back;
             dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
 
-            // The map adds the hover cue to its own dots as it builds them.
-            root.Query<Button>().ForEach(sounds.AttachHover);
-            map.Bind(screens[(int)MenuScreen.Map], sounds, Launch);
-            settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds);
-
-            inputMode = new MenuInputMode(sounds);
-            inputMode.Attach(menuRoot);
-            inputMode.Set(false);
-            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            foreach (VisualElement field in settings.Fields)
-                inputMode.FollowPointer(field);
-            root.RegisterCallback<PointerDownEvent>(inputMode.OnPointerPressed, TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
+            navigation = new MenuNavigation(sounds);
+            navigation.Attach(root, menuRoot);
+            navigation.SetKeyboard(false);
+            navigation.AddLine(MenuAxis.Column, true, singlePlayerButton, multiPlayerButton, settingsButton, quitButton);
+            navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
+            map.Bind(screens[(int)MenuScreen.Map], sounds, navigation, Launch);
+            settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds, navigation);
 
             Show(CampaignSession.ConsumeMapRequest() ? MenuScreen.Map : MenuScreen.Main);
             root.schedule.Execute(() => fade.RemoveFromClassList(FadeClass)).StartingIn(50);
@@ -272,20 +266,11 @@ namespace Squadra
             // Escape also closes an open dropdown list; that press must not leave the screen as well.
             bool popupOpen = root.panel != null && root.panel.visualTree.Q(className: PopupClass) != null;
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard.anyKey.wasPressedThisFrame && !inputMode.Keyboard) inputMode.Set(true);
-            if (keyboard != null && !loading)
-            {
-                if (keyboard.escapeKey.wasPressedThisFrame)
-                {
-                    if (!popupOpen && !popupWasOpen) Back();
-                }
-                else if (screen == MenuScreen.Map && !DialogOpen)
-                {
-                    // A and D do what Left and Right do on the map.
-                    if (keyboard.aKey.wasPressedThisFrame) map.StepAlongRow(-1);
-                    else if (keyboard.dKey.wasPressedThisFrame) map.StepAlongRow(1);
-                }
-            }
+            navigation.NoticeKeys();
+            // W, A, S and D reach the screens as navigation moves, through the UI actions of the
+            // project-wide input actions, so they need nothing here.
+            if (keyboard != null && !loading && keyboard.escapeKey.wasPressedThisFrame && !popupOpen && !popupWasOpen)
+                Back();
 
             popupWasOpen = popupOpen;
             dialog.Tick();
