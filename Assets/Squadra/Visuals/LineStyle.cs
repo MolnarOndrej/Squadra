@@ -39,6 +39,18 @@ namespace Squadra
             }
         }
 
+        /// <summary>
+        /// Takes the width, dashes and end fade of <paramref name="tuning"/>. Color and scrolling are left
+        /// to the caller. Takes effect with the next <see cref="Set"/>.
+        /// </summary>
+        public void Shape(LineTuning tuning)
+        {
+            Width = tuning.Width;
+            Dash = tuning.Dash;
+            Gap = tuning.Gap;
+            EndFade = tuning.EndFade;
+        }
+
         public void Set(Vector2 from, Vector2 to)
         {
             Vector2 delta = to - from;

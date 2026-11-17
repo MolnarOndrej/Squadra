@@ -11,7 +11,8 @@ namespace Squadra
     /// state: ownership ring and aura in the owner's color, selection outline, fleet count and capture
     /// progress. While a battle is fought here it shows both sides' counts and that they are fighting,
     /// and a capture that was running is shown held at the progress it had reached. The surface is the
-    /// shared material of the world's look and is never changed by ownership.
+    /// shared material of the world's look and is never changed by ownership. The orbit, rings and aura
+    /// look as the shared <see cref="WorldStyle"/> says, read every frame, so an edit to it shows at once.
     /// </summary>
     [ExecuteAlways]
     public sealed class WorldView : MonoBehaviour
@@ -19,7 +20,15 @@ namespace Squadra
         static readonly int TintId = Shader.PropertyToID("_Tint");
         static readonly int BodyRadiusId = Shader.PropertyToID("_BodyRadius");
 
+        // How the rings move: timing, not looks, so it stays here rather than in the style.
+        const float OwnerRingSpin = 0.01f;     // turns per second
+        const float SelectionRingSpin = 0.035f;
+        const float CapturePulseRate = 6f;     // radians per second
+        const float SelectionPulseRate = 4.5f;
+
         [Header("Look")]
+        [Tooltip("How the orbit, rings and aura look. Shared with every world of every mission.")]
+        [SerializeField] WorldStyle style;
         [Tooltip("Radius of the body in world units.")]
         [SerializeField] float bodyRadius = 1.1f;
         [SerializeField] MeshRenderer surface;
@@ -74,7 +83,7 @@ namespace Squadra
         public float BodyRadius => bodyRadius;
 
         /// <summary>Radius of the ring the stationed fleet orbits on.</summary>
-        public float OrbitRadius => bodyRadius + 0.42f;
+        public float OrbitRadius => bodyRadius + (style != null ? style.OrbitGap : 0f);
 
         public float PickRadius => OrbitRadius + 0.3f;
         public Vector2 Position => transform.position;
@@ -138,7 +147,7 @@ namespace Squadra
 
         void Preview()
         {
-            if (surface == null || ownerRing == null) return;
+            if (surface == null || ownerRing == null || style == null) return;
             EnsureHandles();
             Layout();
             Render(new State { Interval = 1f }, 1000f, false, false);
@@ -165,9 +174,9 @@ namespace Squadra
                 surface.transform.localScale = new Vector3(side, side, 1f);
             }
 
-            if (aura != null)
+            if (aura != null && style != null)
             {
-                float side = (OrbitRadius + 1.5f) * 2f;
+                float side = (OrbitRadius + style.AuraReach) * 2f;
                 aura.transform.localScale = new Vector3(side, side, 1f);
             }
 
@@ -180,7 +189,7 @@ namespace Squadra
 
         void Render(State state, float deltaTime, bool selected, bool hovered)
         {
-            if (owner == null) return;
+            if (owner == null || style == null) return;
 
             float blend = 1f - Mathf.Exp(-deltaTime * 6f);
             float fast = 1f - Mathf.Exp(-deltaTime * 14f);
@@ -195,23 +204,22 @@ namespace Squadra
 
             float time = Application.isPlaying ? Time.time : 0f;
 
-            // Ownership ring: a solid glowing band when owned, a faint dashed circle when neutral.
+            // Ownership ring: a solid glowing band when owned, a faint dashed circle when neutral. The
+            // dashes go or come at once; everything else blends.
+            RingTuning ownerLook = RingTuning.Lerp(style.NeutralRing, style.OwnedRing, ownedAmount);
             owner.Radius = OrbitRadius;
-            owner.Thickness = Mathf.Lerp(0.018f, 0.03f, ownedAmount);
-            owner.Softness = Mathf.Lerp(0.05f, 0.075f, ownedAmount);
-            owner.Glow = Mathf.Lerp(0.1f, 0.25f, ownedAmount);
-            owner.Dashes = owned ? 0f : 44f;
-            owner.DashFill = 0.5f;
-            owner.Spin = 0.01f;
-            owner.Additive = 0.7f;
-            owner.Tint = Palette.Hdr(shownColor, Mathf.Lerp(0.9f, 1.65f, ownedAmount) + flash * 2f,
-                Mathf.Lerp(0.55f, 1f, ownedAmount));
+            owner.Shape(ownerLook);
+            owner.Dashes = owned ? style.OwnedRing.Dashes : style.NeutralRing.Dashes;
+            owner.Spin = OwnerRingSpin;
+            owner.Tint = Palette.Hdr(shownColor, ownerLook.Brightness + flash * style.FlashBrightness,
+                ownerLook.Opacity);
             owner.Apply();
 
             if (aura != null)
             {
-                float alpha = Mathf.Lerp(0.03f, 0.11f, ownedAmount) + flash * 0.5f + selectAmount * 0.08f;
-                auraBlock.SetVector(TintId, Palette.Hdr(shownColor, 1f, alpha));
+                float alpha = Mathf.Lerp(style.NeutralAuraOpacity, style.OwnedAuraOpacity, ownedAmount)
+                    + flash * style.FlashAuraOpacity + selectAmount * style.SelectedAuraOpacity;
+                auraBlock.SetVector(TintId, Palette.Hdr(shownColor, style.AuraBrightness, alpha));
                 aura.SetPropertyBlock(auraBlock);
             }
 
@@ -223,36 +231,30 @@ namespace Squadra
             capture.Visible = capturing;
             if (capturing)
             {
-                capture.Radius = OrbitRadius + 0.2f;
-                capture.Thickness = 0.075f;
-                capture.Softness = 0.1f;
-                capture.Glow = held ? 0.15f : 0.35f;
+                RingTuning captureLook = held ? style.HeldCapture : style.RunningCapture;
+                capture.Radius = OrbitRadius + style.CaptureOffset;
+                capture.Shape(captureLook);
                 capture.Arc = state.CaptureProgress;
-                capture.Track = held ? 0.22f : 0.1f;
-                capture.Dashes = held ? 40f : 0f;
-                capture.DashFill = 0.55f;
                 capture.Spin = 0f;
-                capture.Additive = 0.6f;
-                capture.Tint = Palette.Hdr(Palette.Of(state.Captor),
-                    held ? 1.3f : 2.3f + 0.4f * Mathf.Sin(time * 6f), 1f);
+                float brightness = held
+                    ? captureLook.Brightness
+                    : captureLook.Brightness + style.CapturePulse * Mathf.Sin(time * CapturePulseRate);
+                capture.Tint = Palette.Hdr(Palette.Of(state.Captor), brightness, captureLook.Opacity);
                 capture.Apply();
             }
 
-            // Selection outline: a rotating dashed ring in the accent color; fainter while only hovered.
-            float outline = Mathf.Max(selectAmount, hoverAmount * 0.45f);
+            // Selection outline: a rotating dashed ring in the selection color; fainter while only hovered.
+            float outline = Mathf.Max(selectAmount * style.SelectedRing.Opacity, hoverAmount * style.HoveredRing.Opacity);
             selection.Visible = outline > 0.01f;
             if (selection.Visible)
             {
-                float pulse = selectAmount * 0.035f * Mathf.Sin(time * 4.5f);
-                selection.Radius = OrbitRadius + (capturing ? 0.44f : 0.3f) + pulse;
-                selection.Thickness = Mathf.Lerp(0.022f, 0.036f, selectAmount);
-                selection.Softness = 0.045f;
-                selection.Glow = 0.22f * selectAmount;
-                selection.Dashes = 36f;
-                selection.DashFill = 0.55f;
-                selection.Spin = 0.035f;
-                selection.Additive = 0.6f;
-                selection.Tint = Palette.Hdr(Palette.Accent, 1.6f + selectAmount * 0.8f, outline);
+                RingTuning selectionLook = RingTuning.Lerp(style.HoveredRing, style.SelectedRing, selectAmount);
+                float pulse = selectAmount * style.SelectionPulse * Mathf.Sin(time * SelectionPulseRate);
+                float offset = capturing ? style.SelectionOffsetWhileCapturing : style.SelectionOffset;
+                selection.Radius = OrbitRadius + offset + pulse;
+                selection.Shape(selectionLook);
+                selection.Spin = SelectionRingSpin;
+                selection.Tint = Palette.Hdr(style.SelectionColor, selectionLook.Brightness, outline);
                 selection.Apply();
             }
 

@@ -11,18 +11,19 @@ using static Squadra.EditorTools.SceneWiring;
 namespace Squadra.EditorTools
 {
     /// <summary>
-    /// Assembles the shared mission scene from code: materials, world looks, post-processing profile,
-    /// backdrop, the world template, fleet and effect layers, HUD, results screen, pause menu and the game
-    /// controller. The scene has no worlds of its own: every mission builds its battlefield from its
-    /// mission file when it is played. Run it again from <c>Squadra &gt; Rebuild Mission Scene</c> to
-    /// regenerate everything; it overwrites the scene and the generated materials, so tweak values here
-    /// rather than in the generated assets if they must survive. The layout and look of the results
-    /// screen and the pause menu live in <c>Assets/Squadra/Results/UI</c> and <c>Assets/Squadra/Pause/UI</c>,
-    /// and the world name dictionaries in <c>Assets/Squadra/Visuals/WorldNames</c>; those are left alone.
+    /// Assembles the shared mission scene from code: backdrop, the world template, fleet and effect
+    /// layers, HUD, results screen, pause menu and the game controller. The scene has no worlds of its
+    /// own: every mission builds its battlefield from its mission file when it is played. Run it again
+    /// from <c>Squadra &gt; Rebuild Mission Scene</c> to regenerate the scene; lasting changes to its
+    /// structure belong here. How the scene looks does not: the materials, the world, route and fleet
+    /// styles, the post-processing profile and the world looks are shared assets, created when missing
+    /// and otherwise kept as edited in the Inspector, and the rebuilt scene points at the same ones. The
+    /// layout and look of the results screen and the pause menu live in <c>Assets/Squadra/Results/UI</c>
+    /// and <c>Assets/Squadra/Pause/UI</c>, and the world name dictionaries in
+    /// <c>Assets/Squadra/Visuals/WorldNames</c>; those are left alone too.
     ///
-    /// The materials, world looks and post-processing profile come from <see cref="SquadraAssetBuilder"/>,
-    /// and serialized fields are set through <see cref="SceneWiring"/>. What is here is the composition of
-    /// the scene itself.
+    /// The shared assets come from <see cref="SquadraAssetBuilder"/>, and serialized fields are set
+    /// through <see cref="SceneWiring"/>. What is here is the composition of the scene itself.
     /// </summary>
     public static class SquadraSceneBuilder
     {
@@ -62,13 +63,17 @@ namespace Squadra.EditorTools
             Directory.CreateDirectory(SquadraAssetBuilder.SettingsFolder);
             AssetDatabase.Refresh();
 
-            SceneMaterials materials = SquadraAssetBuilder.BuildMaterials();
+            SceneMaterials materials = SquadraAssetBuilder.EnsureMaterials();
             SquadraAssetBuilder.BuildWorldLooks();
-            VolumeProfile profile = SquadraAssetBuilder.BuildVolumeProfile();
+            SquadraAssetBuilder.EnsureStyles();
+            VolumeProfile profile = SquadraAssetBuilder.EnsureVolumeProfile();
             AssetDatabase.SaveAssets();
             SquadraMenuBuilder.EnsurePanel(); // before the new scene: opening it drops assets created just now
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // Loaded only now: a style created a moment ago would otherwise be wired as nothing.
+            SceneStyles styles = SquadraAssetBuilder.LoadStyles();
 
             CameraRig rig = BuildCamera();
             BuildVolume(profile);
@@ -76,10 +81,10 @@ namespace Squadra.EditorTools
 
             // The mission's worlds are copies of this template, made when the mission starts.
             var worldsRoot = new GameObject("Worlds").transform;
-            WorldView template = BuildWorld(worldsRoot, "World Template", 1f, materials.Thalassa, materials);
+            WorldView template = BuildWorld(worldsRoot, "World Template", 1f, materials.Thalassa, materials, styles);
             template.gameObject.SetActive(false);
 
-            FleetLayer fleets = BuildFleets(materials);
+            FleetLayer fleets = BuildFleets(materials, styles);
             EffectsLayer effects = BuildEffects(materials);
             HudView hud = BuildHud(materials, rig);
             ResultsScreen results = BuildResults();
@@ -97,6 +102,7 @@ namespace Squadra.EditorTools
             Wire(game, "results", results);
             Wire(game, "rig", rig);
             Wire(game, "lineMaterial", materials.Line);
+            Wire(game, "routeStyle", styles.Routes);
             BuildPause(game);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -243,7 +249,7 @@ namespace Squadra.EditorTools
         }
 
         static WorldView BuildWorld(Transform parent, string name, float radius, Material surfaceMaterial,
-            SceneMaterials materials)
+            SceneMaterials materials, SceneStyles styles)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -261,6 +267,7 @@ namespace Squadra.EditorTools
                 FontStyles.Normal, 14f);
 
             var view = go.AddComponent<WorldView>();
+            Wire(view, "style", styles.World);
             WireFloat(view, "bodyRadius", radius);
             Wire(view, "surface", surface);
             Wire(view, "aura", aura);
@@ -274,7 +281,7 @@ namespace Squadra.EditorTools
             return view;
         }
 
-        static FleetLayer BuildFleets(SceneMaterials materials)
+        static FleetLayer BuildFleets(SceneMaterials materials, SceneStyles styles)
         {
             var go = new GameObject("Fleets");
             go.AddComponent<MeshFilter>();
@@ -289,6 +296,7 @@ namespace Squadra.EditorTools
             label.gameObject.SetActive(false);
 
             var fleets = go.AddComponent<FleetLayer>();
+            Wire(fleets, "style", styles.Fleets);
             Wire(fleets, "fleetLabelTemplate", label);
             return fleets;
         }

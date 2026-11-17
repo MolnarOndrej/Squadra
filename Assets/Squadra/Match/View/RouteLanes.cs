@@ -7,7 +7,8 @@ namespace Squadra
     /// <summary>
     /// The dashed lines between worlds: an idle lane for every route of the mission, and the preview of
     /// the order the player is about to give, which only a route allows. A lane that carries a fleet or
-    /// the preview is hidden, because the animated line drawn over it would fill its gaps.
+    /// the preview is hidden, because the animated line drawn over it would fill its gaps. How both look
+    /// comes from the shared <see cref="RouteStyle"/>.
     /// </summary>
     sealed class RouteLanes
     {
@@ -17,13 +18,18 @@ namespace Squadra
         readonly LineStyle[] idleLanes;
         readonly bool[] activeLanes;
         readonly LineStyle orderPreview;
+        readonly RouteStyle style;
+
+        // How fast the preview's dashes scroll toward the target, in world units per second.
+        const float PreviewScroll = 1.15f;
 
         /// <summary>Creates the lines for the match's routes as children of <paramref name="parent"/>.</summary>
         public RouteLanes(Match match, IReadOnlyList<WorldView> worlds, Faction player, Transform parent,
-            Material lineMaterial)
+            Material lineMaterial, RouteStyle style)
         {
             this.worlds = worlds;
             this.player = player;
+            this.style = style;
 
             // Keep the idle lanes readable under active orders.
             IReadOnlyList<Route> routes = match.Routes;
@@ -34,12 +40,9 @@ namespace Squadra
                 GetRoute(routes[i].A, routes[i].B, out Vector2 from, out Vector2 to);
                 var lane = new LineStyle(Shapes.CreateQuad("Lane", parent, lineMaterial, -50))
                 {
-                    Tint = Palette.Hdr(Palette.Starlight, 0.66f, 0.53f),
-                    Width = 0.10f,
-                    Dash = 0.13f,
-                    Gap = 0.16f,
-                    EndFade = 0.04f,
+                    Tint = Palette.Hdr(style.LaneColor, style.Lane.Brightness, style.Lane.Opacity),
                 };
+                lane.Shape(style.Lane);
                 lane.Set(from, to);
                 idleLanes[i] = lane;
                 laneOf[routes[i]] = i;
@@ -47,11 +50,7 @@ namespace Squadra
 
             orderPreview = new LineStyle(Shapes.CreateQuad("Order Preview", parent, lineMaterial, 8))
             {
-                Width = 0.16f,
-                Dash = 0.26f,
-                Gap = 0.16f,
-                Scroll = 1.15f,
-                EndFade = 0.05f,
+                Scroll = PreviewScroll,
             };
             orderPreview.Visible = false;
         }
@@ -68,7 +67,9 @@ namespace Squadra
             if (show)
             {
                 GetRoute(selected, hovered, out Vector2 from, out Vector2 to);
-                orderPreview.Tint = Palette.Hdr(Palette.Accent, 1.55f, 0.95f);
+                LineTuning preview = style.Preview;
+                orderPreview.Shape(preview);
+                orderPreview.Tint = Palette.Hdr(style.PreviewColor, preview.Brightness, preview.Opacity);
                 orderPreview.Set(from, to);
             }
 

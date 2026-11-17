@@ -18,7 +18,8 @@ Shader "Squadra/Space"
         _StarDensity ("Star density", Range(0, 1)) = 0.5
         _StarBrightness ("Star brightness", Range(0, 4)) = 1.3
         _SunColor ("Sun glow color", Color) = (1, 0.86, 0.68, 1)
-        _SunPosition ("Sun position (world xy)", Vector) = (-12, 7.5, 0, 0)
+        [PerRendererData] _SunPosition ("Sun position (world xy)", Vector) = (-12, 7.5, 0, 0)
+        _SunOffset ("Sun offset from the view's top-left corner (for a view 10 high)", Vector) = (-3.1, 2.5, 0, 0)
         _SunStrength ("Sun glow strength", Range(0, 3)) = 0.7
         _Drift ("Drift speed", Float) = 0.012
     }
@@ -72,6 +73,7 @@ Shader "Squadra/Space"
                 float _StarBrightness;
                 float4 _SunColor;
                 float4 _SunPosition;
+                float4 _SunOffset; // read by Backdrop, not by the shader
                 float _SunStrength;
                 float _Drift;
             CBUFFER_END

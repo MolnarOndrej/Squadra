@@ -4,7 +4,7 @@ Shader "Squadra/Glow"
 {
     Properties
     {
-        _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
+        [PerRendererData] _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
         _Power ("Falloff power", Range(0.2, 8)) = 2
         _Hole ("Inner hole radius", Range(0, 1)) = 0
     }

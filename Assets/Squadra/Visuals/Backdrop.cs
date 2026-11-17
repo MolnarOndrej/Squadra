@@ -5,16 +5,17 @@ namespace Squadra
     /// <summary>
     /// Stretches the space backdrop quad so it always covers the camera view, and keeps the backdrop's sun
     /// just outside the view's top-left corner, wherever the view is: a mission's map can lie anywhere,
-    /// and a sun fixed in the world would end up behind one of its worlds or nowhere in sight.
+    /// and a sun fixed in the world would end up behind one of its worlds or nowhere in sight. How far
+    /// outside the corner is part of each backdrop material's look (its Sun Offset).
     /// </summary>
     [ExecuteAlways]
     public sealed class Backdrop : MonoBehaviour
     {
         static readonly int SunPositionId = Shader.PropertyToID("_SunPosition");
+        static readonly int SunOffsetId = Shader.PropertyToID("_SunOffset");
 
-        // Where the sun sits from the view's top-left corner, for a view 10 units high: the place it had
-        // when the battlefield was always framed around the origin. Larger views move it out with them.
-        static readonly Vector2 SunOffset = new Vector2(-3.1f, 2.5f);
+        // A material's sun offset is measured for a view this many units high. Larger views move the
+        // sun out with them.
         const float ReferenceViewHeight = 10f;
 
         [SerializeField] CameraRig rig;
@@ -52,8 +53,12 @@ namespace Squadra
             if (quad == null) quad = GetComponent<MeshRenderer>();
             if (quad == null) return;
 
+            Material material = quad.sharedMaterial;
+            if (material == null || !material.HasProperty(SunOffsetId)) return;
+
             block ??= new MaterialPropertyBlock();
-            Vector2 sun = new Vector2(view.xMin, view.yMax) + SunOffset * (view.height / ReferenceViewHeight);
+            Vector2 offset = material.GetVector(SunOffsetId);
+            Vector2 sun = new Vector2(view.xMin, view.yMax) + offset * (view.height / ReferenceViewHeight);
             quad.GetPropertyBlock(block);
             block.SetVector(SunPositionId, new Vector4(sun.x, sun.y, 0f, 0f));
             quad.SetPropertyBlock(block);

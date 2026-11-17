@@ -15,21 +15,32 @@ namespace Squadra
         const float GoldenAngle = 2.39996323f;
         const float DotSpacing = 0.15f;
         const float WidestFront = 2.3f; // radians of a world's circumference a formation may cover
+        const float LaneSlowdown = 0.075f; // radians per second each orbit lane turns slower than the one inside it
 
-        /// <summary>How many dots stand for a fleet. One per Dart at first, then growing slowly.</summary>
-        public static int DotCount(int darts)
+        /// <summary>
+        /// How many dots stand for a fleet. One per Dart at first, then growing slowly, and never more than
+        /// the most a fleet is drawn with, even when that is below the one-dot-per-Dart threshold.
+        /// </summary>
+        public static int DotCount(int darts, DartDisplay display)
         {
+            int oneEach = display.OneDotPerDartUpTo;
             if (darts <= 0) return 0;
-            if (darts <= 24) return darts;
-            return Mathf.Min(64, 24 + Mathf.RoundToInt(Mathf.Sqrt(darts - 24) * 2.5f));
+            int dots = darts <= oneEach
+                ? darts
+                : oneEach + Mathf.RoundToInt(Mathf.Sqrt(darts - oneEach) * 2.5f);
+            return Mathf.Min(display.MostDots, dots);
         }
 
-        /// <summary>The place of dot number <paramref name="index"/> on its orbit at a moment.</summary>
-        public static void OrbitPlace(WorldView world, int index, float time, out float angle, out float radius)
+        /// <summary>
+        /// The place of dot number <paramref name="index"/> on its orbit at a moment. The innermost of the
+        /// three lanes turns at <paramref name="orbitSpeed"/> radians per second, each outer one a little slower.
+        /// </summary>
+        public static void OrbitPlace(WorldView world, int index, float time, float orbitSpeed, out float angle,
+            out float radius)
         {
             int lane = index % 3;
             int slot = index / 3;
-            float speed = 0.42f - lane * 0.075f;
+            float speed = orbitSpeed - lane * LaneSlowdown;
             angle = slot * GoldenAngle + lane * 2.1f + time * speed;
             radius = world.OrbitRadius + (lane - 1) * 0.13f + 0.018f * Mathf.Sin(time * 1.3f + index * 1.7f);
         }
