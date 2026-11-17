@@ -8,9 +8,10 @@ namespace Squadra
     /// the focused control in either mode; pointing at a control gives it the focus, so the highlight
     /// stays on the last control pointed at. The hover cue sounds when the pointer or a keyboard move
     /// reaches a control; in keyboard mode a control that appears under a resting pointer stays silent
-    /// and does not take the focus. The main menu, the
-    /// pause menu and the results screen each keep one. The screen decides which events switch the
-    /// mode; this keeps the mode and shows it.
+    /// and does not take the focus. The
+    /// pause menu and the results screen each keep one; the main menu has moved on to
+    /// <see cref="MenuNavigation"/>. The screen decides which events switch the mode; this keeps the
+    /// mode and shows it.
     /// </summary>
     sealed class MenuInputMode
     {

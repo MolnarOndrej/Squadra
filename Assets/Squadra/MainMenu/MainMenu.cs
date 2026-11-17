@@ -1,4 +1,5 @@
 using System;
+using Squadra.Menus;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -41,7 +42,7 @@ namespace Squadra
         MenuScreen screen;
         bool loading;
         bool popupWasOpen;
-        MenuInputMode inputMode;
+        MenuNavigation navigation;
 
         public MenuScreen CurrentScreen => screen;
 
@@ -49,7 +50,7 @@ namespace Squadra
         /// True while the keyboard is the input in use, false while the mouse is. The focused control is
         /// highlighted either way; the mouse moves the focus to the control it points at.
         /// </summary>
-        public bool KeyboardMode => inputMode != null && inputMode.Keyboard;
+        public bool KeyboardMode => navigation != null && navigation.Keyboard;
         public bool DialogOpen => dialog != null && dialog.IsOpen;
 
         /// <summary>True from the moment a mission is launched until its scene replaces the menu.</summary>
@@ -225,7 +226,8 @@ namespace Squadra
             settingsButton = root.Q<Button>("settingsButton");
             quitButton = root.Q<Button>("quitButton");
             mapBackButton = root.Q<Button>("mapBackButton");
-            root.Q<Button>("multiPlayerButton").SetEnabled(false);
+            Button multiPlayerButton = root.Q<Button>("multiPlayerButton");
+            multiPlayerButton.SetEnabled(false);
 
             singlePlayerButton.clicked += () =>
             {
@@ -246,20 +248,14 @@ namespace Squadra
             root.Q<Button>("settingsBackButton").clicked += Back;
             dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
 
-            // The map adds the hover cue to its own dots as it builds them.
-            root.Query<Button>().ForEach(sounds.AttachHover);
             map.Bind(screens[(int)MenuScreen.Map], sounds, Launch);
             settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds);
 
-            inputMode = new MenuInputMode(sounds);
-            inputMode.Attach(menuRoot);
-            inputMode.Set(false);
-            root.RegisterCallback<PointerMoveEvent>(inputMode.OnPointerMoved, TrickleDown.TrickleDown);
-            foreach (VisualElement field in settings.Fields)
-                inputMode.FollowPointer(field);
-            root.RegisterCallback<PointerDownEvent>(inputMode.OnPointerPressed, TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(_ => inputMode.Set(true), TrickleDown.TrickleDown);
-            root.RegisterCallback<NavigationMoveEvent>(inputMode.OnNavigated);
+            navigation = new MenuNavigation(sounds);
+            navigation.Attach(root, menuRoot);
+            navigation.SetKeyboard(false);
+            navigation.AddLine(MenuAxis.Column, true, singlePlayerButton, multiPlayerButton, settingsButton, quitButton);
+            navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
 
             Show(CampaignSession.ConsumeMapRequest() ? MenuScreen.Map : MenuScreen.Main);
             root.schedule.Execute(() => fade.RemoveFromClassList(FadeClass)).StartingIn(50);
@@ -272,7 +268,7 @@ namespace Squadra
             // Escape also closes an open dropdown list; that press must not leave the screen as well.
             bool popupOpen = root.panel != null && root.panel.visualTree.Q(className: PopupClass) != null;
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard.anyKey.wasPressedThisFrame && !inputMode.Keyboard) inputMode.Set(true);
+            navigation.NoticeKeys();
             if (keyboard != null && !loading)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame)

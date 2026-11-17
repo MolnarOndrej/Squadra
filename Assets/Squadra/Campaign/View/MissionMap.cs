@@ -346,7 +346,6 @@ namespace Squadra
                 slot.Root.Add(slot.Status);
 
                 slot.Root.clicked += () => Activate(slot);
-                if (sounds != null) sounds.AttachHover(slot.Root);
                 slotRow.Add(slot.Root);
                 slots.Add(slot);
             }
