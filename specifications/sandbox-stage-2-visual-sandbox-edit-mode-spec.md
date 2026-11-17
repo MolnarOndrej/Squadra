@@ -8,7 +8,7 @@ The reusable mission scene has an inactive world template and creates its battle
 
 Add a saved Sandbox scene with stable, representative content visible without entering Play Mode. Use the same renderers and shared visual assets as generated missions. Arrange three owned planets at the corners of a triangle and a neutral moon in its center, with additional preview states available without advancing a match.
 
-This is stage 2. It depends on [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md), works with the existing Dart renderer, and supplies the scene extended by the later [playable sandbox](sandbox-stage-5-playable-sandbox-spec.md).
+This is stage 2. It depends on [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md), works with the existing Dart renderer, and supplies the scene extended by the later [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/d18416b6e247593d52cd96780d1afc6597f59a5b/specifications/sandbox-stage-5-playable-sandbox-spec.md).
 
 ## User Stories
 

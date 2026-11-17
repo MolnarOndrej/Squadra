@@ -10,7 +10,7 @@ The author needs one durable visual design used by generated missions and a futu
 
 Establish shared, Inspector-editable visual assets consumed by the existing mission presentation. Preserve authored assets during normal scene rebuilds. Keep behavior defaults owned by source code; provide an explicit way for a future sandbox to override them without changing normal missions.
 
-This is stage 1 of the sandbox work. It is independently useful for tuning existing generated missions and precedes the [Edit Mode sandbox](sandbox-stage-2-visual-sandbox-edit-mode-spec.md). Later stages are [Dart visuals](sandbox-stage-3-dart-visuals-spec.md), [game speed](sandbox-stage-4-game-speed-settings-spec.md), [playable sandbox](sandbox-stage-5-playable-sandbox-spec.md), and [menu integration](sandbox-stage-6-sandbox-menu-integration-spec.md).
+This is stage 1 of the sandbox work. It is independently useful for tuning existing generated missions and precedes the [Edit Mode sandbox](sandbox-stage-2-visual-sandbox-edit-mode-spec.md). Later stages are [Dart visuals](https://github.com/MolnarOndrej/Squadra/blob/d18416b6e247593d52cd96780d1afc6597f59a5b/specifications/sandbox-stage-3-dart-visuals-spec.md), [game speed](https://github.com/MolnarOndrej/Squadra/blob/d18416b6e247593d52cd96780d1afc6597f59a5b/specifications/sandbox-stage-4-game-speed-settings-spec.md), [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/d18416b6e247593d52cd96780d1afc6597f59a5b/specifications/sandbox-stage-5-playable-sandbox-spec.md), and [menu integration](https://github.com/MolnarOndrej/Squadra/blob/d18416b6e247593d52cd96780d1afc6597f59a5b/specifications/sandbox-stage-6-sandbox-menu-integration-spec.md).
 
 ## User Stories
 
