@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Squadra.Campaign;
+using Squadra.Menus;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -66,8 +67,11 @@ namespace Squadra
         public int Page => page;
         public int PageCount => pages.PageCount;
 
-        /// <summary>Connects the map to its screen. <paramref name="onLaunch"/> gets the catalog index to play.</summary>
-        public void Bind(VisualElement screen, MenuAudio audio, Action<int> onLaunch)
+        /// <summary>
+        /// Connects the map to its screen and declares its layout to the menu's navigation.
+        /// <paramref name="onLaunch"/> gets the catalog index to play.
+        /// </summary>
+        public void Bind(VisualElement screen, MenuAudio audio, MenuNavigation navigation, Action<int> onLaunch)
         {
             sounds = audio;
             launch = onLaunch;
@@ -78,7 +82,7 @@ namespace Squadra
             previousButton.clicked += () => PreviousPage();
             nextButton.clicked += () => NextPage();
 
-            screen.RegisterCallback<NavigationMoveEvent>(OnNavigationMove, TrickleDown.TrickleDown);
+            DeclareLayout(navigation);
             slotRow.RegisterCallback<FocusInEvent>(focus =>
             {
                 if (focus.target is Button slot && slot.ClassListContains("mission")) lastFocusedSlot = slot;
@@ -142,10 +146,9 @@ namespace Squadra
         // ------------------------------------------------------------------ keyboard
 
         /// <summary>
-        /// What Left and Right (and A and D) do on the map: move the focus along the row of the previous-page
-        /// arrow, the missions that can be played and the next-page arrow, wrapping around at both ends.
-        /// Hidden or disabled arrows and missions that cannot be played are skipped; a page turns only when
-        /// an arrow is activated. From Back it does nothing, as Back is not in the row.
+        /// What A and D do on the map, the same as Left and Right: move the focus along the row of the
+        /// previous-page arrow, the missions that can be played and the next-page arrow, wrapping around
+        /// at both ends. From Back it does nothing, as Back is not in the row.
         /// </summary>
         public void StepAlongRow(int direction)
         {
@@ -158,46 +161,32 @@ namespace Squadra
             if (sounds != null) sounds.Hover();
         }
 
-        // Left and Right walk the row; Up and Down go to Back, and from Back to the mission that had the
-        // focus before. The panel's own choice goes by position, so the map takes these moves over and
-        // gives the hover cue itself.
-        void OnNavigationMove(NavigationMoveEvent move)
+        // Left and Right walk the row of the previous-page arrow, the missions and the next-page arrow,
+        // wrapping around; hidden or disabled arrows and missions that cannot be played are passed over,
+        // and a page turns only when an arrow is activated. Up and Down go from the row to Back, and from
+        // Back to the mission that had the focus before, else the one to play next, else an arrow that
+        // still leads somewhere. Left and Right do nothing on Back.
+        void DeclareLayout(MenuNavigation navigation)
         {
-            var focused = slotRow.focusController?.focusedElement as VisualElement;
-            if (focused == null) return;
-
-            switch (move.direction)
-            {
-                case NavigationMoveEvent.Direction.Left:
-                case NavigationMoveEvent.Direction.Right:
-                    Claim(move);
-                    StepAlongRow(move.direction == NavigationMoveEvent.Direction.Right ? 1 : -1);
-                    return;
-                case NavigationMoveEvent.Direction.Up:
-                case NavigationMoveEvent.Direction.Down:
-                    Focusable target;
-                    if (focused == backButton)
-                    {
-                        target = lastFocusedSlot != null && lastFocusedSlot.canGrabFocus
-                            ? lastFocusedSlot
-                            : DefaultFocus() ?? FirstUsable(nextButton, previousButton);
-                    }
-                    else if (Row().Contains(focused as Button)) target = backButton;
-                    else return;
-
-                    Claim(move);
-                    if (target == null || !target.canGrabFocus) return;
-
-                    target.Focus();
-                    if (sounds != null) sounds.Hover();
-                    return;
-            }
+            VisualElement row = slotRow.parent;
+            navigation.AddLine(MenuAxis.Row, true, RowStops);
+            navigation.AddLine(MenuAxis.Column, true, row, backButton);
+            navigation.AddGroup(row, RowEntry);
         }
 
-        void Claim(NavigationMoveEvent move)
+        List<VisualElement> RowStops()
         {
-            move.StopPropagation();
-            slotRow.focusController?.IgnoreEvent(move);
+            var stops = new List<VisualElement> { previousButton };
+            foreach (Slot slot in slots)
+                stops.Add(slot.Root);
+            stops.Add(nextButton);
+            return stops;
+        }
+
+        VisualElement RowEntry()
+        {
+            if (lastFocusedSlot != null && lastFocusedSlot.canGrabFocus) return lastFocusedSlot;
+            return DefaultFocus() as VisualElement ?? FirstUsable(nextButton, previousButton);
         }
 
         // The stops of the row, left to right, that can take the focus now.

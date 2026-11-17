@@ -248,14 +248,13 @@ namespace Squadra
             root.Q<Button>("settingsBackButton").clicked += Back;
             dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
 
-            map.Bind(screens[(int)MenuScreen.Map], sounds, Launch);
-            settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds);
-
             navigation = new MenuNavigation(sounds);
             navigation.Attach(root, menuRoot);
             navigation.SetKeyboard(false);
             navigation.AddLine(MenuAxis.Column, true, singlePlayerButton, multiPlayerButton, settingsButton, quitButton);
             navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
+            map.Bind(screens[(int)MenuScreen.Map], sounds, navigation, Launch);
+            settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds, navigation);
 
             Show(CampaignSession.ConsumeMapRequest() ? MenuScreen.Map : MenuScreen.Main);
             root.schedule.Execute(() => fade.RemoveFromClassList(FadeClass)).StartingIn(50);

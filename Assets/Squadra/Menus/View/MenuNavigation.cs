@@ -14,11 +14,12 @@ namespace Squadra
     /// neither takes the focus nor sounds; the first real pointer move switches back. The hover cue
     /// sounds when the player moves the highlight to another control, never when the program does.
     ///
-    /// Screens declare their layout as lines of controls (<see cref="AddLine"/>); a move from a control
-    /// in a line goes along it, and a move across it goes nowhere. A move from a control outside every
-    /// line is left to UI Toolkit, which chooses by position.
+    /// Screens declare their layout as lines of controls (<see cref="AddLine"/>). A move from a control
+    /// in a line goes along it. A move across it goes to a line the control's container is a stop of
+    /// (<see cref="AddGroup"/>), or nowhere. A move from a control outside every line is left to UI
+    /// Toolkit, which chooses by position.
     /// </summary>
-    sealed class MenuNavigation
+    public sealed class MenuNavigation
     {
         const string PointerModeClass = "menu-root--pointer";
         const string KeyboardModeClass = "menu-root--keys";
@@ -27,11 +28,13 @@ namespace Squadra
         {
             public MenuAxis Axis;
             public bool Wraps;
-            public IReadOnlyList<VisualElement> Stops;
+            public Func<IReadOnlyList<VisualElement>> Stops;
         }
 
         readonly MenuAudio sounds;
         readonly List<Line> lines = new List<Line>();
+        readonly Dictionary<VisualElement, Func<VisualElement>> groups = new Dictionary<VisualElement, Func<VisualElement>>();
+        readonly HashSet<VisualElement> keepAcross = new HashSet<VisualElement>();
         readonly List<bool> open = new List<bool>();
         VisualElement root;
         VisualElement styledRoot;
@@ -73,6 +76,8 @@ namespace Squadra
         public void Attach(VisualElement eventRoot, VisualElement modeRoot)
         {
             lines.Clear();
+            groups.Clear();
+            keepAcross.Clear();
             root = eventRoot;
             styledRoot = modeRoot;
             root.RegisterCallback<PointerMoveEvent>(OnPointerMoved, TrickleDown.TrickleDown);
@@ -89,7 +94,32 @@ namespace Squadra
         /// </summary>
         public void AddLine(MenuAxis axis, bool wraps, params VisualElement[] stops)
         {
+            AddLine(axis, wraps, () => stops);
+        }
+
+        /// <summary>
+        /// Declares a line whose controls change while the screen is used (pages, tabs). The list is
+        /// asked for at each move. Controls that cannot take the focus are passed over.
+        /// </summary>
+        public void AddLine(MenuAxis axis, bool wraps, Func<IReadOnlyList<VisualElement>> stops)
+        {
             lines.Add(new Line { Axis = axis, Wraps = wraps, Stops = stops });
+        }
+
+        /// <summary>
+        /// Makes <paramref name="place"/>, a container of controls, a stop of the lines it is listed in.
+        /// A move from a control inside it across the control's own line goes along those lines, and a
+        /// move onto it gives the focus to <paramref name="entry"/> (none: it is passed over).
+        /// </summary>
+        public void AddGroup(VisualElement place, Func<VisualElement> entry)
+        {
+            groups[place] = entry;
+        }
+
+        /// <summary>A move across the control's line is left to the control, as a slider uses Left and Right.</summary>
+        public void KeepAcross(VisualElement control)
+        {
+            keepAcross.Add(control);
         }
 
         public void SetKeyboard(bool keys)
@@ -185,25 +215,66 @@ namespace Squadra
         {
             SetKeyboard(true);
             if (!DirectionOf(move.direction, out MenuDirection direction)) return;
-            if (!Find(root.focusController?.focusedElement as VisualElement, out Line line, out int place))
-            {
-                if (WhenLost == null || !TakesInput) return;
 
-                Claim(move);
-                WhenLost()?.Focus();
+            // The focused control and its containers, innermost first: the first line among them that
+            // runs the way of the move takes it.
+            bool inLine = false;
+            bool keeps = false;
+            for (var element = root.focusController?.focusedElement as VisualElement; element != null; element = element.parent)
+            {
+                keeps |= keepAcross.Contains(element);
+                foreach (Line line in lines)
+                {
+                    IReadOnlyList<VisualElement> stops = line.Stops();
+                    int place = IndexOf(stops, element);
+                    if (place < 0) continue;
+
+                    inLine = true;
+                    int step = MenuStep.Along(line.Axis, direction);
+                    if (step == 0) continue;
+
+                    Claim(move);
+                    Step(stops, place, step, line.Wraps);
+                    return;
+                }
+            }
+
+            if (inLine)
+            {
+                // Across every line of the control: nowhere, unless the control uses the move itself.
+                if (!keeps) Claim(move);
                 return;
             }
 
-            Claim(move);
+            if (WhenLost == null || !TakesInput) return;
 
+            Claim(move);
+            WhenLost()?.Focus();
+        }
+
+        void Step(IReadOnlyList<VisualElement> stops, int place, int step, bool wraps)
+        {
             open.Clear();
-            foreach (VisualElement stop in line.Stops)
-                open.Add(stop.canGrabFocus);
-            int next = MenuStep.Next(open, place, MenuStep.Along(line.Axis, direction), line.Wraps);
+            foreach (VisualElement stop in stops)
+                open.Add(Target(stop)?.canGrabFocus == true);
+            int next = MenuStep.Next(open, place, step, wraps);
             if (next < 0) return;
 
-            line.Stops[next].Focus();
+            Target(stops[next]).Focus();
             if (sounds != null) sounds.Hover();
+        }
+
+        // The control a stop gives the focus to: a group's entry, or the stop itself.
+        VisualElement Target(VisualElement stop)
+        {
+            return groups.TryGetValue(stop, out Func<VisualElement> entry) ? entry() : stop;
+        }
+
+        static int IndexOf(IReadOnlyList<VisualElement> stops, VisualElement element)
+        {
+            for (int i = 0; i < stops.Count; i++)
+                if (stops[i] == element) return i;
+            return -1;
         }
 
         void Claim(NavigationMoveEvent move)
@@ -228,30 +299,6 @@ namespace Squadra
                 Focusable after = root.focusController?.focusedElement;
                 if (after != null && after != before && sounds != null) sounds.Hover();
             });
-        }
-
-        // The line and place of the focused control: the first of its ancestors, itself included, that
-        // is a stop of a declared line.
-        bool Find(VisualElement focused, out Line found, out int place)
-        {
-            for (VisualElement element = focused; element != null; element = element.parent)
-            {
-                foreach (Line line in lines)
-                {
-                    for (int i = 0; i < line.Stops.Count; i++)
-                    {
-                        if (line.Stops[i] != element) continue;
-
-                        found = line;
-                        place = i;
-                        return true;
-                    }
-                }
-            }
-
-            found = null;
-            place = -1;
-            return false;
         }
 
         static bool DirectionOf(NavigationMoveEvent.Direction move, out MenuDirection direction)

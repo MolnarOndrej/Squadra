@@ -335,7 +335,6 @@ namespace Squadra
 
             root.Q<Button>("settingsBackButton").clicked += Back;
             dialog = new MenuDialog(root.Q("dialog"), sounds, OnDialogOpened, OnDialogClosed);
-            settings = new SettingsScreen(settingsScreen, this, sounds);
 
             // As in the main menu: the focused control is highlighted, and pointing at a control gives
             // it the focus.
@@ -344,6 +343,7 @@ namespace Squadra
             navigation.SetKeyboard(false);
             navigation.AddLine(MenuAxis.Column, true, buttons);
             navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
+            settings = new SettingsScreen(settingsScreen, this, sounds, navigation);
             Refresh();
         }
 
