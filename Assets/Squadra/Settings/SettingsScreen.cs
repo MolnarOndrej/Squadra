@@ -92,9 +92,6 @@ namespace Squadra
             SelectTab(0);
         }
 
-        /// <summary>The value controls of every category: dropdowns, sliders and checkboxes, not the tabs.</summary>
-        public IReadOnlyList<VisualElement> Fields => fields;
-
         /// <summary>The tab that should get keyboard focus when the screen opens.</summary>
         public Focusable DefaultFocus => tabs[tab];
 

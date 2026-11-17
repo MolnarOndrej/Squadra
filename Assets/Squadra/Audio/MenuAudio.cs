@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace Squadra
 {
@@ -7,7 +6,7 @@ namespace Squadra
     /// Plays the menu's interface cues: one when the pointer enters a button or a keyboard move reaches a
     /// control, one when a button or tab is activated or the map page changes, and a different one for
     /// going back or cancelling a dialog.
-    /// The screens decide which cue an action gets; this component only plays it.
+    /// The screens and the menu navigation decide which cue an action gets; this component only plays it.
     /// </summary>
     public sealed class MenuAudio : MonoBehaviour
     {
@@ -19,12 +18,6 @@ namespace Squadra
         [SerializeField, Range(0f, 1f)] float hoverLevel = 0.5f;
 
         AudioSource source;
-
-        /// <summary>
-        /// False while the player is using the keyboard and the mouse is resting. A button that appears
-        /// under a resting pointer has not been pointed at, so it stays silent and does not take the focus.
-        /// </summary>
-        public bool PointerActive { get; set; } = true;
 
         /// <summary>How many cues of each kind have played since the scene loaded. Read by play tests.</summary>
         public int HoverCount { get; private set; }
@@ -47,26 +40,6 @@ namespace Squadra
         {
             BackCount++;
             Play(back, 1f);
-        }
-
-        /// <summary>
-        /// Makes a button sound and take keyboard focus when the pointer enters it, so switching from the
-        /// mouse to the keyboard carries on from the button under the pointer. Disabled buttons stay silent.
-        /// </summary>
-        public void AttachHover(Button button)
-        {
-            button.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
-        }
-
-        void OnPointerEnter(PointerEnterEvent pointer)
-        {
-            var element = (VisualElement)pointer.currentTarget;
-            // The cue marks the highlight moving; a button that already has it stays silent.
-            if (!PointerActive || !element.enabledInHierarchy || element.focusController?.focusedElement == element)
-                return;
-
-            Hover();
-            element.Focus();
         }
 
         void Awake()
