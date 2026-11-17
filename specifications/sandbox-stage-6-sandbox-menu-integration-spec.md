@@ -1,4 +1,4 @@
-# Sandbox main menu integration
+# Stage 6 of 6: Sandbox main menu integration
 
 ## Problem Statement
 
@@ -8,7 +8,7 @@ An Editor-only scene cannot be used independently in a built game. Players and t
 
 Add a Sandbox entry to the main menu and include the playable scene in game builds. Enter a fresh sandbox run using the saved game-speed preference and provide a clear return to the main menu.
 
-This is stage 6 and depends on the [playable sandbox](playable-sandbox-spec.md), including its resolved validation items. It completes the sequence beginning with [shared visual tuning](shared-visual-tuning-spec.md). This stage adds navigation and packaging, not another sandbox implementation.
+This is stage 6 and depends on the [playable sandbox](sandbox-stage-5-playable-sandbox-spec.md), including its resolved validation items. It completes the sequence beginning with [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md). This stage adds navigation and packaging, not another sandbox implementation.
 
 ## User Stories
 

@@ -1,4 +1,4 @@
-# Replaceable shared Dart visuals
+# Stage 3 of 6: Replaceable shared Dart visuals
 
 ## Problem Statement
 
@@ -8,7 +8,7 @@ Fleets currently use shader-drawn batched quads. There is no shared Dart mesh au
 
 Support a shared Dart mesh and material, with editable visual size and formation spacing. Use that appearance in the sandbox and generated missions while keeping actual Dart counts independent from configurable visible counts.
 
-This is stage 3, following [shared tuning](shared-visual-tuning-spec.md) and the [Edit Mode sandbox](visual-sandbox-edit-mode-spec.md). Motion and live override controls arrive in the [playable sandbox](playable-sandbox-spec.md).
+This is stage 3, following [shared tuning](sandbox-stage-1-shared-visual-tuning-spec.md) and the [Edit Mode sandbox](sandbox-stage-2-visual-sandbox-edit-mode-spec.md). Motion and live override controls arrive in the [playable sandbox](sandbox-stage-5-playable-sandbox-spec.md).
 
 ## User Stories
 

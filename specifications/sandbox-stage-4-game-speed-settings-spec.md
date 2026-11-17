@@ -1,4 +1,4 @@
-# Persistent game speed settings
+# Stage 4 of 6: Persistent game speed settings
 
 ## Problem Statement
 
@@ -15,7 +15,7 @@ Add Game Speed to the shared Settings screen's General tab with exactly four opt
 | Fast | 1.5 |
 | Turbo | 2.0 |
 
-Normal is the default. This is stage 4 and can be implemented independently of the sandbox scene once existing settings and time ownership have been reviewed. It precedes the [playable sandbox](playable-sandbox-spec.md).
+Normal is the default. This is stage 4 and can be implemented independently of the sandbox scene once existing settings and time ownership have been reviewed. It precedes the [playable sandbox](sandbox-stage-5-playable-sandbox-spec.md).
 
 ## User Stories
 
