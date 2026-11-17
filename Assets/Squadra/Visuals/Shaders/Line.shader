@@ -4,12 +4,12 @@ Shader "Squadra/Line"
 {
     Properties
     {
-        _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
-        _Length ("Length (world units)", Float) = 1
-        _Dash ("Dash length (0 = solid)", Float) = 0
-        _Gap ("Gap length", Float) = 0.2
-        _Scroll ("Scroll speed", Float) = 0
-        _EndFade ("End fade (world units)", Float) = 0.3
+        [PerRendererData] _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
+        [PerRendererData] _Length ("Length (world units)", Float) = 1
+        [PerRendererData] _Dash ("Dash length (0 = solid)", Float) = 0
+        [PerRendererData] _Gap ("Gap length", Float) = 0.2
+        [PerRendererData] _Scroll ("Scroll speed", Float) = 0
+        [PerRendererData] _EndFade ("End fade (world units)", Float) = 0.3
     }
 
     SubShader

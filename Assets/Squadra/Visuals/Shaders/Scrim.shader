@@ -4,7 +4,7 @@ Shader "Squadra/Scrim"
 {
     Properties
     {
-        _Tint ("Tint (linear rgb, a = opacity)", Vector) = (0.01, 0.012, 0.03, 0.7)
+        [PerRendererData] _Tint ("Tint (linear rgb, a = opacity)", Vector) = (0.01, 0.012, 0.03, 0.7)
         _Rim ("Extra opacity at the edges", Range(0, 1)) = 0.25
     }
 

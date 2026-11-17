@@ -48,6 +48,21 @@ namespace Squadra
             }
         }
 
+        /// <summary>
+        /// Takes the band, glow, dashes, track and blend of <paramref name="tuning"/>. Radius, color, spin
+        /// and the filled arc are left to the caller. Call <see cref="Apply"/> afterwards.
+        /// </summary>
+        public void Shape(RingTuning tuning)
+        {
+            Thickness = tuning.Thickness;
+            Softness = tuning.Softness;
+            Glow = tuning.Glow;
+            Dashes = tuning.Dashes;
+            DashFill = tuning.DashFill;
+            Track = tuning.Track;
+            Additive = tuning.Additive;
+        }
+
         public void Apply()
         {
             // The quad is sized so the ring and its glow sit inside the shader's edge fade.

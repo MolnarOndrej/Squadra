@@ -27,9 +27,9 @@ namespace Squadra
     {
         const Faction Player = Faction.Blue;
 
+        // The fleet speed is the match's own default (MatchConfig.FleetSpeed): changing it is a change to
+        // the game's rules, made in code, not a value kept in this scene.
         [Header("Rules")]
-        [Tooltip("Common fleet speed in world units per second.")]
-        [SerializeField] float fleetSpeed = 2.4f;
         [SerializeField] float captureSeconds = 5f;
 
         [Header("Battles")]
@@ -63,6 +63,8 @@ namespace Squadra
         [SerializeField] ResultsScreen results;
         [SerializeField] CameraRig rig;
         [SerializeField] Material lineMaterial;
+        [Tooltip("How the lines between worlds look. Shared with every mission.")]
+        [SerializeField] RouteStyle routeStyle;
 
         PreparedMission mission;
         WorldView[] worlds;
@@ -132,9 +134,9 @@ namespace Squadra
             new MatchFeedback(worlds, fleets, effects, sounds, rig).Attach(match);
             match.StatusChanged += OnStatusChanged;
 
-            fleets.Bind(match, worlds, lineMaterial, sounds);
+            fleets.Bind(match, worlds, lineMaterial, routeStyle, sounds);
             orders = new PlayerOrders(match, worlds, Player);
-            lanes = new RouteLanes(match, worlds, Player, transform, lineMaterial);
+            lanes = new RouteLanes(match, worlds, Player, transform, lineMaterial, routeStyle);
         }
 
         // The mission launched from the map; a scene opened on its own plays its standalone mission,
@@ -162,11 +164,10 @@ namespace Squadra
             return index < 0 ? name : "SECTOR " + (index + 1).ToString("00") + "  -  " + name;
         }
 
-        // The mission's players, worlds and routes, with the match's rules as set in the Inspector.
+        // The mission's players, worlds and routes, with the capture and battle rules as set in the Inspector.
         MatchConfig BuildConfig()
         {
             MatchConfig config = mission.CreateConfig();
-            config.FleetSpeed = fleetSpeed;
             config.CaptureDuration = captureSeconds;
             config.BattleTiming.ShortestDuration = shortestBattleSeconds;
             config.BattleTiming.LongestDuration = longestBattleSeconds;
