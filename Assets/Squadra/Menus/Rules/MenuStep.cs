@@ -27,10 +27,12 @@ namespace Squadra.Menus
         }
 
         /// <summary>
-        /// The place one step from place <paramref name="from"/> lands on: the nearest stop in the
-        /// direction of <paramref name="step"/> (+1 or -1) that can take the focus. -1 when the move is
-        /// blocked: a step of 0 (across the line), the end of a line that does not wrap, or no other stop
-        /// that can take the focus.
+        /// Where a move along the line takes the focus, as a place in the line. Starting at
+        /// <paramref name="from"/>, it goes stop by stop in the direction of <paramref name="step"/>
+        /// (+1 towards the end, -1 towards the start) and lands on the first stop that can take the focus,
+        /// carrying on from the other end when the line wraps. Returns -1 when the focus should stay where
+        /// it is: when <paramref name="step"/> is 0 (the move runs across the line, such as Left in a
+        /// column), when a line that does not wrap ends first, or when no other stop can take the focus.
         /// </summary>
         /// <param name="open">For each stop of the line, in order, whether it can take the focus now.</param>
         public static int Next(IReadOnlyList<bool> open, int from, int step, bool wraps)
