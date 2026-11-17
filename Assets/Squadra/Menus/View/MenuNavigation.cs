@@ -47,12 +47,32 @@ namespace Squadra
         public bool Keyboard { get; private set; }
 
         /// <summary>
+        /// While this returns false the screen takes no input: pointing at a control neither gives it
+        /// the focus nor sounds, and a lost focus is not brought back. Unset, it always takes input.
+        /// </summary>
+        public Func<bool> Accepting { get; set; }
+
+        /// <summary>
+        /// Where a move takes the focus when no control of a declared line has it, so the first arrow
+        /// press brings it back. Unset, such a move is left to UI Toolkit.
+        /// </summary>
+        public Func<Focusable> WhenLost { get; set; }
+
+        /// <summary>
+        /// Whether a press on an element may move the focus. Any other press leaves the focus where it
+        /// is. Unset, a press on a control or inside one may.
+        /// </summary>
+        public Func<VisualElement, bool> PressMovesFocus { get; set; }
+
+        /// <summary>
         /// Listens to the pointer and navigation events of <paramref name="eventRoot"/> and everything in
         /// it. <paramref name="modeRoot"/> carries the mode's style classes; they are only written by the
         /// next <see cref="SetKeyboard"/>, so a tree that was built anew starts out as its layout has it.
+        /// Attaching to a new tree forgets the lines of the old one; the mode carries over.
         /// </summary>
         public void Attach(VisualElement eventRoot, VisualElement modeRoot)
         {
+            lines.Clear();
             root = eventRoot;
             styledRoot = modeRoot;
             root.RegisterCallback<PointerMoveEvent>(OnPointerMoved, TrickleDown.TrickleDown);
@@ -119,14 +139,16 @@ namespace Squadra
         void OnPointerPressed(PointerDownEvent pressed)
         {
             SetKeyboard(false);
-            if (!PressesControl(pressed.target as VisualElement)) root.focusController?.IgnoreEvent(pressed);
+            var target = pressed.target as VisualElement;
+            bool movesFocus = PressMovesFocus != null ? PressMovesFocus(target) : PressesControl(target);
+            if (!movesFocus) root.focusController?.IgnoreEvent(pressed);
         }
 
         // Gives the control the focus. The cue marks the highlight moving, so a control that already
         // has it stays silent. Only buttons sound when pointed at; fields take the focus silently.
         void Point(VisualElement control)
         {
-            if (control == null || !control.enabledInHierarchy) return;
+            if (control == null || !control.enabledInHierarchy || !TakesInput) return;
             if (Holds(control, root.focusController?.focusedElement as VisualElement)) return;
 
             if (control is Button && sounds != null) sounds.Hover();
@@ -163,10 +185,16 @@ namespace Squadra
         {
             SetKeyboard(true);
             if (!DirectionOf(move.direction, out MenuDirection direction)) return;
-            if (!Find(root.focusController?.focusedElement as VisualElement, out Line line, out int place)) return;
+            if (!Find(root.focusController?.focusedElement as VisualElement, out Line line, out int place))
+            {
+                if (WhenLost == null || !TakesInput) return;
 
-            move.StopPropagation();
-            root.focusController?.IgnoreEvent(move);
+                Claim(move);
+                WhenLost()?.Focus();
+                return;
+            }
+
+            Claim(move);
 
             open.Clear();
             foreach (VisualElement stop in line.Stops)
@@ -177,6 +205,14 @@ namespace Squadra
             line.Stops[next].Focus();
             if (sounds != null) sounds.Hover();
         }
+
+        void Claim(NavigationMoveEvent move)
+        {
+            move.StopPropagation();
+            root.focusController?.IgnoreEvent(move);
+        }
+
+        bool TakesInput => Accepting == null || Accepting();
 
         /// <summary>
         /// A navigation move event from the panel, bubbling up, so a move that a line or a screen takes
