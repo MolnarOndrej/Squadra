@@ -15,15 +15,20 @@ namespace Squadra
     ///
     /// This component keeps the dots of every world and of every fleet in transit, hands them from
     /// one to the other and decides when a battle fires and sounds. Where a dot belongs in an orbit
-    /// or a formation is worked out by <see cref="DartFormations"/>; shots, explosions and sparks
-    /// live in <see cref="DartEffects"/>. Garrisons and transits stay together here because a dot
+    /// or a formation is worked out by <see cref="DartFormations"/>; a fleet in transit is drawn as a
+    /// <see cref="DartSwarm"/> with its <see cref="FleetCourse"/>, which the sandbox draws its samples
+    /// with too; shots, explosions and sparks live in <see cref="DartEffects"/>. Garrisons and transits stay together here because a dot
     /// passes between them without leaving the screen.
+    ///
+    /// How the dots and a fleet's lines look comes from the shared <see cref="FleetStyle"/> and
+    /// <see cref="RouteStyle"/>; how many dots stand for a fleet and how fast they orbit comes from
+    /// <see cref="DartDisplay"/>.
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class FleetLayer : MonoBehaviour
     {
-        [SerializeField] float dotRadius = 0.055f;
-        [SerializeField] float dotBrightness = 1.5f;
+        [Tooltip("How the dots look. Shared with every mission.")]
+        [SerializeField] FleetStyle style;
         [Tooltip("Inactive template cloned for the Dart count that travels with each fleet.")]
         [SerializeField] TextMeshPro fleetLabelTemplate;
 
@@ -31,12 +36,8 @@ namespace Squadra
         [Tooltip("Seconds before a hostile fleet arrives that the defenders start gathering to face it. "
             + "Only what is drawn: the defenders can still be ordered away.")]
         [SerializeField] float gatherSeconds = 1.4f;
-        [Tooltip("Gap between the defenders' front and the attackers' front, in world units.")]
-        [SerializeField] float frontGap = 0.5f;
         [Tooltip("Seconds a dot takes to settle into a new place: into formation, or back into orbit.")]
         [SerializeField] float settleSeconds = 0.32f;
-        [Tooltip("How far a fighting dot strays from its place in the formation, in world units.")]
-        [SerializeField] float strayDistance = 0.1f;
         [Tooltip("Most shots drawn per second at one battle, however large the fleets.")]
         [SerializeField] float maxShotsPerSecond = 24f;
         [Tooltip("Most shot sounds per second at one battle.")]
@@ -79,26 +80,14 @@ namespace Squadra
         sealed class Transit
         {
             public Fleet Fleet;
-            public Vector2 Start;
-            public Vector2 End;
-            public Vector2 Direction;
-            public Vector2[] Offsets;
-            public Vector2[] Positions;
-            public float[] Phases;
-            public float Standoff; // 1 when the fleet is heading for the outer formation of a battle
+            public DartSwarm Swarm;
             public TextMeshPro Label;
-            public TransitRoute Route;
-        }
-
-        sealed class TransitRoute
-        {
-            public LineStyle Lead;
-            public LineStyle Wake;
+            public FleetCourse Course;
         }
 
         readonly Dictionary<int, Transit> transits = new Dictionary<int, Transit>();
         readonly Stack<TextMeshPro> labelPool = new Stack<TextMeshPro>();
-        readonly Stack<TransitRoute> routePool = new Stack<TransitRoute>();
+        readonly Stack<FleetCourse> coursePool = new Stack<FleetCourse>();
         readonly Stack<Dot> dotPool = new Stack<Dot>();
         readonly DartEffects effects = new DartEffects();
 
@@ -106,6 +95,8 @@ namespace Squadra
         Match match;
         IReadOnlyList<WorldView> worlds;
         Material lineMaterial;
+        RouteStyle routeStyle;
+        DartDisplay display;
         SoundLayer sounds;
         Garrison[] garrisons;
 
@@ -121,12 +112,18 @@ namespace Squadra
         /// <summary>Sparks alive right now: explosions, landings and captures.</summary>
         public int SparkCount => effects.SparkCount;
 
+        /// <summary>
+        /// Starts drawing a match. Leave <paramref name="dartDisplay"/> out for the game's own Dart
+        /// behavior; a sandbox may pass other values.
+        /// </summary>
         public void Bind(Match boundMatch, IReadOnlyList<WorldView> boundWorlds, Material routeMaterial,
-            SoundLayer battleSounds = null)
+            RouteStyle routes, SoundLayer battleSounds = null, DartDisplay dartDisplay = null)
         {
             match = boundMatch;
             worlds = boundWorlds;
             lineMaterial = routeMaterial;
+            routeStyle = routes;
+            display = dartDisplay ?? DartDisplay.Default;
             sounds = battleSounds;
 
             garrisons = new Garrison[worlds.Count];
@@ -136,11 +133,11 @@ namespace Squadra
                 garrisons[n] = garrison;
 
                 // The starting fleets are simply there: nothing fades in.
-                int count = DartFormations.DotCount(match.Nodes[n].Darts);
+                int count = DartFormations.DotCount(match.Nodes[n].Darts, display);
                 for (int i = 0; i < count; i++)
                 {
                     Dot dot = RentDot();
-                    DartFormations.OrbitPlace(worlds[n], i, 0f, out dot.Angle, out dot.Radius);
+                    DartFormations.OrbitPlace(worlds[n], i, 0f, display.OrbitSpeed, out dot.Angle, out dot.Radius);
                     dot.Shown = 1f;
                     dot.Position = worlds[n].Position + DartFormations.Polar(dot.Angle, dot.Radius);
                     garrison.Stationed.Add(dot);
@@ -159,40 +156,15 @@ namespace Squadra
 
         public void BeginTransit(Fleet fleet)
         {
-            WorldView source = worlds[fleet.SourceId];
-            WorldView target = worlds[fleet.TargetId];
-            Vector2 delta = target.Position - source.Position;
-            Vector2 direction = delta.sqrMagnitude > 1e-6f ? delta.normalized : Vector2.right;
-
-            int dots = DartFormations.DotCount(fleet.Darts);
-            var random = new System.Random(fleet.Id * 7919 + 17);
-            float spread = 0.14f + 0.045f * Mathf.Sqrt(dots);
-            var offsets = new Vector2[dots];
-            var phases = new float[dots];
-            for (int i = 0; i < dots; i++)
-            {
-                // A loose teardrop: wide at the front, trailing off behind.
-                float angle = (float)random.NextDouble() * Mathf.PI * 2f;
-                float radius = Mathf.Sqrt((float)random.NextDouble());
-                float along = Mathf.Cos(angle) * radius;
-                float across = Mathf.Sin(angle) * radius * Mathf.Lerp(0.35f, 0.8f, (along + 1f) * 0.5f);
-                offsets[i] = new Vector2(along * spread * 1.5f, across * spread);
-                phases[i] = (float)random.NextDouble() * Mathf.PI * 2f;
-            }
-
+            int dots = DartFormations.DotCount(fleet.Darts, display);
             var transit = new Transit
             {
                 Fleet = fleet,
-                Start = source.Position + direction * source.OrbitRadius,
-                End = target.Position - direction * target.OrbitRadius,
-                Direction = direction,
-                Offsets = offsets,
-                Positions = new Vector2[dots],
-                Phases = phases,
+                Swarm = new DartSwarm(fleet.Id, dots, worlds[fleet.SourceId], worlds[fleet.TargetId], style),
                 Label = RentLabel(fleet),
-                Route = RentRoute(fleet.Faction),
+                Course = RentCourse(fleet.Faction),
             };
-            transit.Standoff = HeadsForOuterFormation(fleet) ? 1f : 0f;
+            transit.Swarm.Standoff = HeadsForOuterFormation(fleet) ? 1f : 0f;
             PlaceTransit(transit, Time.time, out _, out _);
             transits[fleet.Id] = transit;
         }
@@ -215,7 +187,7 @@ namespace Squadra
                 // The fronts meet where the attackers came in.
                 Retire(garrison, garrison.Arriving, 0, Palette.Of(garrison.ArrivingFaction));
                 garrison.ArrivingFaction = report.Arriving;
-                garrison.FrontAngle = Mathf.Atan2(-transit.Direction.y, -transit.Direction.x);
+                garrison.FrontAngle = Mathf.Atan2(-transit.Swarm.Direction.y, -transit.Swarm.Direction.x);
                 garrison.ShotIn = 0.25f;
                 side = garrison.Arriving;
             }
@@ -224,7 +196,7 @@ namespace Squadra
                 side = garrison.Arriving;
             }
 
-            foreach (Vector2 position in transit.Positions)
+            foreach (Vector2 position in transit.Swarm.Positions)
             {
                 Dot dot = RentDot();
                 Vector2 offset = position - world.Position;
@@ -237,43 +209,23 @@ namespace Squadra
 
             transit.Label.gameObject.SetActive(false);
             labelPool.Push(transit.Label);
-            transit.Route.Lead.Visible = false;
-            transit.Route.Wake.Visible = false;
-            routePool.Push(transit.Route);
+            transit.Course.Hide();
+            coursePool.Push(transit.Course);
         }
 
         // True when the fleet will form up outside the orbit, facing a force stationed at its target.
         bool HeadsForOuterFormation(Fleet fleet)
         {
-            Node node = match.Nodes[fleet.TargetId];
-            if (node.IsContested) return node.Battle.Arriving == fleet.Faction;
-            return node.Darts > 0 && node.Occupant != fleet.Faction;
+            return DartSwarm.FormsUpOutside(fleet.Faction, WorldState.Of(match.Nodes[fleet.TargetId]));
         }
 
-        TransitRoute RentRoute(Faction faction)
+        FleetCourse RentCourse(Faction faction)
         {
-            TransitRoute route = routePool.Count > 0 ? routePool.Pop() : new TransitRoute
-            {
-                Lead = new LineStyle(Shapes.CreateQuad("Fleet Course", transform, lineMaterial, -42))
-                {
-                    Width = 0.14f,
-                    Dash = 0.23f,
-                    Gap = 0.17f,
-                    Scroll = 0.9f,
-                    EndFade = 0.08f,
-                },
-                Wake = new LineStyle(Shapes.CreateQuad("Fleet Wake", transform, lineMaterial, -44))
-                {
-                    Width = 0.10f,
-                    Dash = 0.16f,
-                    Gap = 0.18f,
-                    EndFade = 0.08f,
-                },
-            };
-            Color tint = Palette.Of(faction);
-            route.Lead.Tint = Palette.Hdr(Palette.Bright(tint, 0.25f), 1.4f, 0.84f);
-            route.Wake.Tint = Palette.Hdr(Palette.Bright(tint, 0.18f), 1f, 0.62f);
-            return route;
+            FleetCourse course = coursePool.Count > 0 ? coursePool.Pop() : new FleetCourse(transform, lineMaterial);
+
+            // Taken from the style every time, so a pooled line shows the style as it is now.
+            course.Paint(faction, routeStyle);
+            return course;
         }
 
         TextMeshPro RentLabel(Fleet fleet)
@@ -281,10 +233,16 @@ namespace Squadra
             TextMeshPro label = labelPool.Count > 0
                 ? labelPool.Pop()
                 : Instantiate(fleetLabelTemplate, transform);
-            label.SetText("{0}", fleet.Darts);
-            label.color = Palette.Bright(Palette.Of(fleet.Faction), 0.35f);
+            ShowCount(label, fleet.Faction, fleet.Darts);
             label.gameObject.SetActive(true);
             return label;
+        }
+
+        /// <summary>Writes the Dart count of a fleet in transit on its label, in its owner's color.</summary>
+        internal static void ShowCount(TextMeshPro label, Faction faction, int darts)
+        {
+            label.SetText("{0}", darts);
+            label.color = Palette.Bright(Palette.Of(faction), 0.35f);
         }
 
         // ------------------------------------------------------------------ battles
@@ -299,9 +257,9 @@ namespace Squadra
             if (pairs <= 0) return;
 
             Garrison garrison = garrisons[battle.NodeId];
-            LoseDots(garrison, garrison.Stationed, DartFormations.DotCount(battle.StationedDarts),
+            LoseDots(garrison, garrison.Stationed, DartFormations.DotCount(battle.StationedDarts, display),
                 Palette.Of(battle.Stationed), ref garrison.StationedFlashIn);
-            LoseDots(garrison, garrison.Arriving, DartFormations.DotCount(battle.ArrivingDarts),
+            LoseDots(garrison, garrison.Arriving, DartFormations.DotCount(battle.ArrivingDarts, display),
                 Palette.Of(battle.Arriving), ref garrison.ArrivingFlashIn);
         }
 
@@ -333,7 +291,7 @@ namespace Squadra
                 {
                     int index = Random.Range(0, dots.Count);
                     Dot dot = dots[index];
-                    effects.Explode(dot.Position, color, 1f, dotRadius);
+                    effects.Explode(dot.Position, color, 1f, style.DotRadius);
                     BlastSound(garrison, dot.Position);
 
                     // The dot from the far end of the formation closes the gap.
@@ -345,7 +303,7 @@ namespace Squadra
             else if (dots.Count > 0 && flashIn <= 0f)
             {
                 Dot dot = dots[Random.Range(0, dots.Count)];
-                effects.Explode(dot.Position + Random.insideUnitCircle * 0.05f, color, 0.7f, dotRadius);
+                effects.Explode(dot.Position + Random.insideUnitCircle * 0.05f, color, 0.7f, style.DotRadius);
                 BlastSound(garrison, dot.Position);
                 flashIn = Random.Range(0.1f, 0.2f);
             }
@@ -401,7 +359,7 @@ namespace Squadra
         /// <summary>Throws a ring of short-lived sparks outward from a circle around <paramref name="center"/>.</summary>
         public void Burst(Vector2 center, float spawnRadius, Color color, int count, float speed, float life = 0.55f)
         {
-            effects.Burst(center, spawnRadius, color, count, speed, life, dotRadius);
+            effects.Burst(center, spawnRadius, color, count, speed, life, style.DotRadius);
         }
 
         // ------------------------------------------------------------------ drawing
@@ -421,7 +379,7 @@ namespace Squadra
             for (int n = 0; n < garrisons.Length; n++)
                 DrawGarrison(n, time, deltaTime, playing);
             DrawTransits(time, deltaTime);
-            effects.Draw(batch, deltaTime, dotRadius);
+            effects.Draw(batch, deltaTime, style.DotRadius);
             batch.End();
         }
 
@@ -444,7 +402,7 @@ namespace Squadra
                 if (weight <= garrison.ApproachWeight) continue;
 
                 garrison.ApproachWeight = weight;
-                garrison.ApproachAngle = Mathf.Atan2(-transit.Direction.y, -transit.Direction.x);
+                garrison.ApproachAngle = Mathf.Atan2(-transit.Swarm.Direction.y, -transit.Swarm.Direction.x);
             }
         }
 
@@ -467,15 +425,15 @@ namespace Squadra
 
             Color stationedColor = Palette.Of(node.Occupant);
             Color arrivingColor = Palette.Of(garrison.ArrivingFaction);
-            int stationedDots = DartFormations.DotCount(node.Darts);
-            int arrivingDots = fighting ? DartFormations.DotCount(battle.ArrivingDarts) : 0;
+            int stationedDots = DartFormations.DotCount(node.Darts, display);
+            int arrivingDots = fighting ? DartFormations.DotCount(battle.ArrivingDarts, display) : 0;
             Resize(garrison, garrison.Stationed, stationedDots, stationedColor, world, time, gathered, true);
             Resize(garrison, garrison.Arriving, arrivingDots, arrivingColor, world, time, 1f, false);
 
             DrawSide(garrison, garrison.Stationed, world, time, deltaTime, gathered, true,
-                Palette.Hdr(stationedColor, dotBrightness, 1f));
+                style.StationedTint(stationedColor));
             DrawSide(garrison, garrison.Arriving, world, time, deltaTime, 1f, false,
-                Palette.Hdr(arrivingColor, dotBrightness * 1.15f, 1f));
+                style.MovingTint(arrivingColor));
             DrawLeaving(garrison, deltaTime);
 
             if (fighting && playing && deltaTime > 0f) Fight(garrison, battle, deltaTime);
@@ -504,7 +462,7 @@ namespace Squadra
 
         void Retire(Garrison garrison, List<Dot> dots, int target, Color color)
         {
-            Vector4 tint = Palette.Hdr(color, dotBrightness, 1f);
+            Vector4 tint = style.StationedTint(color);
             for (int faded = 0; dots.Count > target; faded++)
             {
                 Dot dot = dots[dots.Count - 1];
@@ -541,15 +499,16 @@ namespace Squadra
                 if (garrison.Engaged > 0f)
                 {
                     float pace = 1.7f + 1.3f * Mathf.Repeat(dot.Phase * 3.7f, 1f);
-                    lunge = strayDistance * dot.Restless * (0.5f + 0.5f * Mathf.Sin(time * pace + dot.Phase))
+                    float stray = style.StrayDistance;
+                    lunge = stray * dot.Restless * (0.5f + 0.5f * Mathf.Sin(time * pace + dot.Phase))
                         * towardEnemy * garrison.Engaged;
-                    drift = 0.35f * strayDistance * Mathf.Sin(time * 2.3f + dot.Phase * 5f) * garrison.Engaged;
+                    drift = 0.35f * stray * Mathf.Sin(time * 2.3f + dot.Phase * 5f) * garrison.Engaged;
                 }
 
                 float shownRadius = dot.Radius + lunge;
                 float shownAngle = dot.Angle + drift / Mathf.Max(0.2f, shownRadius);
                 dot.Position = center + DartFormations.Polar(shownAngle, shownRadius);
-                batch.Add(dot.Position, dotRadius * 2f * Mathf.Clamp01(dot.Shown), color);
+                batch.Add(dot.Position, style.DotSize * Mathf.Clamp01(dot.Shown), color);
             }
         }
 
@@ -568,7 +527,7 @@ namespace Squadra
                     continue;
                 }
 
-                batch.Add(dot.Position, dotRadius * 2f * Mathf.Clamp01(dot.Shown), dot.Tint);
+                batch.Add(dot.Position, style.DotSize * Mathf.Clamp01(dot.Shown), dot.Tint);
             }
         }
 
@@ -579,15 +538,15 @@ namespace Squadra
         {
             if (!stationed)
             {
-                DartFormations.FormationPlace(world, index, count, garrison.FrontAngle, false, frontGap,
+                DartFormations.FormationPlace(world, index, count, garrison.FrontAngle, false, style.FrontGap,
                     out angle, out radius);
                 return;
             }
 
-            DartFormations.OrbitPlace(world, index, time, out angle, out radius);
+            DartFormations.OrbitPlace(world, index, time, display.OrbitSpeed, out angle, out radius);
             if (gathered <= 0f) return;
 
-            DartFormations.FormationPlace(world, index, count, garrison.FrontAngle, true, frontGap,
+            DartFormations.FormationPlace(world, index, count, garrison.FrontAngle, true, style.FrontGap,
                 out float formedAngle, out float formedRadius);
             angle += Mathf.DeltaAngle(angle * Mathf.Rad2Deg, formedAngle * Mathf.Rad2Deg) * Mathf.Deg2Rad * gathered;
             radius = Mathf.Lerp(radius, formedRadius, gathered);
@@ -601,50 +560,21 @@ namespace Squadra
 
                 // A fleet about to fight stops short of the orbit, where its formation will be. Whether
                 // it will is read from the match, so it changes course if the defenders leave.
-                transit.Standoff = Mathf.MoveTowards(transit.Standoff, HeadsForOuterFormation(fleet) ? 1f : 0f,
+                DartSwarm swarm = transit.Swarm;
+                swarm.Standoff = Mathf.MoveTowards(swarm.Standoff, HeadsForOuterFormation(fleet) ? 1f : 0f,
                     deltaTime / 0.5f);
 
                 PlaceTransit(transit, time, out Vector2 center, out float formation);
-                Vector2 direction = transit.Direction;
-                Vector4 color = Palette.Hdr(Palette.Of(fleet.Faction), dotBrightness * 1.15f, 1f);
-                Vector4 trail = color;
-                foreach (Vector2 position in transit.Positions)
-                {
-                    batch.Add(position, dotRadius * 2f, color);
-
-                    trail.w = 0.38f;
-                    batch.Add(position - direction * 0.1f, dotRadius * 1.5f, trail);
-                    trail.w = 0.16f;
-                    batch.Add(position - direction * 0.2f, dotRadius * 1.1f, trail);
-                }
-
-                float extent = 0.14f + 0.045f * Mathf.Sqrt(transit.Offsets.Length);
-                transit.Label.transform.position = center + Vector2.up * (extent * formation + 0.38f);
+                swarm.Draw(batch, fleet.Faction, style);
+                transit.Label.transform.position = swarm.LabelPosition(center, formation, style);
             }
         }
 
         void PlaceTransit(Transit transit, float time, out Vector2 center, out float formation)
         {
             Fleet fleet = transit.Fleet;
-            float standoff = (frontGap + DartFormations.RowSpacing) * Mathf.SmoothStep(0f, 1f, transit.Standoff);
-            Vector2 end = transit.End - transit.Direction * standoff;
-            center = Vector2.Lerp(transit.Start, end, fleet.Progress);
-            transit.Route.Lead.Set(center, end);
-            transit.Route.Wake.Set(transit.Start, center);
-            Vector2 direction = transit.Direction;
-            var normal = new Vector2(-direction.y, direction.x);
-
-            // The swarm fans out after launch and gathers again before arrival.
-            float opening = Mathf.Clamp01((float)fleet.Elapsed / 0.45f);
-            float closing = Mathf.Clamp01((float)fleet.Remaining / 0.3f);
-            formation = Mathf.Lerp(0.3f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Min(opening, closing)));
-
-            for (int i = 0; i < transit.Offsets.Length; i++)
-            {
-                Vector2 offset = transit.Offsets[i] * formation;
-                float wobble = 0.03f * Mathf.Sin(time * 3.1f + transit.Phases[i]);
-                transit.Positions[i] = center + direction * offset.x + normal * (offset.y + wobble);
-            }
+            transit.Swarm.Place(fleet.Progress, fleet.Elapsed, fleet.Remaining, time, style, transit.Course,
+                out center, out formation);
         }
 
         // ------------------------------------------------------------------ helpers

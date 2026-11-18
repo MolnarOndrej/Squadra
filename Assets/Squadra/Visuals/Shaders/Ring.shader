@@ -4,17 +4,17 @@ Shader "Squadra/Ring"
 {
     Properties
     {
-        _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
-        _Radius ("Radius (fraction of half quad)", Range(0, 1)) = 0.8
-        _Thickness ("Thickness", Range(0, 0.5)) = 0.02
-        _Softness ("Glow width", Range(0.001, 0.5)) = 0.06
-        _Glow ("Glow strength", Range(0, 2)) = 0.4
-        _Dashes ("Dash count (0 = solid)", Float) = 0
-        _DashFill ("Dash fill", Range(0, 1)) = 0.5
-        _Spin ("Dash spin (turns per second)", Float) = 0
-        _Arc ("Filled arc (0..1, clockwise from top)", Range(0, 1)) = 1
-        _Track ("Opacity of the unfilled arc", Range(0, 1)) = 0
-        _Additive ("Additive blend", Range(0, 1)) = 0.6
+        [PerRendererData] _Tint ("Tint (linear rgb, a = opacity)", Vector) = (1, 1, 1, 1)
+        [PerRendererData] _Radius ("Radius (fraction of half quad)", Range(0, 1)) = 0.8
+        [PerRendererData] _Thickness ("Thickness", Range(0, 0.5)) = 0.02
+        [PerRendererData] _Softness ("Glow width", Range(0.001, 0.5)) = 0.06
+        [PerRendererData] _Glow ("Glow strength", Range(0, 2)) = 0.4
+        [PerRendererData] _Dashes ("Dash count (0 = solid)", Float) = 0
+        [PerRendererData] _DashFill ("Dash fill", Range(0, 1)) = 0.5
+        [PerRendererData] _Spin ("Dash spin (turns per second)", Float) = 0
+        [PerRendererData] _Arc ("Filled arc (0..1, clockwise from top)", Range(0, 1)) = 1
+        [PerRendererData] _Track ("Opacity of the unfilled arc", Range(0, 1)) = 0
+        [PerRendererData] _Additive ("Additive blend", Range(0, 1)) = 0.6
     }
 
     SubShader

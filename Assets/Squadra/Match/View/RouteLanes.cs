@@ -5,80 +5,96 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// The dashed lines between worlds: an idle lane for every route of the mission, and the preview of
-    /// the order the player is about to give, which only a route allows. A lane that carries a fleet or
-    /// the preview is hidden, because the animated line drawn over it would fill its gaps.
+    /// The dashed lines between worlds: an idle lane for every route, and the preview of the order the
+    /// player is about to give, which only a route allows. A lane that carries a fleet or the preview is
+    /// hidden, because the animated line drawn over it would fill its gaps. How both look comes from the
+    /// shared <see cref="RouteStyle"/>, read every frame, so an edit to it or a world moved in the sandbox
+    /// shows at once.
     /// </summary>
     sealed class RouteLanes
     {
         readonly IReadOnlyList<WorldView> worlds;
-        readonly Faction player;
-        readonly Dictionary<Route, int> laneOf = new Dictionary<Route, int>();
+        readonly IReadOnlyList<Route> routes;
         readonly LineStyle[] idleLanes;
-        readonly bool[] activeLanes;
+        readonly HashSet<Route> flown = new HashSet<Route>();
         readonly LineStyle orderPreview;
+        readonly RouteStyle style;
 
-        /// <summary>Creates the lines for the match's routes as children of <paramref name="parent"/>.</summary>
-        public RouteLanes(Match match, IReadOnlyList<WorldView> worlds, Faction player, Transform parent,
-            Material lineMaterial)
+        // How fast the preview's dashes scroll toward the target, in world units per second.
+        const float PreviewScroll = 1.15f;
+
+        /// <summary>Creates the lines for <paramref name="routes"/> as children of <paramref name="parent"/>.</summary>
+        public RouteLanes(IReadOnlyList<Route> routes, IReadOnlyList<WorldView> worlds, Transform parent,
+            Material lineMaterial, RouteStyle style)
         {
             this.worlds = worlds;
-            this.player = player;
+            this.routes = routes;
+            this.style = style;
 
             // Keep the idle lanes readable under active orders.
-            IReadOnlyList<Route> routes = match.Routes;
             idleLanes = new LineStyle[routes.Count];
-            activeLanes = new bool[routes.Count];
             for (int i = 0; i < routes.Count; i++)
             {
-                GetRoute(routes[i].A, routes[i].B, out Vector2 from, out Vector2 to);
-                var lane = new LineStyle(Shapes.CreateQuad("Lane", parent, lineMaterial, -50))
-                {
-                    Tint = Palette.Hdr(Palette.Starlight, 0.66f, 0.53f),
-                    Width = 0.10f,
-                    Dash = 0.13f,
-                    Gap = 0.16f,
-                    EndFade = 0.04f,
-                };
-                lane.Set(from, to);
-                idleLanes[i] = lane;
-                laneOf[routes[i]] = i;
+                idleLanes[i] = new LineStyle(Shapes.CreateQuad("Lane", parent, lineMaterial, -50));
+                LayLane(i);
             }
 
             orderPreview = new LineStyle(Shapes.CreateQuad("Order Preview", parent, lineMaterial, 8))
             {
-                Width = 0.16f,
-                Dash = 0.26f,
-                Gap = 0.16f,
-                Scroll = 1.15f,
-                EndFade = 0.05f,
+                Scroll = PreviewScroll,
             };
             orderPreview.Visible = false;
         }
 
         /// <summary>
-        /// Shows the preview from the selected world to the hovered one when that order could be
-        /// given, and hides the idle lanes that the preview or a fleet in transit runs along.
+        /// Shows the preview from the selected world to the hovered one when <paramref name="player"/>
+        /// could give that order, and hides the idle lanes that the preview or a fleet in transit runs along.
         /// </summary>
-        public void Refresh(Match match, int selected, int hovered)
+        public void Refresh(Match match, Faction player, int selected, int hovered)
         {
             bool show = selected >= 0 && hovered >= 0 && hovered != selected
                 && match.CanLaunch(player, selected, hovered);
+
+            flown.Clear();
+            foreach (Fleet fleet in match.Fleets)
+                flown.Add(new Route(fleet.SourceId, fleet.TargetId));
+
+            Draw(show ? selected : -1, show ? hovered : -1, flown);
+        }
+
+        /// <summary>
+        /// Draws the preview of an order from one world to another, or none when either is negative, and
+        /// every idle lane except those the preview or a fleet runs along: the routes in <paramref name="busy"/>.
+        /// </summary>
+        public void Draw(int previewFrom, int previewTo, ICollection<Route> busy)
+        {
+            bool show = previewFrom >= 0 && previewTo >= 0 && previewFrom != previewTo;
             orderPreview.Visible = show;
             if (show)
             {
-                GetRoute(selected, hovered, out Vector2 from, out Vector2 to);
-                orderPreview.Tint = Palette.Hdr(Palette.Accent, 1.55f, 0.95f);
+                GetRoute(previewFrom, previewTo, out Vector2 from, out Vector2 to);
+                LineTuning preview = style.Preview;
+                orderPreview.Shape(preview);
+                orderPreview.Tint = Palette.Hdr(style.PreviewColor, preview.Brightness, preview.Opacity);
                 orderPreview.Set(from, to);
             }
 
-            System.Array.Clear(activeLanes, 0, activeLanes.Length);
-            if (show) MarkActive(selected, hovered);
-            foreach (Fleet fleet in match.Fleets)
-                MarkActive(fleet.SourceId, fleet.TargetId);
-
             for (int i = 0; i < idleLanes.Length; i++)
-                idleLanes[i].Visible = !activeLanes[i];
+            {
+                Route route = routes[i];
+                bool active = (show && route.Joins(previewFrom, previewTo)) || busy.Contains(route);
+                if (active) idleLanes[i].Visible = false;
+                else LayLane(i);
+            }
+        }
+
+        void LayLane(int index)
+        {
+            GetRoute(routes[index].A, routes[index].B, out Vector2 from, out Vector2 to);
+            LineStyle lane = idleLanes[index];
+            lane.Tint = Palette.Hdr(style.LaneColor, style.Lane.Brightness, style.Lane.Opacity);
+            lane.Shape(style.Lane);
+            lane.Set(from, to);
         }
 
         // A route is drawn between the two orbits, not between the centers of the worlds. The rules still
@@ -89,11 +105,6 @@ namespace Squadra
             Vector2 direction = delta.sqrMagnitude > 1e-6f ? delta.normalized : Vector2.right;
             from = worlds[source].Position + direction * worlds[source].OrbitRadius;
             to = worlds[target].Position - direction * worlds[target].OrbitRadius;
-        }
-
-        void MarkActive(int source, int target)
-        {
-            if (laneOf.TryGetValue(new Route(source, target), out int lane)) activeLanes[lane] = true;
         }
     }
 }

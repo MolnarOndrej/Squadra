@@ -8,7 +8,7 @@ Static previews cannot demonstrate moving fleets, orbit behavior, production, ca
 
 Extend the saved Sandbox scene into an endless, no-AI, three-player testing environment. Let the user order every player's fleets and edit selected nodes through an on-screen panel. Provide temporary behavior tuning, player colors, pause, reset, replenishment and repeatable capture/battle examples.
 
-This is stage 5. It depends on [shared tuning](sandbox-stage-1-shared-visual-tuning-spec.md), the [Edit Mode scene](sandbox-stage-2-visual-sandbox-edit-mode-spec.md), [Dart visuals](sandbox-stage-3-dart-visuals-spec.md), and [game speed settings](sandbox-stage-4-game-speed-settings-spec.md). Direct scene entry is sufficient for this stage; [menu integration](sandbox-stage-6-sandbox-menu-integration-spec.md) follows.
+This is stage 5. It depends on [shared tuning](sandbox-stage-1-shared-visual-tuning-spec.md), the [Edit Mode scene](sandbox-stage-2-visual-sandbox-edit-mode-spec.md), [Dart visuals](https://github.com/MolnarOndrej/Squadra/blob/a9d8b66d022220220121f37568f85093d470ae06/specifications/sandbox-stage-3-dart-visuals-spec.md), and [game speed settings](sandbox-stage-4-game-speed-settings-spec.md). Direct scene entry is sufficient for this stage; [menu integration](sandbox-stage-6-sandbox-menu-integration-spec.md) follows.
 
 ## User Stories
 
