@@ -60,6 +60,24 @@ namespace Squadra
             return TryFind(VariantsOf(kind), variantId, out material);
         }
 
+        /// <summary>
+        /// The surface of one variant of a world type or, when the type has no such variant, its first
+        /// surface: for a sandbox sample whose type was just changed. False when the type has no surface.
+        /// </summary>
+        public bool TryGetSurfaceOrFirst(NodeKind kind, string variantId, out Material material)
+        {
+            if (TryGetSurface(kind, variantId, out material)) return true;
+
+            foreach (Variant variant in VariantsOf(kind))
+            {
+                if (variant == null || variant.material == null) continue;
+                material = variant.material;
+                return true;
+            }
+
+            return false;
+        }
+
         /// <summary>The material of one space backdrop. False when this game has no such backdrop.</summary>
         public bool TryGetBackdrop(string backdropId, out Material material)
         {

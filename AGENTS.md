@@ -46,7 +46,7 @@ All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project l
 - **Serialized fields:** renaming a `[SerializeField]` needs `[FormerlySerializedAs]`, and the builders set fields by name via `SceneWiring`: update them too.
 - **UI Toolkit:** rename element names and USS classes in `.uxml`, `.uss` and C# queries together.
 - **Path strings:** a move must update UXML `Style`/`Template` `src` (relative), builder path constants, `ProjectSettings/EditorBuildSettings.asset` and mission catalog scene paths.
-- **Generated scenes:** `SquadraSceneBuilder`, `SquadraMenuBuilder`, `SquadraMissionEditorBuilder` generate the scenes; lasting scene changes go into the builder too. Don't regenerate as a side effect.
+- **Generated scenes:** `SquadraSceneBuilder`, `SquadraMenuBuilder`, `SquadraMissionEditorBuilder` generate the scenes; lasting scene changes go into the builder too. Don't regenerate as a side effect. `SquadraSandboxBuilder` only creates the Sandbox scene and adds missing structure: its worlds, samples and overrides are authored in the scene and must survive a rebuild.
 - **Don't commit** changes to `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset` or unrelated scene reserialization from play mode/saves.
 
 ## Verification
@@ -56,7 +56,7 @@ No hosted CI. Run what covers the change; run everything for a larger one. All t
 - **Tests:** `unity command test run -- --mode editor` (editor open), or Test Runner > EditMode > Run All.
 - **Compile:** let Unity compile; check the Console for runtime and editor errors.
 - **Format:** `dotnet format whitespace --folder Assets/Squadra --verify-no-changes` (drop the flag to fix).
-- **Presentation/UI** (not covered by tests): play the affected scenes, `MainMenu/Scenes/MainMenu.unity`, `Match/Scenes/Mission.unity`, `MissionEditor/Scenes/MissionEditor.unity`, and check missing scripts and lost serialized values after moves.
+- **Presentation/UI** (not covered by tests): play the affected scenes, `MainMenu/Scenes/MainMenu.unity`, `Match/Scenes/Mission.unity`, `MissionEditor/Scenes/MissionEditor.unity` (open `Sandbox/Scenes/Sandbox.unity` for a change to how the battlefield is drawn), and check missing scripts and lost serialized values after moves.
 - **Builders:** run the changed builder's **Squadra** menu item; restore generated assets you didn't mean to change.
 
 **Handover:** report what ran and what it showed, which scenes were played, and what was not verified. Never present a failing or skipped check as passed. For refactors, also say what was hard to maintain and who owns what now.

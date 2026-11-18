@@ -81,7 +81,7 @@ namespace Squadra.EditorTools
 
             // The mission's worlds are copies of this template, made when the mission starts.
             var worldsRoot = new GameObject("Worlds").transform;
-            WorldView template = BuildWorld(worldsRoot, "World Template", 1f, materials.Thalassa, materials, styles);
+            WorldView template = BuildWorld(worldsRoot, "World Template", materials.Thalassa, materials, styles);
             template.gameObject.SetActive(false);
 
             FleetLayer fleets = BuildFleets(materials, styles);
@@ -238,7 +238,7 @@ namespace Squadra.EditorTools
         }
 
         // The mission's own backdrop replaces this material when the mission starts.
-        static Backdrop BuildBackdrop(SceneMaterials materials, CameraRig rig)
+        internal static Backdrop BuildBackdrop(SceneMaterials materials, CameraRig rig)
         {
             MeshRenderer quad = Shapes.CreateQuad("Space Backdrop", null, materials.Space, OrderBackdrop);
             quad.transform.localScale = new Vector3(21f, 13f, 1f);
@@ -248,7 +248,8 @@ namespace Squadra.EditorTools
             return backdrop;
         }
 
-        static WorldView BuildWorld(Transform parent, string name, float radius, Material surfaceMaterial,
+        // Its name, place, size and surface are given when a mission, or the sandbox, sets it up.
+        internal static WorldView BuildWorld(Transform parent, string name, Material surfaceMaterial,
             SceneMaterials materials, SceneStyles styles)
         {
             var go = new GameObject(name);
@@ -268,7 +269,6 @@ namespace Squadra.EditorTools
 
             var view = go.AddComponent<WorldView>();
             Wire(view, "style", styles.World);
-            WireFloat(view, "bodyRadius", radius);
             Wire(view, "surface", surface);
             Wire(view, "aura", aura);
             Wire(view, "ownerRing", ownerRing);
@@ -291,14 +291,21 @@ namespace Squadra.EditorTools
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
 
-            TextMeshPro label = Text("Fleet Label Template", go.transform, "30", 3.2f, Palette.Text,
-                TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(3f, 0.6f), OrderText, FontStyles.Bold);
-            label.gameObject.SetActive(false);
+            TextMeshPro label = BuildFleetLabelTemplate(go.transform);
 
             var fleets = go.AddComponent<FleetLayer>();
             Wire(fleets, "style", styles.Fleets);
             Wire(fleets, "fleetLabelTemplate", label);
             return fleets;
+        }
+
+        /// <summary>The inactive text copied for the Dart count that travels with each fleet.</summary>
+        internal static TextMeshPro BuildFleetLabelTemplate(Transform parent)
+        {
+            TextMeshPro label = Text("Fleet Label Template", parent, "30", 3.2f, Palette.Text,
+                TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(3f, 0.6f), OrderText, FontStyles.Bold);
+            label.gameObject.SetActive(false);
+            return label;
         }
 
         static EffectsLayer BuildEffects(SceneMaterials materials)
