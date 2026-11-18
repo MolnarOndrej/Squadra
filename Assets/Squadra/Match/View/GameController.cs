@@ -136,7 +136,7 @@ namespace Squadra
 
             fleets.Bind(match, worlds, lineMaterial, routeStyle, sounds);
             orders = new PlayerOrders(match, worlds, Player);
-            lanes = new RouteLanes(match, worlds, Player, transform, lineMaterial, routeStyle);
+            lanes = new RouteLanes(match.Routes, worlds, transform, lineMaterial, routeStyle);
         }
 
         // The mission launched from the map; a scene opened on its own plays its standalone mission,
@@ -208,7 +208,7 @@ namespace Squadra
             }
 
             fleets.Tick(deltaTime);
-            lanes.Refresh(match, selected, hovered);
+            lanes.Refresh(match, Player, selected, hovered);
             hud.SetStatus(match);
             if (match.Status == MatchStatus.InProgress) hud.SetHint(orders.Hint);
         }

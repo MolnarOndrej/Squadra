@@ -54,25 +54,6 @@ namespace Squadra
         long shownCountKey = long.MinValue;
         long shownCaptionKey = long.MinValue;
 
-        /// <summary>What there is to show of one map object at one moment.</summary>
-        struct State
-        {
-            public Faction Owner;
-            public Faction Occupant;
-            public Faction Captor;
-            public int Darts;
-            public float CaptureProgress;
-            public float CaptureRemaining;
-
-            /// <summary>Seconds per produced Dart; zero for a world that never produces.</summary>
-            public float Interval;
-
-            /// <summary>True while a battle is fought here. <see cref="Darts"/> is then the stationed side's count.</summary>
-            public bool Fighting;
-            public Faction Arriving;
-            public int ArrivingDarts;
-        }
-
         /// <summary>The Dart count as shown under the world. Both sides' counts during a battle.</summary>
         public string CountText => countLabel != null ? countLabel.GetParsedText() : string.Empty;
 
@@ -114,20 +95,7 @@ namespace Squadra
 
         public void Refresh(Node node, float deltaTime, bool selected, bool hovered)
         {
-            Battle battle = node.Battle;
-            Render(new State
-            {
-                Owner = node.Owner,
-                Occupant = node.Occupant,
-                Captor = node.Captor,
-                Darts = node.Darts,
-                CaptureProgress = node.CaptureProgress,
-                CaptureRemaining = (float)node.CaptureRemaining,
-                Interval = node.CanProduce ? (float)node.ProductionInterval : 0f,
-                Fighting = battle != null,
-                Arriving = battle != null ? battle.Arriving : Faction.Neutral,
-                ArrivingDarts = battle != null ? battle.ArrivingDarts : 0,
-            }, deltaTime, selected, hovered);
+            Render(WorldState.Of(node), deltaTime, selected, hovered);
         }
 
         // ------------------------------------------------------------------ lifecycle
@@ -150,7 +118,7 @@ namespace Squadra
             if (surface == null || ownerRing == null || style == null) return;
             EnsureHandles();
             Layout();
-            Render(new State { Interval = 1f }, 1000f, false, false);
+            Render(new WorldState { Interval = 1f }, 1000f, false, false);
         }
 
         void EnsureHandles()
@@ -187,7 +155,7 @@ namespace Squadra
 
         // ------------------------------------------------------------------ rendering
 
-        void Render(State state, float deltaTime, bool selected, bool hovered)
+        void Render(WorldState state, float deltaTime, bool selected, bool hovered)
         {
             if (owner == null || style == null) return;
 
@@ -261,7 +229,7 @@ namespace Squadra
             RenderLabels(state, time);
         }
 
-        void RenderLabels(State state, float time)
+        void RenderLabels(WorldState state, float time)
         {
             if (countLabel != null)
             {

@@ -64,5 +64,14 @@ namespace Squadra
 
         public float FrontGap => frontGap;
         public float StrayDistance => strayDistance;
+
+        /// <summary>The width of a dot, in world units.</summary>
+        public float DotSize => dotRadius * 2f;
+
+        /// <summary>The color of a stationed dot of an owner whose color is <paramref name="owner"/>.</summary>
+        public Vector4 StationedTint(Color owner) => Palette.Hdr(owner, dotBrightness, 1f);
+
+        /// <summary>The color of a dot in transit, or arriving to fight, of an owner whose color is <paramref name="owner"/>.</summary>
+        public Vector4 MovingTint(Color owner) => Palette.Hdr(owner, dotBrightness * movingBrightness, 1f);
     }
 }
