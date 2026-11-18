@@ -29,8 +29,6 @@ namespace Squadra
         [Header("Look")]
         [Tooltip("How the orbit, rings and aura look. Shared with every world of every mission.")]
         [SerializeField] WorldStyle style;
-        [Tooltip("Radius of the body in world units.")]
-        [SerializeField] float bodyRadius = 1.1f;
         [SerializeField] MeshRenderer surface;
         [SerializeField] MeshRenderer aura;
         [SerializeField] MeshRenderer ownerRing;
@@ -39,11 +37,18 @@ namespace Squadra
         [SerializeField] TextMeshPro countLabel;
         [SerializeField] TextMeshPro captionLabel;
 
+        // Given by Setup: the mission's or the sandbox's, never kept with the scene.
         string displayName = "World";
+        float bodyRadius = 1f; // world units
         RingStyle owner;
         RingStyle capture;
         RingStyle selection;
         MaterialPropertyBlock auraBlock;
+
+        // What the world shows outside a match: neutral, unless a sandbox sample says otherwise.
+        WorldState preview = new WorldState { Interval = 1f };
+        bool previewSelected;
+        bool previewHovered;
 
         Color shownColor = Palette.Neutral;
         float ownedAmount;
@@ -53,25 +58,6 @@ namespace Squadra
         float flash;
         long shownCountKey = long.MinValue;
         long shownCaptionKey = long.MinValue;
-
-        /// <summary>What there is to show of one map object at one moment.</summary>
-        struct State
-        {
-            public Faction Owner;
-            public Faction Occupant;
-            public Faction Captor;
-            public int Darts;
-            public float CaptureProgress;
-            public float CaptureRemaining;
-
-            /// <summary>Seconds per produced Dart; zero for a world that never produces.</summary>
-            public float Interval;
-
-            /// <summary>True while a battle is fought here. <see cref="Darts"/> is then the stationed side's count.</summary>
-            public bool Fighting;
-            public Faction Arriving;
-            public int ArrivingDarts;
-        }
 
         /// <summary>The Dart count as shown under the world. Both sides' counts during a battle.</summary>
         public string CountText => countLabel != null ? countLabel.GetParsedText() : string.Empty;
@@ -90,10 +76,13 @@ namespace Squadra
 
         /// <summary>
         /// Makes this copy of the template one world of the mission. Call before the copy is first enabled.
+        /// A sandbox world is set up again whenever its sample changes.
         /// </summary>
         public void Setup(string worldName, Vector2 position, float radius, Material surfaceMaterial)
         {
-            displayName = worldName ?? string.Empty;
+            string name = worldName ?? string.Empty;
+            if (name != displayName) shownCaptionKey = long.MinValue; // the caption names the world
+            displayName = name;
             transform.position = new Vector3(position.x, position.y, 0f);
             bodyRadius = radius;
             if (surface != null) surface.sharedMaterial = surfaceMaterial;
@@ -114,20 +103,20 @@ namespace Squadra
 
         public void Refresh(Node node, float deltaTime, bool selected, bool hovered)
         {
-            Battle battle = node.Battle;
-            Render(new State
-            {
-                Owner = node.Owner,
-                Occupant = node.Occupant,
-                Captor = node.Captor,
-                Darts = node.Darts,
-                CaptureProgress = node.CaptureProgress,
-                CaptureRemaining = (float)node.CaptureRemaining,
-                Interval = node.CanProduce ? (float)node.ProductionInterval : 0f,
-                Fighting = battle != null,
-                Arriving = battle != null ? battle.Arriving : Faction.Neutral,
-                ArrivingDarts = battle != null ? battle.ArrivingDarts : 0,
-            }, deltaTime, selected, hovered);
+            Render(WorldState.Of(node), deltaTime, selected, hovered);
+        }
+
+        /// <summary>
+        /// Shows a state no match has reached, for a sandbox sample: at once, with nothing blending in or
+        /// counting down, and kept as it is until the next call. Outside Play Mode the world keeps showing
+        /// it; in Play Mode the caller shows it every frame, as a match refreshes its worlds.
+        /// </summary>
+        public void ShowSample(WorldState state, bool selected, bool hovered)
+        {
+            preview = state;
+            previewSelected = selected;
+            previewHovered = hovered;
+            Preview();
         }
 
         // ------------------------------------------------------------------ lifecycle
@@ -141,7 +130,8 @@ namespace Squadra
 
         void Update()
         {
-            // In the editor, show the template as a neutral world so the scene reads without pressing Play.
+            // In the editor, show the template as a neutral world so the scene reads without pressing Play,
+            // and a sandbox sample as the state it was given.
             if (!Application.isPlaying) Preview();
         }
 
@@ -150,7 +140,7 @@ namespace Squadra
             if (surface == null || ownerRing == null || style == null) return;
             EnsureHandles();
             Layout();
-            Render(new State { Interval = 1f }, 1000f, false, false);
+            Render(preview, 1000f, previewSelected, previewHovered);
         }
 
         void EnsureHandles()
@@ -187,7 +177,7 @@ namespace Squadra
 
         // ------------------------------------------------------------------ rendering
 
-        void Render(State state, float deltaTime, bool selected, bool hovered)
+        void Render(WorldState state, float deltaTime, bool selected, bool hovered)
         {
             if (owner == null || style == null) return;
 
@@ -261,7 +251,7 @@ namespace Squadra
             RenderLabels(state, time);
         }
 
-        void RenderLabels(State state, float time)
+        void RenderLabels(WorldState state, float time)
         {
             if (countLabel != null)
             {

@@ -56,6 +56,13 @@ namespace Squadra.EditorTools
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        public static void WireBool(Object target, string field, bool value)
+        {
+            var serialized = new SerializedObject(target);
+            Property(serialized, field).boolValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static void WireFloat(Object target, string field, float value)
         {
             var serialized = new SerializedObject(target);
