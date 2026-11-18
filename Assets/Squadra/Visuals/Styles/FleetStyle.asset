@@ -12,9 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 955c7e37f06928741b7c37eb49482e5a, type: 3}
   m_Name: FleetStyle
   m_EditorClassIdentifier: Assembly-CSharp::Squadra.FleetStyle
+  dartMesh: {fileID: 0}
+  dartMeshRotation: {x: 0, y: 0, z: 0}
+  dartMaterial: {fileID: 0}
   dotRadius: 0.055
   dotBrightness: 1.5
   movingBrightness: 1.15
+  laneSpacing: 0.13
+  frontSpacing: 0.15
+  rowSpacing: 0.14
   swarmSpread: 0.14
   swarmSpreadPerDot: 0.045
   swarmLength: 1.5

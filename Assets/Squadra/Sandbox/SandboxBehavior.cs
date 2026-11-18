@@ -1,6 +1,7 @@
 using System;
 using Squadra.Simulation;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Squadra
 {
@@ -19,10 +20,16 @@ namespace Squadra
         [Tooltip("Radians per second of the innermost orbit lane. The preview stands still, so this shows "
             + "only once the sandbox is played.")]
         [SerializeField] SandboxOverride orbitSpeed = new SandboxOverride(DartDisplay.DefaultOrbitSpeed);
-        [Tooltip("Up to this many Darts, every Dart has a dot of its own.")]
+        [Tooltip("Up to this many Darts, every Dart is drawn. Not below 0.")]
         [SerializeField] SandboxOverride oneDotPerDartUpTo = new SandboxOverride(DartDisplay.DefaultOneDotPerDartUpTo);
-        [Tooltip("The most dots one fleet is ever drawn with.")]
-        [SerializeField] SandboxOverride mostDots = new SandboxOverride(DartDisplay.DefaultMostDots);
+        [Tooltip("The most Darts drawn for the fleet at a world, and for either side of a battle there. "
+            + "From 1 to 1000.")]
+        [FormerlySerializedAs("mostDots")]
+        [SerializeField]
+        SandboxOverride mostStationedDots = new SandboxOverride(DartDisplay.DefaultMostStationedDots);
+        [Tooltip("The most Darts drawn for one fleet in transit. From 1 to 1000.")]
+        [SerializeField]
+        SandboxOverride mostTravellingDots = new SandboxOverride(DartDisplay.DefaultMostTravellingDots);
 
         [Header("Rules")]
         [Tooltip("Fleet speed in map units per second. The preview shows it only in how far a fleet near "
@@ -35,10 +42,28 @@ namespace Squadra
         [SerializeField]
         SandboxOverride moonProductionInterval = new SandboxOverride((float)NodeConfig.MoonProductionInterval);
 
-        /// <summary>How the sandbox draws Darts: the game's way, but for what is overridden.</summary>
+        /// <summary>
+        /// How the sandbox draws Darts: the game's way, but for what is overridden. An override out of its
+        /// range is held to the nearest value in it (<see cref="DartsProblem"/> says which).
+        /// </summary>
         public DartDisplay Darts()
         {
-            return new DartDisplay(orbitSpeed.Value, oneDotPerDartUpTo.WholeValue, mostDots.WholeValue);
+            return new DartDisplay(orbitSpeed.Value, AtLeast(oneDotPerDartUpTo.WholeValue, 0),
+                Limit(mostStationedDots.WholeValue), Limit(mostTravellingDots.WholeValue));
+        }
+
+        /// <summary>What is wrong with the Dart overrides, or null when nothing is.</summary>
+        public string DartsProblem()
+        {
+            if (oneDotPerDartUpTo.WholeValue < 0)
+                return "count up to which every Dart is drawn cannot be below 0; 0 is used.";
+            if (Limit(mostStationedDots.WholeValue) != mostStationedDots.WholeValue)
+                return "most stationed Darts drawn must be from 1 to " + DartDisplay.MostDotsAllowed + "; "
+                    + Limit(mostStationedDots.WholeValue) + " is used.";
+            if (Limit(mostTravellingDots.WholeValue) != mostTravellingDots.WholeValue)
+                return "most travelling Darts drawn must be from 1 to " + DartDisplay.MostDotsAllowed + "; "
+                    + Limit(mostTravellingDots.WholeValue) + " is used.";
+            return null;
         }
 
         /// <summary>The rules the sandbox replaces; null in each for the game's default.</summary>
@@ -51,6 +76,16 @@ namespace Squadra
                 PlanetProductionInterval = planetProductionInterval.Value,
                 MoonProductionInterval = moonProductionInterval.Value,
             };
+        }
+
+        static int? AtLeast(int? value, int least)
+        {
+            return value.HasValue ? Mathf.Max(least, value.Value) : (int?)null;
+        }
+
+        static int? Limit(int? value)
+        {
+            return value.HasValue ? Mathf.Clamp(value.Value, 1, DartDisplay.MostDotsAllowed) : (int?)null;
         }
     }
 }
