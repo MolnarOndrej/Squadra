@@ -10,6 +10,12 @@ namespace Squadra
     /// for a fleet and how fast they orbit are behavior (<see cref="DartDisplay"/>), and timing stays in
     /// code. <c>Squadra &gt; Rebuild Mission Scene</c> creates the asset with these defaults when it is
     /// missing and otherwise leaves it as edited.
+    ///
+    /// The Dart mesh and material are assets, never a look written in code: the material lives in
+    /// <c>Visuals/Materials/Darts</c> and the mesh in <c>Visuals/Meshes</c>. The rebuild creates the round
+    /// dot there when they are missing and assigns them only where the style has none. A style without a
+    /// usable mesh or material is an error (<see cref="DartProblem"/>), as a world without its surface is:
+    /// a mission does not start, and the sandbox draws no Darts until it is fixed.
     /// </summary>
     [CreateAssetMenu(menuName = "Squadra/Fleet Style", fileName = "FleetStyle")]
     public sealed class FleetStyle : ScriptableObject
@@ -22,15 +28,15 @@ namespace Squadra
 
         [Header("Darts")]
         [Tooltip("The shape of one Dart, nose along +X and top toward the camera (or turned so by the "
-            + "rotation below); a mesh one unit long is drawn twice the dot radius long. Empty for a round "
-            + "dot. Needs Read/Write enabled in its import settings and at most 256 vertices; otherwise the "
-            + "dot is drawn and a warning says why. Trails, shots, explosions and sparks stay dots.")]
+            + "rotation below); a mesh one unit long is drawn twice the dot radius long. Required: "
+            + "Visuals/Meshes/Dart is the round dot. Needs Read/Write enabled in its import settings and at most "
+            + "256 vertices. Trails, shots, explosions and sparks stay dots.")]
         [SerializeField] Mesh dartMesh;
         [Tooltip("Turns the Dart mesh, in degrees, so that its nose points along +X and its top faces the camera.")]
         [SerializeField] Vector3 dartMeshRotation;
-        [Tooltip("What a Dart is drawn with. Empty for the dot material the fleets are drawn with. The owner's "
-            + "color reaches it as vertex color and, where the shader has one, as _BaseColor, _Color or _Tint; "
-            + "the material itself is never changed.")]
+        [Tooltip("What a Dart is drawn with. Required: one of Visuals/Materials/Darts, such as Dart, the round "
+            + "dot. The owner's color reaches it as vertex color and, where the shader has one, as _BaseColor, "
+            + "_Color or _Tint; the material itself is never changed.")]
         [SerializeField] Material dartMaterial;
         [Tooltip("Radius of one dot in world units, and so the size of a Dart. Shots, explosions and sparks are "
             + "sized from it too.")]
@@ -74,13 +80,13 @@ namespace Squadra
         [Tooltip("How far a fighting dot strays from its place in the formation, in world units.")]
         [SerializeField, Min(0f)] float strayDistance = 0.1f;
 
-        /// <summary>The mesh a Dart is drawn with, or null for the round dot: none is set, or it cannot be drawn.</summary>
-        public Mesh DartMesh => dartMesh != null && MeshProblem(dartMesh) == null ? dartMesh : null;
+        /// <summary>The mesh a Dart is drawn with; usable only when <see cref="DartProblem"/> finds nothing wrong.</summary>
+        public Mesh DartMesh => dartMesh;
 
         public Quaternion DartMeshRotation => Quaternion.Euler(dartMeshRotation);
 
-        /// <summary>The material a Dart is drawn with, or null for the dot material: none is set, or its shader cannot run here.</summary>
-        public Material DartMaterial => dartMaterial != null && MaterialProblem(dartMaterial) == null ? dartMaterial : null;
+        /// <summary>The material a Dart is drawn with; usable only when <see cref="DartProblem"/> finds nothing wrong.</summary>
+        public Material DartMaterial => dartMaterial;
 
         public float DotRadius => dotRadius;
         public float DotBrightness => dotBrightness;
@@ -113,10 +119,27 @@ namespace Squadra
         /// <summary>The color of a dot in transit, or arriving to fight, of an owner whose color is <paramref name="owner"/>.</summary>
         public Vector4 MovingTint(Color owner) => Palette.Hdr(owner, dotBrightness * movingBrightness, 1f);
 
-        /// <summary>Why <paramref name="mesh"/> cannot be a Dart, or null when it can.</summary>
-        public static string MeshProblem(Mesh mesh)
+        /// <summary>Why the Darts cannot be drawn with this style, or null when they can.</summary>
+        public string DartProblem()
         {
-            if (!mesh.isReadable) return "it is not readable: turn on Read/Write in its import settings";
+            if (dartMesh == null)
+                return name + " has no Dart mesh. Assign one; Visuals/Meshes/Dart is the round dot, and "
+                    + "Squadra > Rebuild Mission Scene assigns it to a style that has none.";
+            if (dartMaterial == null)
+                return name + " has no Dart material. Assign one from Visuals/Materials/Darts; Squadra > "
+                    + "Rebuild Mission Scene assigns that folder's first to a style that has none.";
+
+            string problem = MeshProblem(dartMesh);
+            if (problem != null) return name + " cannot draw Darts with the mesh " + dartMesh.name + ": " + problem + ".";
+            problem = MaterialProblem(dartMaterial);
+            if (problem != null) return name + " cannot draw Darts with the material " + dartMaterial.name + ": " + problem + ".";
+            return null;
+        }
+
+        /// <summary>Why <paramref name="mesh"/> cannot be a Dart, or null when it can.</summary>
+        static string MeshProblem(Mesh mesh)
+        {
+            if (!mesh.isReadable) return "it is not readable; turn on Read/Write in its import settings";
             if (mesh.vertexCount == 0) return "it has no vertices";
             if (mesh.vertexCount > MostMeshVertices)
                 return "it has " + mesh.vertexCount + " vertices, more than the " + MostMeshVertices + " a Dart may have";
@@ -129,30 +152,11 @@ namespace Squadra
         }
 
         /// <summary>Why <paramref name="material"/> cannot draw a Dart, or null when it can.</summary>
-        public static string MaterialProblem(Material material)
+        static string MaterialProblem(Material material)
         {
             Shader shader = material.shader;
             if (shader == null || !shader.isSupported) return "its shader cannot run with this render pipeline";
             return null;
-        }
-
-        void OnValidate()
-        {
-            if (dartMesh != null)
-            {
-                string problem = MeshProblem(dartMesh);
-                if (problem != null)
-                    Debug.LogWarning("Squadra: " + name + " draws Darts as dots, not with the mesh " + dartMesh.name
-                        + ", because " + problem + ".", this);
-            }
-
-            if (dartMaterial != null)
-            {
-                string problem = MaterialProblem(dartMaterial);
-                if (problem != null)
-                    Debug.LogWarning("Squadra: " + name + " draws Darts with the dot material, not " + dartMaterial.name
-                        + ", because " + problem + ".", this);
-            }
         }
     }
 }

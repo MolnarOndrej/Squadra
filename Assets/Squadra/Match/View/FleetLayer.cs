@@ -129,6 +129,10 @@ namespace Squadra
             lineMaterial = routeMaterial;
             routeStyle = routes;
             display = dartDisplay ?? DartDisplay.Default;
+
+            // Like a world without its surface, Darts without their look cannot be played.
+            string problem = style != null ? style.DartProblem() : "The fleet layer has no fleet style.";
+            if (problem != null) throw new System.InvalidOperationException(problem);
             sounds = battleSounds;
 
             garrisons = new Garrison[worlds.Count];
@@ -174,7 +178,7 @@ namespace Squadra
             renderer.sortingOrder = own.sortingOrder - 1; // trails, shots and sparks are drawn over the bodies
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-            return new DartBatch(bodiesObject.AddComponent<MeshFilter>(), renderer, own.sharedMaterial);
+            return new DartBatch(bodiesObject.AddComponent<MeshFilter>(), renderer);
         }
 
         // ------------------------------------------------------------------ transit

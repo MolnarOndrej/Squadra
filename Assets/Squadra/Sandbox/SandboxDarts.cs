@@ -48,7 +48,7 @@ namespace Squadra
             bodiesRenderer.sortingOrder = BodiesSortingOrder;
             bodiesRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             bodiesRenderer.receiveShadows = false;
-            bodies = new DartBatch(bodiesObject.AddComponent<MeshFilter>(), bodiesRenderer, dotMaterial);
+            bodies = new DartBatch(bodiesObject.AddComponent<MeshFilter>(), bodiesRenderer);
 
             courses = new FleetCourse[fleets];
             labels = new TextMeshPro[fleets];

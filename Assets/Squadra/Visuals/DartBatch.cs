@@ -5,11 +5,11 @@ namespace Squadra
 {
     /// <summary>
     /// The bodies of the Darts drawn in one frame, rebuilt every frame into one mesh: a copy of the
-    /// shared Dart mesh, or of a round dot, for each Dart drawn, turned to its heading and colored for its
-    /// owner. Darts of one color share a submesh, and the renderer draws each submesh with the Dart
+    /// shared Dart mesh for each Dart drawn, turned to its heading and colored for its owner. Darts of one color share a submesh, and the renderer draws each submesh with the Dart
     /// material and that color in a property block of its own, so the shared material is never changed;
     /// the color is in the vertices too, for a shader that reads it there. Trails, shots and sparks are
-    /// not bodies: they stay round dots in a <see cref="DotBatch"/>.
+    /// not bodies: they stay round dots in a <see cref="DotBatch"/>. With no usable Dart mesh or material
+    /// in the style it draws no bodies and says why as an error, once until the style changes.
     /// </summary>
     public sealed class DartBatch
     {
@@ -35,8 +35,6 @@ namespace Squadra
 
         readonly Mesh mesh;
         readonly MeshRenderer renderer;
-        readonly Material dotMaterial;
-        readonly Mesh dot;
         readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
         readonly List<Group> groups = new List<Group>();
         readonly Stack<Group> spareGroups = new Stack<Group>();
@@ -61,13 +59,12 @@ namespace Squadra
 
         Material[] materials = new Material[0];
         Material material;
+        bool usable;
+        string reported;
         bool warnedFull;
 
-        /// <summary>
-        /// Draws into <paramref name="filter"/>'s mesh with <paramref name="target"/>; Darts take
-        /// <paramref name="dotMaterial"/> when the style gives no material of its own.
-        /// </summary>
-        public DartBatch(MeshFilter filter, MeshRenderer target, Material dotMaterial)
+        /// <summary>Draws into <paramref name="filter"/>'s mesh with <paramref name="target"/>.</summary>
+        public DartBatch(MeshFilter filter, MeshRenderer target)
         {
             mesh = new Mesh
             {
@@ -78,8 +75,6 @@ namespace Squadra
             mesh.MarkDynamic();
             filter.sharedMesh = mesh;
             renderer = target;
-            this.dotMaterial = dotMaterial;
-            dot = DotShape();
         }
 
         /// <summary>Starts a frame drawn with the mesh, rotation and material <paramref name="style"/> has now.</summary>
@@ -92,10 +87,15 @@ namespace Squadra
             }
 
             groups.Clear();
-            Mesh shape = style.DartMesh;
-            if (shape != null) UseShape(shape, style.DartMeshRotation);
-            else UseShape(dot, Quaternion.identity);
-            material = style.DartMaterial != null ? style.DartMaterial : dotMaterial;
+
+            string problem = style.DartProblem();
+            usable = problem == null;
+            if (problem != null && problem != reported) Debug.LogError("Squadra: " + problem, style);
+            reported = problem;
+            if (!usable) return;
+
+            UseShape(style.DartMesh, style.DartMeshRotation);
+            material = style.DartMaterial;
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace Squadra
         /// <param name="tint">Linear-space color; values above 1 bloom.</param>
         public void Add(Vector2 center, float heading, float size, Vector4 tint)
         {
-            if (size <= 0f || tint.w <= 0f) return;
+            if (!usable || size <= 0f || tint.w <= 0f) return;
 
             Group group = GroupOf(tint);
             group.Bodies.Add(new Body { Center = center, Heading = heading, Size = size });
@@ -113,6 +113,12 @@ namespace Squadra
 
         public void End()
         {
+            if (!usable)
+            {
+                mesh.Clear();
+                return;
+            }
+
             int perBody = shapeVertices.Length;
             int bodies = 0;
             foreach (Group group in groups)
@@ -188,7 +194,6 @@ namespace Squadra
         public void Dispose()
         {
             Destroy(mesh);
-            Destroy(dot);
         }
 
         // ------------------------------------------------------------------ helpers
@@ -222,7 +227,7 @@ namespace Squadra
             bool baseColor = material.HasProperty(BaseColorId);
             bool color = material.HasProperty(ColorId);
             bool tint = material.HasProperty(TintId);
-            if (!baseColor && !color && !tint) return; // the vertex colors carry it, as the dot material reads them
+            if (!baseColor && !color && !tint) return; // the vertex colors carry it, as the Squadra/Dot shader reads them
 
             for (int g = 0; g < groups.Count; g++)
             {
@@ -289,20 +294,6 @@ namespace Squadra
             warnedFull = true;
             Debug.LogWarning("Squadra: too many Darts to draw with a mesh of " + shapeVertices.Length
                 + " vertices; some are left out this frame. Use a simpler Dart mesh or lower the visible limits.");
-        }
-
-        // The round dot: a quad twice as wide as the dot's core, which the dot material draws as a soft
-        // disc. At a size of the style's dot width it is the dot the fleets were always drawn with.
-        static Mesh DotShape()
-        {
-            var shape = new Mesh { name = "Dart Dot", hideFlags = HideFlags.DontSave };
-            shape.SetVertices(new[]
-            {
-                new Vector3(-1f, -1f, 0f), new Vector3(-1f, 1f, 0f), new Vector3(1f, 1f, 0f), new Vector3(1f, -1f, 0f),
-            });
-            shape.SetUVs(0, new[] { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) });
-            shape.SetTriangles(new[] { 0, 1, 2, 0, 2, 3 }, 0);
-            return shape;
         }
 
         static void Destroy(Object target)
