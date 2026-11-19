@@ -17,6 +17,9 @@ namespace Squadra
     /// action picked there. All game rules live in the match; nothing here decides an outcome. It also
     /// owns the pause: while paused the match gets no time and no orders, the scene's animation and
     /// effects stand still, and the match, the selection and any result are kept exactly as they were.
+    /// The match and everything that moves with it run at the game speed the player chose, through the
+    /// shared <see cref="GameClock"/>; the controller starts the clock's run and leaves it, and never
+    /// sets the time scale itself.
     ///
     /// The controller sets the match up, runs the frame, owns the pause and leaves the scene. The worlds
     /// are built by <see cref="Battlefield"/>, the player's selection and clicks are
@@ -72,6 +75,7 @@ namespace Squadra
         PlayerOrders orders;
         RouteLanes lanes;
         bool paused;
+        bool running;
         bool leaving;
         int inputHeldFrame = -1;
 
@@ -137,6 +141,10 @@ namespace Squadra
             fleets.Bind(match, worlds, lineMaterial, routeStyle, sounds);
             orders = new PlayerOrders(match, worlds, Player);
             lanes = new RouteLanes(match.Routes, worlds, transform, lineMaterial, routeStyle);
+
+            // From here the match gets time, at the saved game speed.
+            GameSettings.Clock.BeginRun();
+            running = true;
         }
 
         // The mission launched from the map; a scene opened on its own plays its standalone mission,
@@ -180,6 +188,7 @@ namespace Squadra
         void Update()
         {
             // Paused, game time stands still: the views below redraw the same moment every frame.
+            // Otherwise Unity's delta time already carries the game speed, once, for the match and the views.
             float deltaTime = paused ? 0f : Time.deltaTime;
 
             if (paused)
@@ -190,6 +199,7 @@ namespace Squadra
             {
                 // The frame the pause menu closes still belongs to the menu: its input is not an order.
                 if (Time.frameCount != inputHeldFrame) orders.ReadPointer(rig.Camera);
+                orders.CountDownNotice(Time.unscaledDeltaTime);
                 match.Advance(deltaTime);
                 orders.DropUnusableSelection();
             }
@@ -216,7 +226,9 @@ namespace Squadra
         void OnDestroy()
         {
             // However the scene goes, the next one gets normal time and the music at its own level.
-            if (paused) ReleasePause();
+            // A run already left (restart, next mission, menu) is not left again: the next mission's
+            // run may have begun by now.
+            if (running) EndRun();
         }
 
         // ------------------------------------------------------------------ pause
@@ -225,8 +237,9 @@ namespace Squadra
         /// Freezes the mission for the pause menu, or lets it carry on. Paused, the match is not
         /// advanced and takes no orders, the scene's animation and gameplay effects stand still, the
         /// battlefield is dimmed and the mission music drops to its paused level; a results panel is put
-        /// away until the pause ends. The time spent paused is never made up afterwards. Returns false
-        /// when nothing changed: already in that state, or the mission is on its way out.
+        /// away until the pause ends. The time spent paused is never made up afterwards, and the mission
+        /// carries on at the game speed selected by then. Returns false when nothing changed: already in
+        /// that state, or the mission is on its way out.
         /// </summary>
         public bool SetPaused(bool value)
         {
@@ -234,7 +247,7 @@ namespace Squadra
             if (value && !CanPause) return false;
 
             paused = value;
-            Time.timeScale = value ? 0f : 1f;
+            GameSettings.Clock.SetPaused(value);
             MusicPlayer.SetPaused(value);
             sounds.SetPaused(value);
             hud.SetDimmed(value);
@@ -243,11 +256,13 @@ namespace Squadra
             return true;
         }
 
-        // Leaving the scene ends the pause for whatever comes next, without showing the mission again.
-        void ReleasePause()
+        // Leaving the scene ends the run and its pause for whatever comes next, without showing the
+        // mission again. The game speed preference stays as it is.
+        void EndRun()
         {
             paused = false;
-            Time.timeScale = 1f;
+            running = false;
+            GameSettings.Clock.EndRun();
             MusicPlayer.SetPaused(false);
         }
 
@@ -268,14 +283,14 @@ namespace Squadra
         /// <summary>Starts a fresh attempt at this mission. It stays the campaign's active mission.</summary>
         public void Restart()
         {
-            ReleasePause();
+            EndRun();
             SceneManager.LoadScene(gameObject.scene.name);
         }
 
         /// <summary>Launches the mission that follows this one in the campaign, if it can be played.</summary>
         public void StartNextMission(int missionIndex)
         {
-            ReleasePause();
+            EndRun();
             if (CampaignSession.TryBeginMission(catalog, missionIndex, out string scenePath))
                 SceneManager.LoadScene(scenePath);
             else
@@ -289,7 +304,7 @@ namespace Squadra
         public void BackToMenu()
         {
             leaving = true;
-            ReleasePause();
+            EndRun();
             MainMenu.OpenCampaignMap();
         }
 

@@ -206,7 +206,9 @@ namespace Squadra
 
         void Awake()
         {
-            Time.timeScale = 1f;
+            // The menu runs at normal speed whatever the game speed; a mission left behind takes its
+            // pause with it.
+            GameSettings.Clock.EndRun();
             CampaignSession.EndMission();
 
             // Every assigned mission is prepared before the menu takes input, so the map knows which can
