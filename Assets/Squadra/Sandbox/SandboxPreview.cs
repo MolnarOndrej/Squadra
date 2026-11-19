@@ -81,6 +81,12 @@ namespace Squadra
             Clear();
         }
 
+        void OnValidate()
+        {
+            string problem = behavior.DartsProblem();
+            if (problem != null) Debug.LogWarning("Squadra: the sandbox's " + problem, this);
+        }
+
         void Update()
         {
             Redraw();
@@ -147,7 +153,7 @@ namespace Squadra
         void DrawDarts(Match match)
         {
             DartDisplay display = behavior.Darts();
-            darts.Begin();
+            darts.Begin(fleetStyle);
             for (int i = 0; i < worlds.Count; i++)
                 darts.Garrison(views[i], states[i], worlds[i].FrontAngle, display, fleetStyle);
 

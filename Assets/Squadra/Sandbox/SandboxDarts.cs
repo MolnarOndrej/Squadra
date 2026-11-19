@@ -7,20 +7,23 @@ namespace Squadra
     /// <summary>
     /// Draws the Darts of the sandbox's samples, standing still: the fleet stationed at each world on its
     /// orbit, the two fronts of a battle, and fleets held on their way with their course, wake and count.
-    /// Places, swarms, lines and colors come from what the mission's fleet layer draws with
+    /// Places, headings, swarms, lines and colors come from what the mission's fleet layer draws with
     /// (<see cref="DartFormations"/>, <see cref="DartSwarm"/>, <see cref="FleetCourse"/> and the shared
-    /// <see cref="FleetStyle"/>); only the movement is left out: dots do not orbit, settle, lunge or fire.
-    /// Each frame is drawn between <see cref="Begin"/> and <see cref="End"/>.
+    /// <see cref="FleetStyle"/>), and the Darts' bodies are drawn the same way, by a <see cref="DartBatch"/>
+    /// with the style's mesh and material, beneath the trails. Only the movement is left out: Darts do not
+    /// orbit, settle, lunge or fire. Each frame is drawn between <see cref="Begin"/> and <see cref="End"/>.
     /// </summary>
     sealed class SandboxDarts
     {
         // The moment every sample is drawn at. Nothing moves, so it is always the same picture.
         const float Moment = 0f;
 
-        // Drawn where the mission scene draws its fleets.
+        // Drawn where the mission scene draws its fleets: the bodies just beneath the trails.
         const int DotsSortingOrder = 10;
+        const int BodiesSortingOrder = DotsSortingOrder - 1;
 
         readonly DotBatch batch;
+        readonly DartBatch bodies;
         readonly FleetCourse[] courses;
         readonly TextMeshPro[] labels;
         readonly bool[] shown;
@@ -39,6 +42,14 @@ namespace Squadra
             renderer.receiveShadows = false;
             batch = new DotBatch(filter);
 
+            var bodiesObject = new GameObject("Dart Bodies");
+            bodiesObject.transform.SetParent(parent, false);
+            var bodiesRenderer = bodiesObject.AddComponent<MeshRenderer>();
+            bodiesRenderer.sortingOrder = BodiesSortingOrder;
+            bodiesRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            bodiesRenderer.receiveShadows = false;
+            bodies = new DartBatch(bodiesObject.AddComponent<MeshFilter>(), bodiesRenderer);
+
             courses = new FleetCourse[fleets];
             labels = new TextMeshPro[fleets];
             shown = new bool[fleets];
@@ -49,9 +60,11 @@ namespace Squadra
             }
         }
 
-        public void Begin()
+        /// <summary>Starts a frame drawn with the Dart mesh and material <paramref name="style"/> has now.</summary>
+        public void Begin(FleetStyle style)
         {
             batch.Begin();
+            bodies.Begin(style);
             System.Array.Clear(shown, 0, shown.Length);
         }
 
@@ -62,26 +75,29 @@ namespace Squadra
         public void Garrison(WorldView world, WorldState state, float frontAngle, DartDisplay display, FleetStyle style)
         {
             Vector4 stationed = style.StationedTint(Palette.Of(state.Occupant));
-            int count = DartFormations.DotCount(state.Darts, display);
+            float formed = state.Fighting ? 1f : 0f;
+            int count = DartFormations.StationedDots(state.Darts, display);
             for (int i = 0; i < count; i++)
             {
                 float angle, radius;
                 if (state.Fighting)
-                    DartFormations.FormationPlace(world, i, count, frontAngle, true, style.FrontGap, out angle, out radius);
+                    DartFormations.FormationPlace(world, i, count, frontAngle, true, style, out angle, out radius);
                 else
-                    DartFormations.OrbitPlace(world, i, Moment, display.OrbitSpeed, out angle, out radius);
-                batch.Add(world.Position + DartFormations.Polar(angle, radius), style.DotSize, stationed);
+                    DartFormations.OrbitPlace(world, i, Moment, display.OrbitSpeed, style, out angle, out radius);
+                bodies.Add(world.Position + DartFormations.Polar(angle, radius),
+                    DartFormations.Heading(angle, i, true, formed, display.OrbitSpeed), style.DotSize, stationed);
             }
 
             if (!state.Fighting) return;
 
             Vector4 arriving = style.MovingTint(Palette.Of(state.Arriving));
-            int attackers = DartFormations.DotCount(state.ArrivingDarts, display);
+            int attackers = DartFormations.StationedDots(state.ArrivingDarts, display);
             for (int i = 0; i < attackers; i++)
             {
-                DartFormations.FormationPlace(world, i, attackers, frontAngle, false, style.FrontGap,
+                DartFormations.FormationPlace(world, i, attackers, frontAngle, false, style,
                     out float angle, out float radius);
-                batch.Add(world.Position + DartFormations.Polar(angle, radius), style.DotSize, arriving);
+                bodies.Add(world.Position + DartFormations.Polar(angle, radius),
+                    DartFormations.Heading(angle, i, false, 1f, display.OrbitSpeed), style.DotSize, arriving);
             }
         }
 
@@ -94,7 +110,7 @@ namespace Squadra
         public void Transit(int slot, WorldView source, WorldView target, WorldState targetState, Faction faction,
             int darts, float progress, double duration, DartDisplay display, FleetStyle style, RouteStyle routeStyle)
         {
-            int dots = DartFormations.DotCount(darts, display);
+            int dots = DartFormations.TravellingDots(darts, display);
 
             // Seeded like the match's fleets, whose ids count from one.
             var swarm = new DartSwarm(slot + 1, dots, source, target, style)
@@ -107,7 +123,7 @@ namespace Squadra
             double elapsed = progress * duration;
             swarm.Place(progress, elapsed, duration - elapsed, Moment, style, course, out Vector2 center,
                 out float formation);
-            swarm.Draw(batch, faction, style);
+            swarm.Draw(bodies, batch, faction, style);
 
             TextMeshPro label = labels[slot];
             if (label != null)
@@ -123,6 +139,7 @@ namespace Squadra
         /// <summary>Finishes the frame: the lines and labels of fleets not drawn in it are hidden.</summary>
         public void End()
         {
+            bodies.End();
             batch.End();
             for (int i = 0; i < shown.Length; i++)
             {
@@ -134,6 +151,7 @@ namespace Squadra
 
         public void Dispose()
         {
+            bodies.Dispose();
             batch.Dispose();
         }
     }

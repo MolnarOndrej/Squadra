@@ -1,0 +1,60 @@
+# Stage 3 of 6: Replaceable shared Dart visuals
+
+## Problem Statement
+
+Fleets currently use shader-drawn batched quads. Stages 1 and 2 provide a shared FleetStyle for dot size, brightness, transit spread/trails and battle-front appearance, plus static sandbox samples, but no replaceable Dart mesh. The author needs to change the individual fighter appearance while seeing stationed, travelling and fighting fleets.
+
+## Solution
+
+Support a shared Dart mesh and material, stored as assets like the world surfaces, with editable visual size and formation spacing. Use that appearance in the sandbox and generated missions while keeping actual Dart counts independent from configurable visible counts.
+
+This is stage 3, following [shared tuning](sandbox-stage-1-shared-visual-tuning-spec.md) and the [Edit Mode sandbox](sandbox-stage-2-visual-sandbox-edit-mode-spec.md). Stages 1 and 2 are implemented and merged; this stage extends their existing assets and preview scene. Motion in the sandbox and live override controls arrive in the [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/5d459bb5fc1b20c024d7a46cbf4ff6a6be2e4c03/specifications/sandbox-stage-5-playable-sandbox-spec.md).
+
+## User Stories
+
+1. As a visual author, I want to assign a Dart mesh and material, so that I can replace the dot appearance.
+2. As a visual author, I want the Dart material kept in its own material folder and shown in the Inspector like planet and moon surfaces, so that every Dart look is an asset I can find and edit, not a default hidden in code.
+3. As a visual author, I want shared Dart size and formation spacing, so that formations remain readable around worlds and along routes.
+4. As a visual author, I want changes to appear in both the sandbox and generated missions, so that the preview matches the game.
+5. As a developer, I want separate stationed and travelling visible limits, so that I can tune density and rendering cost independently.
+6. As a developer, I want orbit speed and visible limits to remain source-defined defaults, so that sandbox experiments do not alter the game.
+7. As a player, I want exact fleet counts regardless of visible limits, so that rendering never changes strength or results.
+8. As a visual author, I want owner coloring, formation direction and combat feedback to work with the replacement mesh, so that appearance remains coherent during play.
+
+## Implementation Decisions
+
+- Extend Visuals' existing FleetStyle authoring boundary for the shared Dart mesh/material and visual size/spacing, rather than introducing a competing fleet style. FleetLayer and SandboxDarts consume the same appearance through their shared formation/swarm presentation. Keep formation movement and game rules with their existing owners.
+- Reuse the existing FleetStyle.asset and preserve authored size, brightness, spread, trails and battle-front values and references during migration. Move remaining formation spacing out of DartFormations' hard-coded geometry into shared visual tuning, updating DartSwarm and both mission and sandbox callers together. Preserve serialized compatibility and update scene-builder wiring where references change.
+- No Dart visual default lives in code. The Dart material is an asset in `Visuals/Materials/Darts`, beside the `Planets`, `Moons`, `Asteroids` and `Backdrops` surface folders, and the Dart mesh an asset in `Visuals/Meshes`; FleetStyle references both and shows them in the Inspector. As for surfaces, the asset builder creates the missing ones with the first look: `Darts/Dart.mat` as a copy of the dot material the Darts were drawn with (edits included) and `Meshes/Dart.asset` as the round-dot quad, so the default appearance is unchanged and this stage does not require importing a custom model to run. The builder assigns them, the folder's first material by name, only to a style that has none, and keeps any assigned mesh or material. Assigning a mesh changes presentation, not the number of simulated Darts or the mission format.
+- A style without a usable Dart mesh or material is an error, following the rule for a world whose surface is missing: a mission does not start (binding the fleet layer throws, naming the problem), and the sandbox logs the error once until the style changes and draws no Dart bodies. There is no silent fallback to a code-built dot.
+- Extend the existing DartDisplay and SandboxBehavior boundaries for separate stationed/travelling visible limits. Currently DartDisplay supplies an orbit speed, a one-dot-per-Dart threshold and a single representative cap used by stationed, travelling and both combat fronts. Preserve the existing count-reduction behavior and source defaults when splitting the cap; an untouched mission must retain its current visible density. Reuse SandboxOverride's explicit default/override distinction, preserve saved sandbox experiments and leave unticked overrides following current source defaults. Do not store behavior defaults in FleetStyle. Static Inspector overrides work in this stage; live controls remain deferred.
+- Visible limits cap the number of rendered representatives, not production, launch size, battle strength, capture, results or labels. A representative may stand for multiple Darts; exact numeric counts remain available.
+- Preserve faction tinting without mutating the shared material per fleet. A sandbox palette override must reach stationed, travelling and fighting representations for that player.
+- Preserve existing arrival formations, combat approach, front alignment, movement, shots, explosions and audio timing except where a chosen mesh's geometry changes appearance. Retain batching or equivalent bounded rendering; do not require one GameObject per simulated Dart.
+- Keep normal mission defaults and existing look as close as practical during the renderer change. Any unavoidable default appearance difference must be identified and visually reviewed.
+- Extend the existing SandboxPreview/SandboxDarts samples with the same Dart drawing path used by missions; sharing only geometry while retaining a separate dot-only preview is insufficient. Refresh mesh/material/size/spacing edits in Edit Mode without starting simulation, orbit motion, shots or audio. Preserve transient preview-object cleanup on scene/script reload and keep authored worlds, fleets, routes and behavior overrides through sandbox rebuilds.
+- DotBatch currently also draws trails and DartEffects' shots, explosions and sparks. Replacing a Dart's body must preserve those effects and their existing style relationships; it must not inadvertently turn every effect or trail dot into the assigned ship mesh.
+- Invalid mesh/material assignments and invalid count limits need clear validation; do not allocate unbounded geometry. A missing, unreadable, over-detailed or non-triangle mesh, or a material whose shader cannot run, is reported as the error above. Out-of-range sandbox limits are clamped with a warning. Exact authoring validation UX is an implementation choice.
+
+## Testing Decisions
+
+- Use rendered fleets and public match state as the acceptance seams. Reuse MatchTests, BattleTests and MatchResultsTests for exact counts and combat results rather than checking private draw buffers.
+- With equivalent simulation inputs, compare default, low and high visible limits: fleet strength, casualties, production and outcomes must match while visible density changes.
+- Start with the merged FleetStyle asset and a saved sandbox layout/override experiment. Assign a visibly different mesh/material and edit size/spacing in the Inspector; verify immediate static Edit Mode refresh. Save, run the affected mission/sandbox builders and reopen. Inspect sandbox samples and a generated mission for the same shape, size, spacing and faction coloring, preserved authored values/references and preserved sandbox samples/overrides.
+- Clear the style's Dart material, then its mesh: the sandbox reports one error and draws no Darts, and the mission does not start. Restore them and rebuild: the builder keeps an assigned mesh and material, and assigns `Darts`' first material and `Meshes/Dart.asset` to a style without them.
+- Reload scripts and repeatedly switch the mesh/material and preview states. Verify no accumulating transient meshes/objects, unwanted asset writes, simulation progress or preview sounds. Check the default body migration leaves trails, shots, explosions and sparks coherent.
+- In Play Mode, inspect stationed orbit, launches, transit, arrival, capture, combat and survivor return. Verify orientation, overlap, route visibility and consistent color.
+- Check large Dart counts for bounded representatives and practical rendering cost. Select concrete stress counts during implementation based on existing mission limits; this specification does not invent a performance benchmark.
+- Run affected Edit Mode tests, compilation and formatting checks. Report manual rendering coverage separately from automated rule coverage.
+
+## Out of Scope
+
+Model creation/import pipelines, skeletal animation, faction-specific ship classes, changed combat rules, one rendered object per real Dart, runtime asset browsers and a general formation editor.
+
+## Further Notes
+
+### Assumptions still to validate
+
+- Validate mesh orientation, material/shader compatibility and instancing support against the project's camera and render pipeline before choosing the draw implementation.
+- Both combat fronts currently use DartDisplay's same cap as stationed and travelling fleets. Confirm how the new two-limit policy applies as travelling representatives form up for combat and return to orbit, preserving continuous handoff and exact simulated counts. Do not introduce an unrequested third independent count control.
+- Pixel-identical results cannot be assumed for arbitrary replacement geometry; the default migration still requires visual comparison.

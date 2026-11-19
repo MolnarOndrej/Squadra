@@ -9,9 +9,9 @@ namespace Squadra.EditorTools
 {
     /// <summary>
     /// Makes sure the assets the scenes are built from exist: the materials of the backdrop, the world
-    /// surfaces and the effects, the styles of the worlds, routes and fleets, the post-processing profile,
-    /// and the world looks that list which surfaces each type of world can be given and which space
-    /// backdrops a mission can be shown against.
+    /// surfaces, the Darts and the effects, the Dart mesh, the styles of the worlds, routes and fleets,
+    /// the post-processing profile, and the world looks that list which surfaces each type of world can
+    /// be given and which space backdrops a mission can be shown against.
     ///
     /// A missing asset is created with the look written here, which is where the game's look started.
     /// An existing one is left exactly as it is: its values are edited in the Inspector and survive every
@@ -19,7 +19,9 @@ namespace Squadra.EditorTools
     /// values; to start one over, delete it and rebuild.
     ///
     /// World surfaces live in their type's folder (Planets, Moons, Asteroids) and backdrops in Backdrops,
-    /// so a material added there is offered the next time the looks are built.
+    /// so a material added there is offered the next time the looks are built. Dart materials live in
+    /// Darts and the Dart mesh in <c>Visuals/Meshes</c>; the fleet style is given the folder's first
+    /// material and that mesh only when it has none.
     /// </summary>
     static class SquadraAssetBuilder
     {
@@ -28,6 +30,9 @@ namespace Squadra.EditorTools
         public const string MoonFolder = MaterialFolder + "/Moons";
         public const string AsteroidFolder = MaterialFolder + "/Asteroids";
         public const string BackdropFolder = MaterialFolder + "/Backdrops";
+        public const string DartFolder = MaterialFolder + "/Darts";
+        public const string MeshFolder = ProjectFolders.Root + "/Visuals/Meshes";
+        public const string DartMeshPath = MeshFolder + "/Dart.asset";
         public const string SettingsFolder = ProjectFolders.Root + "/Visuals/PostProcessing";
         public const string NamesFolder = ProjectFolders.Root + "/Visuals/WorldNames";
         public const string WorldLooksPath = ProjectFolders.Root + "/Visuals/WorldLooks.asset";
@@ -46,12 +51,12 @@ namespace Squadra.EditorTools
         /// </summary>
         public static SceneMaterials EnsureMaterials()
         {
-            foreach (string folder in new[] { MaterialFolder, PlanetFolder, MoonFolder, AsteroidFolder, BackdropFolder })
+            foreach (string folder in new[] { MaterialFolder, PlanetFolder, MoonFolder, AsteroidFolder, BackdropFolder, DartFolder })
                 Directory.CreateDirectory(folder);
             AssetDatabase.Refresh();
 
             // Ring, line and scrim materials have nothing of their own: their renderers set every value.
-            return new SceneMaterials
+            var materials = new SceneMaterials
             {
                 Space = EnsureMaterial(BackdropFolder, "Space", "Squadra/Space", FirstSpaceLook),
                 Thalassa = EnsureMaterial(PlanetFolder, "Thalassa", "Squadra/Planet", FirstThalassaLook),
@@ -65,6 +70,55 @@ namespace Squadra.EditorTools
                 Line = EnsureMaterial(MaterialFolder, "Line", "Squadra/Line", null),
                 Scrim = EnsureMaterial(MaterialFolder, "Scrim", "Squadra/Scrim", null),
             };
+            EnsureDartMaterial(materials.Dot);
+            return materials;
+        }
+
+        // The Darts were drawn with the dot material until they had one of their own, so the first Dart
+        // material starts as a copy of it, edits included. Any material in the folder will do.
+        static void EnsureDartMaterial(Material dot)
+        {
+            if (DartMaterials().Count > 0) return;
+
+            var dart = new Material(dot) { name = "Dart" };
+            AssetDatabase.CreateAsset(dart, DartFolder + "/Dart.mat");
+        }
+
+        // The materials of the Darts folder itself, by name.
+        static List<Material> DartMaterials()
+        {
+            var found = new List<Material>();
+            foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { DartFolder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (Path.GetDirectoryName(path)?.Replace('\\', '/') != DartFolder) continue;
+                var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material != null) found.Add(material);
+            }
+
+            found.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            return found;
+        }
+
+        // The round dot: a quad twice as wide as the dot's core, which the Squadra/Dot shader draws as a
+        // soft disc. At the style's dot width it is the dot the fleets were always drawn with.
+        static Mesh EnsureDartMesh()
+        {
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(DartMeshPath);
+            if (mesh != null) return mesh;
+
+            Directory.CreateDirectory(MeshFolder);
+            AssetDatabase.Refresh();
+            mesh = new Mesh { name = "Dart" };
+            mesh.SetVertices(new[]
+            {
+                new Vector3(-1f, -1f, 0f), new Vector3(-1f, 1f, 0f), new Vector3(1f, 1f, 0f), new Vector3(1f, -1f, 0f),
+            });
+            mesh.SetUVs(0, new[] { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) });
+            mesh.SetTriangles(new[] { 0, 1, 2, 0, 2, 3 }, 0);
+            mesh.RecalculateBounds();
+            AssetDatabase.CreateAsset(mesh, DartMeshPath);
+            return mesh;
         }
 
         static Material EnsureMaterial(string folder, string name, string shaderName, System.Action<Material> firstLook)
@@ -243,6 +297,24 @@ namespace Squadra.EditorTools
             EnsureAsset<WorldStyle>(WorldStylePath);
             EnsureAsset<RouteStyle>(RouteStylePath);
             EnsureAsset<FleetStyle>(FleetStylePath);
+            KeepOrAssignDartLook(AssetDatabase.LoadAssetAtPath<FleetStyle>(FleetStylePath));
+        }
+
+        // A mesh or material already chosen is kept, whatever it is; only an empty one is filled.
+        static void KeepOrAssignDartLook(FleetStyle style)
+        {
+            var serialized = new SerializedObject(style);
+            SerializedProperty mesh = SceneWiring.Property(serialized, "dartMesh");
+            SerializedProperty material = SceneWiring.Property(serialized, "dartMaterial");
+            if (mesh.objectReferenceValue == null) mesh.objectReferenceValue = EnsureDartMesh();
+            if (material.objectReferenceValue == null)
+            {
+                List<Material> found = DartMaterials();
+                if (found.Count > 0) material.objectReferenceValue = found[0];
+                else Debug.LogError("Squadra: there is no Dart material in " + DartFolder + ".");
+            }
+
+            if (serialized.ApplyModifiedPropertiesWithoutUndo()) EditorUtility.SetDirty(style);
         }
 
         public static SceneStyles LoadStyles()
