@@ -148,7 +148,7 @@ namespace Squadra
                     Dot dot = RentDot();
                     DartFormations.OrbitPlace(worlds[n], i, 0f, display.OrbitSpeed, style, out dot.Angle,
                         out dot.Radius);
-                    dot.Heading = DartFormations.Heading(dot.Angle, true, 0f, display.OrbitSpeed);
+                    dot.Heading = DartFormations.Heading(dot.Angle, i, true, 0f, display.OrbitSpeed);
                     dot.Shown = 1f;
                     dot.Position = worlds[n].Position + DartFormations.Polar(dot.Angle, dot.Radius);
                     garrison.Stationed.Add(dot);
@@ -492,7 +492,8 @@ namespace Squadra
                 Dot dot = RentDot();
                 dots.Add(dot);
                 Place(garrison, world, dots.Count - 1, target, time, gathered, stationed, out dot.Angle, out dot.Radius);
-                dot.Heading = DartFormations.Heading(dot.Angle, stationed, stationed ? gathered : 1f, display.OrbitSpeed);
+                dot.Heading = DartFormations.Heading(dot.Angle, dots.Count - 1, stationed, stationed ? gathered : 1f,
+                    display.OrbitSpeed);
                 dot.Shown = -0.1f * added;
                 dot.Position = world.Position + DartFormations.Polar(dot.Angle, dot.Radius);
             }
@@ -530,7 +531,7 @@ namespace Squadra
                         Mathf.Infinity, deltaTime);
 
                     // It turns as it settles: along its orbit, toward the enemy in formation.
-                    float heading = DartFormations.Heading(dot.Angle, stationed, stationed ? gathered : 1f,
+                    float heading = DartFormations.Heading(dot.Angle, i, stationed, stationed ? gathered : 1f,
                         display.OrbitSpeed);
                     dot.Heading = Mathf.SmoothDampAngle(dot.Heading * Mathf.Rad2Deg, heading * Mathf.Rad2Deg,
                         ref dot.HeadingSpeed, settleSeconds, Mathf.Infinity, deltaTime) * Mathf.Deg2Rad;

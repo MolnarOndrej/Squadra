@@ -28,16 +28,25 @@ namespace Squadra
         }
 
         /// <summary>
-        /// The place of Dart number <paramref name="index"/> on its orbit at a moment. The innermost of the
-        /// three lanes turns at <paramref name="orbitSpeed"/> radians per second, each outer one a little slower.
+        /// Radians per second at which Dart number <paramref name="index"/> turns on its orbit. The innermost
+        /// of the three lanes turns at <paramref name="orbitSpeed"/>, each outer one a little slower, so with
+        /// a slow enough orbit an outer lane turns the other way.
+        /// </summary>
+        public static float LaneSpeed(int index, float orbitSpeed)
+        {
+            return orbitSpeed - (index % 3) * LaneSlowdown;
+        }
+
+        /// <summary>
+        /// The place of Dart number <paramref name="index"/> on its orbit at a moment, turning at its
+        /// <see cref="LaneSpeed"/>.
         /// </summary>
         public static void OrbitPlace(WorldView world, int index, float time, float orbitSpeed, FleetStyle style,
             out float angle, out float radius)
         {
             int lane = index % 3;
             int slot = index / 3;
-            float speed = orbitSpeed - lane * LaneSlowdown;
-            angle = slot * GoldenAngle + lane * 2.1f + time * speed;
+            angle = slot * GoldenAngle + lane * 2.1f + time * LaneSpeed(index, orbitSpeed);
             radius = world.OrbitRadius + (lane - 1) * style.LaneSpacing + 0.018f * Mathf.Sin(time * 1.3f + index * 1.7f);
         }
 
@@ -64,15 +73,15 @@ namespace Squadra
         }
 
         /// <summary>
-        /// Which way a Dart at <paramref name="angle"/> around its world faces, in radians: a stationed one
-        /// along its orbit, turned toward the enemy outside as it is <paramref name="formed"/> (0 in orbit,
-        /// 1 in formation); an arriving one toward the world it attacks.
+        /// Which way Dart number <paramref name="index"/>, at <paramref name="angle"/> around its world, faces,
+        /// in radians: a stationed one the way its own lane turns, turned toward the enemy outside as it is
+        /// <paramref name="formed"/> (0 in orbit, 1 in formation); an arriving one toward the world it attacks.
         /// </summary>
-        public static float Heading(float angle, bool stationed, float formed, float orbitSpeed)
+        public static float Heading(float angle, int index, bool stationed, float formed, float orbitSpeed)
         {
             if (!stationed) return angle + Mathf.PI;
 
-            float along = angle + (orbitSpeed < 0f ? -QuarterTurn : QuarterTurn);
+            float along = angle + (LaneSpeed(index, orbitSpeed) < 0f ? -QuarterTurn : QuarterTurn);
             return along + Mathf.DeltaAngle(along * Mathf.Rad2Deg, angle * Mathf.Rad2Deg) * Mathf.Deg2Rad * formed;
         }
 
