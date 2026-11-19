@@ -16,7 +16,7 @@ namespace Squadra
         readonly IReadOnlyList<WorldView> worlds;
         readonly Faction player;
 
-        float noticeUntil;
+        float noticeLeft;
         string notice;
 
         public PlayerOrders(Match match, IReadOnlyList<WorldView> worlds, Faction player)
@@ -142,7 +142,7 @@ namespace Squadra
         {
             get
             {
-                if (notice != null && Time.time < noticeUntil) return notice;
+                if (notice != null && noticeLeft > 0f) return notice;
 
                 if (Selected < 0) return "Click one of your worlds to select its fleet";
 
@@ -153,10 +153,19 @@ namespace Squadra
             }
         }
 
+        /// <summary>
+        /// Lets a notice run out. Called with real seconds, and only while the match is played: a notice
+        /// stays as long at every game speed and does not run out under the pause menu.
+        /// </summary>
+        public void CountDownNotice(float seconds)
+        {
+            noticeLeft -= seconds;
+        }
+
         void Notify(string text)
         {
             notice = text;
-            noticeUntil = Time.time + 1.8f; // game time: a notice does not run out under the pause menu
+            noticeLeft = 1.8f;
         }
     }
 }

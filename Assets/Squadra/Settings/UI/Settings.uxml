@@ -17,6 +17,10 @@
                 <ui:Label text="Language" class="setting-row__name" />
                 <ui:DropdownField name="languageField" class="setting-row__control" />
             </ui:VisualElement>
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="Game Speed" class="setting-row__name" />
+                <ui:DropdownField name="gameSpeedField" class="setting-row__control" />
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <ui:VisualElement name="graphicsPanel" class="settings-page hidden">
