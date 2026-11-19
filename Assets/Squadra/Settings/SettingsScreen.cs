@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using Squadra.Menus;
+using Squadra.Pause;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Squadra
 {
     /// <summary>
-    /// The Settings screen: General (language), Graphics (display mode, resolution, VSync) and Sound
+    /// The Settings screen: General (language, game speed), Graphics (display mode, resolution, VSync) and Sound
     /// (master, music and effects volume, Mute in Background). Every control applies its change at once
     /// and saves it when the player finishes with the control. A display change is only previewed until
     /// the player confirms it. The main menu and the pause menu each show their own copy of the screen
@@ -22,6 +23,7 @@ namespace Squadra
         readonly Button[] tabs;
         readonly VisualElement[] panels;
         readonly Button backButton;
+        readonly DropdownField gameSpeedField;
         readonly DropdownField displayModeField;
         readonly DropdownField resolutionField;
         readonly Toggle vsyncToggle;
@@ -57,6 +59,14 @@ namespace Squadra
             language.choices = new List<string> { "English" };
             language.index = 0;
 
+            gameSpeedField = screen.Q<DropdownField>("gameSpeedField");
+            var speedNames = new List<string>();
+            foreach (GameSpeed speed in GameClock.Speeds)
+                speedNames.Add(GameClock.NameOf(speed));
+            gameSpeedField.choices = speedNames;
+            gameSpeedField.formatSelectedValueCallback = ShownGameSpeed;
+            gameSpeedField.RegisterValueChangedCallback(_ => OnGameSpeedPicked());
+
             displayModeField = screen.Q<DropdownField>("displayModeField");
             resolutionField = screen.Q<DropdownField>("resolutionField");
             vsyncToggle = screen.Q<Toggle>("vsyncToggle");
@@ -84,7 +94,7 @@ namespace Squadra
 
             fields = new VisualElement[]
             {
-                language, displayModeField, resolutionField, vsyncToggle, masterSlider, musicSlider, sfxSlider,
+                language, gameSpeedField, displayModeField, resolutionField, vsyncToggle, masterSlider, musicSlider, sfxSlider,
                 muteToggle,
             };
             backButton = screen.Q<Button>("settingsBackButton");
@@ -98,6 +108,7 @@ namespace Squadra
         /// <summary>Call when the screen appears: shows the current preferences.</summary>
         public void Open()
         {
+            ShowGameSpeed();
             ShowDisplay();
             vsyncToggle.SetValueWithoutNotify(GameSettings.VSync);
             ShowVolume(masterSlider, GameSettings.MasterVolume);
@@ -154,6 +165,32 @@ namespace Squadra
                 if (panels[tab].Contains(field)) column.Add(field);
             column.Add(backButton);
             return column;
+        }
+
+        // ------------------------------------------------------------------ game speed
+
+        // While a sandbox run plays at a speed of its own, the field holds no choice and only shows the
+        // saved one. Picking any speed is then a change, the saved one included, so the player can
+        // always go back to the saved speed and end the sandbox's.
+        void ShowGameSpeed()
+        {
+            GameClock clock = GameSettings.Clock;
+            gameSpeedField.SetValueWithoutNotify(clock.Override.HasValue ? "" : GameClock.NameOf(clock.Preference));
+        }
+
+        static string ShownGameSpeed(string value)
+        {
+            return string.IsNullOrEmpty(value) ? GameClock.NameOf(GameSettings.GameSpeed) : value;
+        }
+
+        void OnGameSpeedPicked()
+        {
+            int index = gameSpeedField.index;
+            if (index < 0 || index >= GameClock.Speeds.Count) return;
+
+            GameSettings.GameSpeed = GameClock.Speeds[index];
+            GameSettings.Save();
+            ShowGameSpeed();
         }
 
         // ------------------------------------------------------------------ display

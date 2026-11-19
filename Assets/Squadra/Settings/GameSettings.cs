@@ -6,15 +6,18 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// The player's preferences: audio volumes, Mute in Background, VSync and the display. Setting a value
+    /// The player's preferences: game speed, audio volumes, Mute in Background, VSync and the display. Setting a value
     /// applies it at once; <see cref="Save"/> writes everything to the local player preferences, and the
     /// saved values are applied again at every launch before the first scene loads. Volumes default to 1,
     /// which is the mix the scenes were balanced at. The game keeps running while another application is
-    /// in front; Mute in Background only decides whether it can be heard then.
+    /// in front; Mute in Background only decides whether it can be heard then. It also keeps the game's
+    /// one <see cref="GameClock"/>, which combines the game speed with the pause and a sandbox run's
+    /// speed, and is the only thing that sets Unity's time scale.
     /// </summary>
     [AutoStaticsCleanup]
     public static partial class GameSettings
     {
+        const string GameSpeedKey = "settings.gameSpeed";
         const string MasterKey = "settings.volume.master";
         const string MusicKey = "settings.volume.music";
         const string SfxKey = "settings.volume.sfx";
@@ -29,6 +32,7 @@ namespace Squadra
         const int MinHeight = 576;
 
         static bool loaded;
+        static GameClock clock;
         static float master;
         static float music;
         static float sfx;
@@ -37,6 +41,37 @@ namespace Squadra
         static DisplayMode displayMode;
         static Vector2Int resolution;
         static bool displayChosen;
+
+        // ------------------------------------------------------------------ game speed
+
+        /// <summary>
+        /// The game speed the player chose in Settings. Setting it is that choice: it applies at once,
+        /// replaces a sandbox run's speed even when it is the speed already saved, and is kept by
+        /// <see cref="Save"/>. Normal for a new profile.
+        /// </summary>
+        public static GameSpeed GameSpeed
+        {
+            get => Clock.Preference;
+            set => Clock.Choose(value);
+        }
+
+        /// <summary>
+        /// How fast gameplay runs: the missions and the sandbox start and leave their runs, pause and
+        /// choose a sandbox speed through it. Every change is applied to Unity's time scale at once.
+        /// </summary>
+        public static GameClock Clock
+        {
+            get
+            {
+                EnsureLoaded();
+                return clock;
+            }
+        }
+
+        static void ApplyClock()
+        {
+            Time.timeScale = clock.Scale;
+        }
 
         // ------------------------------------------------------------------ audio
 
@@ -230,10 +265,12 @@ namespace Squadra
         /// <summary>
         /// Writes the current preferences to disk. The display is included only once the player has
         /// confirmed one with <see cref="SaveDisplay"/>; a previewed display is never saved by accident.
+        /// The game speed saved is always the preference, never a sandbox run's speed or the pause.
         /// </summary>
         public static void Save()
         {
             EnsureLoaded();
+            PlayerPrefs.SetString(GameSpeedKey, GameClock.KeyOf(clock.Preference));
             PlayerPrefs.SetFloat(MasterKey, master);
             PlayerPrefs.SetFloat(MusicKey, music);
             PlayerPrefs.SetFloat(SfxKey, sfx);
@@ -269,6 +306,7 @@ namespace Squadra
             Application.focusChanged += OnFocusChanged;
             focused = Application.isFocused;
             ApplyOutput();
+            ApplyClock();
             if (VSyncSupported && PlayerPrefs.HasKey(VSyncKey)) VSync = PlayerPrefs.GetInt(VSyncKey) != 0;
 
             if (DisplaySupported && !Application.isEditor && displayChosen
@@ -282,6 +320,9 @@ namespace Squadra
             if (loaded) return;
 
             loaded = true;
+            // A new clock: nothing is running before the first scene, so time starts at normal speed.
+            clock = new GameClock(GameClock.FromKey(PlayerPrefs.GetString(GameSpeedKey, "")));
+            clock.Changed += ApplyClock;
             master = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterKey, 1f));
             music = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicKey, 1f));
             sfx = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxKey, 1f));
