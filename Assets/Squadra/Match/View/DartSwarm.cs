@@ -5,9 +5,9 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// The dots of one fleet in transit: a loose teardrop, wide at the front and trailing off behind, that
-    /// fans out after launch and gathers again before arrival, each dot with two fading trail dots behind
-    /// it. It flies from the source's orbit to the target's, and stops short of the target's orbit when it
+    /// The Darts of one fleet in transit: a loose teardrop, wide at the front and trailing off behind, that
+    /// fans out after launch and gathers again before arrival, each Dart facing its course with two fading
+    /// trail dots behind it. It flies from the source's orbit to the target's, and stops short of the target's orbit when it
     /// is to form up outside it for a battle. Where it is comes from the fleet's progress; how it looks
     /// from the shared <see cref="FleetStyle"/>. The swarm's shape is the same every time for the same seed.
     /// </summary>
@@ -81,7 +81,7 @@ namespace Squadra
         public void Place(float progress, double elapsed, double remaining, float time, FleetStyle style,
             FleetCourse course, out Vector2 center, out float formation)
         {
-            float standoff = (style.FrontGap + DartFormations.RowSpacing) * Mathf.SmoothStep(0f, 1f, Standoff);
+            float standoff = (style.FrontGap + style.RowSpacing) * Mathf.SmoothStep(0f, 1f, Standoff);
             Vector2 end = End - Direction * standoff;
             center = Vector2.Lerp(Start, end, progress);
             course.Follow(Start, center, end);
@@ -100,20 +100,24 @@ namespace Squadra
             }
         }
 
-        /// <summary>Draws the dots where they were last placed, in the color of <paramref name="faction"/>.</summary>
-        public void Draw(DotBatch batch, Faction faction, FleetStyle style)
+        /// <summary>
+        /// Draws the Darts where they were last placed, in the color of <paramref name="faction"/>: their
+        /// bodies into <paramref name="bodies"/>, facing the course, and their trails into <paramref name="trails"/>.
+        /// </summary>
+        public void Draw(DartBatch bodies, DotBatch trails, Faction faction, FleetStyle style)
         {
             Vector4 color = style.MovingTint(Palette.Of(faction));
             Vector4 trail = color;
             float dotSize = style.DotSize;
+            float heading = Mathf.Atan2(Direction.y, Direction.x);
             foreach (Vector2 position in positions)
             {
-                batch.Add(position, dotSize, color);
+                bodies.Add(position, heading, dotSize, color);
 
                 trail.w = style.NearTrailOpacity;
-                batch.Add(position - Direction * style.NearTrailDistance, dotSize * style.NearTrailSize, trail);
+                trails.Add(position - Direction * style.NearTrailDistance, dotSize * style.NearTrailSize, trail);
                 trail.w = style.FarTrailOpacity;
-                batch.Add(position - Direction * style.FarTrailDistance, dotSize * style.FarTrailSize, trail);
+                trails.Add(position - Direction * style.FarTrailDistance, dotSize * style.FarTrailSize, trail);
             }
         }
 
