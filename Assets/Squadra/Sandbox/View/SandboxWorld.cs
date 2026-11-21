@@ -1,3 +1,4 @@
+using Squadra.Sandbox;
 using Squadra.Simulation;
 using UnityEngine;
 
@@ -6,9 +7,9 @@ namespace Squadra
     /// <summary>
     /// One world of the sandbox, drawn by the <see cref="WorldView"/> beside it exactly as a mission's
     /// world is. Here is what a mission file would say of it (its type, surface, size, owner and Darts;
-    /// its place is the object's own) and the states only a running match could bring, set by hand to see
-    /// how they look: a highlight, a capture under way and a battle. Those are a preview and nothing more:
-    /// no match ever starts from them, in the editor or in Play Mode.
+    /// its place is the object's own) and what is already under way there when the sandbox starts: a
+    /// capture and a battle. Edit Mode shows that moment frozen, and Play Mode plays on from it. The
+    /// highlight is the one thing only Edit Mode shows; a run starts with nothing selected or hovered.
     /// </summary>
     [SelectionBase]
     [DisallowMultipleComponent]
@@ -24,17 +25,22 @@ namespace Squadra
         [Tooltip("Radius of the body in game world units, as a mission file gives it.")]
         [SerializeField, Range(0.1f, 5f)] float size = 1f;
         [SerializeField] Faction owner = Faction.Neutral;
-        [Tooltip("Darts stationed here.")]
+        [Tooltip("Darts stationed here. During a capture they are the captor's.")]
         [SerializeField, Min(0)] int darts;
 
-        [Header("Preview only, never played")]
+        [Header("Edit Mode only")]
+        [Tooltip("An outline as the pointer or a selection would draw it. A run starts without any.")]
         [SerializeField] SandboxHighlight highlight = SandboxHighlight.None;
-        [Tooltip("Shows a capture under way: the captor's ring and countdown, its Darts as the ones stationed here.")]
+
+        [Header("Under way at the start")]
+        [Tooltip("A capture under way: the Darts stationed here are the captor's, and the world stays its "
+            + "owner's until the capture completes. With no Darts here there is no capture.")]
         [SerializeField] bool capturing;
         [SerializeField] Faction captor = Faction.Blue;
         [SerializeField, Range(0f, 1f)] float captureProgress = 0.4f;
-        [Tooltip("Shows a battle: the attackers' formation facing the Darts stationed here. With a capture, "
-            + "the capture is shown held.")]
+        [Tooltip("A battle: the attackers' Darts facing the ones stationed here, nobody lost yet. During a "
+            + "capture the captor's Darts defend and the capture is held. With no attackers there is no "
+            + "battle; with nobody stationed here the attackers land.")]
         [SerializeField] bool fighting;
         [SerializeField] Faction attacker = Faction.Red;
         [SerializeField, Min(0)] int attackingDarts = 12;
@@ -42,6 +48,9 @@ namespace Squadra
         [SerializeField] float frontAngle;
 
         WorldView view;
+        NodeKind dressedKind;
+        WorldLooks dressedLooks;
+        bool dressed;
 
         public WorldView View
         {
@@ -55,6 +64,9 @@ namespace Squadra
         /// <summary>The direction the attackers stand in, in radians.</summary>
         public float FrontAngle => frontAngle * Mathf.Deg2Rad;
 
+        /// <summary>The outline Edit Mode shows.</summary>
+        public SandboxHighlight Highlight => highlight;
+
         /// <summary>The world as a mission would lay it down, with the game's defaults for its type.</summary>
         public NodeConfig ToNode()
         {
@@ -67,43 +79,49 @@ namespace Squadra
             }
         }
 
-        /// <summary>
-        /// What the world shows: <paramref name="node"/>, the world as a match that has not started has it,
-        /// with the capture and battle of this sample on top. A capture by the owner, or a battle with the
-        /// side stationed here, cannot happen and is left out.
-        /// </summary>
-        public WorldState Sample(Node node, double captureDuration)
+        /// <summary>The capture under way here at the start, as world <paramref name="index"/>; null for none.</summary>
+        public StartingCapture ToCapture(int index)
         {
-            WorldState state = WorldState.Of(node);
-            if (capturing && captor != Faction.Neutral && captor != state.Owner)
-            {
-                state.Captor = captor;
-                state.Occupant = captor;
-                state.CaptureProgress = captureProgress;
-                state.CaptureRemaining = (float)((1.0 - captureProgress) * captureDuration);
-            }
+            if (!capturing) return null;
+            return new StartingCapture { World = index, Captor = captor, Progress = captureProgress };
+        }
 
-            if (fighting && attacker != Faction.Neutral && attacker != state.Occupant)
-            {
-                state.Fighting = true;
-                state.Arriving = attacker;
-                state.ArrivingDarts = attackingDarts;
-            }
-
-            return state;
+        /// <summary>The battle being fought here at the start, as world <paramref name="index"/>; null for none.</summary>
+        public StartingBattle ToBattle(int index)
+        {
+            if (!fighting) return null;
+            return new StartingBattle { World = index, Attacker = attacker, Darts = attackingDarts };
         }
 
         /// <summary>
-        /// Has the world drawn with its surface from <paramref name="looks"/>, showing <paramref name="state"/>.
-        /// Without a surface for its type it keeps the one it has.
+        /// Gives the world the surface of <paramref name="shownKind"/> from <paramref name="looks"/>: its own
+        /// surface when that is one of the kind, else the kind's first. A run that changes the world's type
+        /// passes the new one; nothing here is changed by it. Without a surface for the kind it keeps the one
+        /// it has.
+        /// </summary>
+        public void Dress(WorldLooks looks, NodeKind shownKind)
+        {
+            if (looks != null && looks.TryGetSurfaceOrFirst(shownKind, surface, out Material material))
+                View.Setup(worldName, transform.position, size, material);
+            dressedKind = shownKind;
+            dressedLooks = looks;
+            dressed = true;
+        }
+
+        /// <summary>Dresses the world again only when its kind or the looks differ from what it was dressed for.</summary>
+        public void DressIfChanged(WorldLooks looks, NodeKind shownKind)
+        {
+            if (!dressed || shownKind != dressedKind || looks != dressedLooks) Dress(looks, shownKind);
+        }
+
+        /// <summary>
+        /// Has the world drawn, in Edit Mode, with its own type's surface from <paramref name="looks"/> and
+        /// showing <paramref name="state"/> with its highlight.
         /// </summary>
         public void Present(WorldLooks looks, WorldState state)
         {
-            WorldView world = View;
-            if (looks != null && looks.TryGetSurfaceOrFirst(kind, surface, out Material material))
-                world.Setup(worldName, transform.position, size, material);
-
-            world.ShowSample(state, highlight == SandboxHighlight.Selected, highlight == SandboxHighlight.Hovered);
+            Dress(looks, kind);
+            View.ShowSample(state, highlight == SandboxHighlight.Selected, highlight == SandboxHighlight.Hovered);
         }
     }
 }

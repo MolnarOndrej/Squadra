@@ -19,13 +19,14 @@ namespace Squadra.Simulation
 
         public int Id { get; }
         public string Name { get; }
-        public NodeKind Kind { get; }
+        /// <summary>Planet, moon or asteroid. Only a sandbox edit changes it during a match.</summary>
+        public NodeKind Kind { get; private set; }
         public MapPoint Position { get; }
 
         /// <summary>Seconds per produced Dart. Exposed so upgrades can change it mid-match.</summary>
         public double ProductionInterval { get; set; }
 
-        /// <summary>Formal owner. Changes only when a capture completes.</summary>
+        /// <summary>Formal owner. Changes when a capture completes, or by a sandbox edit.</summary>
         public Faction Owner { get; private set; }
 
         /// <summary>
@@ -56,11 +57,15 @@ namespace Squadra.Simulation
         /// <summary>Intervals shorter than this count as "no production".</summary>
         public const double MinProductionInterval = 0.001;
 
+        /// <summary>True when a sandbox edit has switched this object's production off.</summary>
+        public bool ProductionStopped { get; private set; }
+
         /// <summary>
         /// True for an object that builds Darts while owned. An asteroid never does, whatever its interval:
-        /// that follows from its kind.
+        /// that follows from its kind. Nor does an object whose production a sandbox switched off.
         /// </summary>
-        public bool CanProduce => Kind != NodeKind.Asteroid && ProductionInterval >= MinProductionInterval;
+        public bool CanProduce =>
+            Kind != NodeKind.Asteroid && !ProductionStopped && ProductionInterval >= MinProductionInterval;
 
         /// <summary>True while the production clock runs: owned, outside capture and not fought over.</summary>
         public bool IsProducing => CanProduce && Owner != Faction.Neutral && !IsBeingCaptured && !IsContested;
@@ -139,6 +144,58 @@ namespace Squadra.Simulation
         {
             Captor = Faction.Neutral;
             CaptureElapsed = 0;
+        }
+
+        // ------------------------------------------------------------------ sandbox edits, through the match
+
+        /// <summary>
+        /// Starts a capture by <paramref name="captor"/> as if it had already run for <paramref name="elapsed"/>
+        /// seconds. The Darts stationed here are the captor's from now on.
+        /// </summary>
+        internal void StageCapture(Faction captor, double elapsed)
+        {
+            Captor = captor;
+            CaptureElapsed = elapsed;
+        }
+
+        /// <summary>
+        /// Hands the object to <paramref name="owner"/> at once, with no capture: a capture under way is
+        /// dropped, the stationed Darts are the new owner's and production starts a fresh interval.
+        /// </summary>
+        internal void SetOwner(Faction owner)
+        {
+            Owner = owner;
+            ClearCapture();
+            productionClock = 0;
+        }
+
+        /// <summary>
+        /// Makes the object another kind, producing at <paramref name="interval"/> (ignored for an
+        /// asteroid) and switched on, as every new kind starts. The Dart in progress keeps how far along it is.
+        /// </summary>
+        internal void ChangeKind(NodeKind kind, double interval)
+        {
+            Kind = kind;
+            ProductionStopped = false;
+            RetimeProduction(kind == NodeKind.Asteroid ? 0 : interval);
+        }
+
+        /// <summary>
+        /// Sets the seconds per produced Dart. The Dart in progress keeps how far along it is and is
+        /// finished at the new pace.
+        /// </summary>
+        internal void RetimeProduction(double interval)
+        {
+            double done = ProductionInterval >= MinProductionInterval ? productionClock / ProductionInterval : 0;
+            done = System.Math.Min(1, System.Math.Max(0, done));
+            ProductionInterval = interval;
+            productionClock = interval >= MinProductionInterval ? done * interval : 0;
+        }
+
+        /// <summary>Switches production off, or on again. The Dart in progress waits where it was.</summary>
+        internal void SetProductionStopped(bool stopped)
+        {
+            ProductionStopped = stopped;
         }
 
         /// <summary>Hands the object to its captor and returns the previous owner.</summary>

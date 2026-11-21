@@ -6,25 +6,28 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UIElements;
 using static Squadra.EditorTools.SceneWiring;
 
 namespace Squadra.EditorTools
 {
     /// <summary>
     /// Makes the Sandbox scene: camera, post-processing, space backdrop, the sandbox's worlds and its
-    /// preview, built from the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox
-    /// Scene</c>. The first run lays down the starting setup: three planets, one per player, at the
-    /// corners of a triangle and a neutral moon in its middle, with routes along the edges and to the
-    /// moon and a few samples of what a match shows. From then on the scene belongs to its author: a
-    /// later run only adds what is missing of the scene's structure and points it at the shared looks
-    /// again, and leaves the worlds, samples and overrides as they were saved. To start over, delete the
-    /// scene and run it again. The scene is not part of the game's build.
+    /// preview, the fleet, effect and sound layers and the control panel its run plays with, built from
+    /// the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox Scene</c>. The first
+    /// run lays down the starting setup: three planets, one per player, at the corners of a triangle and a
+    /// neutral moon in its middle, with routes along the edges and to the moon, a capture and a battle
+    /// under way and two fleets on their way. From then on the scene belongs to its author: a later run
+    /// only adds what is missing of the scene's structure and points it at the shared looks again, and
+    /// leaves the worlds, the starting activity and the overrides as they were saved. To start over,
+    /// delete the scene and run it again. The scene is not part of the game's build.
     /// </summary>
     public static class SquadraSandboxBuilder
     {
         internal const string ScenePath = ProjectFolders.Root + "/Sandbox/Scenes/Sandbox.unity";
 
         const string WorldsName = "Worlds";
+        const string PanelLayoutPath = ProjectFolders.Root + "/Sandbox/UI/SandboxPanel.uxml";
 
         [MenuItem("Squadra/Build Sandbox Scene")]
         public static void Build()
@@ -46,6 +49,7 @@ namespace Squadra.EditorTools
             SquadraAssetBuilder.EnsureStyles();
             SquadraAssetBuilder.EnsureVolumeProfile();
             AssetDatabase.SaveAssets();
+            SquadraMenuBuilder.EnsurePanel(); // before the scene opens: opening it drops assets created just now
 
             bool exists = File.Exists(ScenePath);
             var scene = exists
@@ -77,10 +81,54 @@ namespace Squadra.EditorTools
             Wire(preview, "backdrop", backdrop);
             Relayout(preview);
 
+            // What a run plays with: the mission's fleet, effect and sound layers and the sandbox's panel.
+            FleetLayer fleets = Object.FindAnyObjectByType<FleetLayer>();
+            if (fleets == null) fleets = SquadraSceneBuilder.BuildFleets(materials, styles);
+            Wire(fleets, "style", styles.Fleets);
+            EffectsLayer effects = Object.FindAnyObjectByType<EffectsLayer>();
+            if (effects == null) effects = SquadraSceneBuilder.BuildEffects(materials);
+            SoundLayer sounds = Object.FindAnyObjectByType<SoundLayer>();
+            if (sounds == null) sounds = SquadraSceneBuilder.BuildSounds(rig);
+            SandboxPanel panel = Object.FindAnyObjectByType<SandboxPanel>();
+            if (panel == null) panel = BuildPanel();
+            WirePanel(panel);
+
+            SandboxRun run = preview.GetComponent<SandboxRun>();
+            if (run == null) run = preview.gameObject.AddComponent<SandboxRun>();
+            Wire(run, "preview", preview);
+            Wire(run, "fleets", fleets);
+            Wire(run, "effects", effects);
+            Wire(run, "sounds", sounds);
+            Wire(run, "panel", panel);
+
             if (!exists || scene.isDirty) EditorSceneManager.SaveScene(scene, ScenePath);
             Debug.Log(exists
                 ? "Squadra: checked the structure of " + ScenePath + "; its worlds, samples and overrides are as they were"
                 : "Squadra: built " + ScenePath);
+        }
+
+        // ------------------------------------------------------------------ the panel
+
+        static SandboxPanel BuildPanel()
+        {
+            var go = new GameObject("Panel");
+            go.AddComponent<UIDocument>();
+            return go.AddComponent<SandboxPanel>();
+        }
+
+        // The panel is a UI document on the menu's panel settings, which scale the 1920 x 1080 layout.
+        static void WirePanel(SandboxPanel panel)
+        {
+            var layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(PanelLayoutPath);
+            PanelSettings settings = SquadraMenuBuilder.EnsurePanel();
+            if (layout == null || settings == null)
+                Debug.LogError("Squadra: the sandbox panel layout (" + PanelLayoutPath + ") or the menu panel is missing.");
+
+            var document = panel.GetComponent<UIDocument>();
+            document.panelSettings = settings;
+            document.visualTreeAsset = layout;
+            EditorUtility.SetDirty(document);
+            Wire(panel, "document", document);
         }
 
         // ------------------------------------------------------------------ the starting setup
@@ -105,7 +153,7 @@ namespace Squadra.EditorTools
             SandboxWorld lune = BuildWorld(worldsRoot, "Lune", NodeKind.Moon, "lune", moon,
                 new Vector2(0f, -0.35f), Faction.Neutral, 0, materials, styles);
 
-            // Blue has its planet selected and points at the moon; Green fights off Red, whose
+            // Blue has its planet selected and points at the moon, in Edit Mode. Green fights off Red, whose
             // reinforcements are on the way; Blue is capturing Red's planet.
             WireEnum(blue, "highlight", (int)SandboxHighlight.Selected);
             WireEnum(lune, "highlight", (int)SandboxHighlight.Hovered);

@@ -1,0 +1,47 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="SandboxPanel.uss" />
+    <ui:VisualElement name="sandboxRoot" picking-mode="Ignore" class="sandbox-root">
+        <ui:VisualElement name="sandboxSide" picking-mode="Ignore" class="sandbox-side">
+            <ui:VisualElement name="sandboxMenu" class="sandbox-menu">
+                <ui:Button name="orderModeButton" tooltip="Order mode: clicks send fleets, as in a mission (M)" class="sandbox-menu-button" />
+                <ui:Button name="pauseButton" tooltip="Pause or resume the battlefield (Space)" class="sandbox-menu-button" />
+                <ui:Button name="speedButton" tooltip="Game speed for this run; press for the next" class="sandbox-menu-button sandbox-menu-button--wide" />
+                <ui:Button name="resetButton" tooltip="Lay the scene's starting moment down again" class="sandbox-menu-button" />
+            </ui:VisualElement>
+            <ui:Label name="hintLabel" picking-mode="Ignore" class="sandbox-hint" />
+
+            <ui:VisualElement name="sandboxPanel" class="sandbox-panel">
+                <ui:Button name="panelToggleButton" tooltip="Slide the panel away or back" class="sandbox-panel-toggle" />
+                <ui:ScrollView name="panelScroll" class="sandbox-scroll">
+
+                    <ui:Label text="WORLD" class="sandbox-heading sandbox-heading--first" />
+                    <ui:Label name="noWorldLabel" text="Turn Order mode off and click a world to edit it." class="sandbox-note" />
+                    <ui:VisualElement name="worldSection">
+                        <ui:Label name="worldNameLabel" class="sandbox-world-name" />
+                        <ui:Label name="worldStateLabel" class="sandbox-note" />
+                        <ui:VisualElement class="sandbox-row">
+                            <ui:Label text="Stationed Darts" class="sandbox-label" />
+                            <ui:TextField name="dartsField" is-delayed="true" class="sandbox-field" />
+                        </ui:VisualElement>
+                        <ui:Label text="Owner" class="sandbox-label" />
+                        <ui:VisualElement name="ownerChoices" class="sandbox-row sandbox-row--wrap" />
+                        <ui:Label text="Type" class="sandbox-label" />
+                        <ui:VisualElement name="kindChoices" class="sandbox-row" />
+                        <ui:Toggle name="productionToggle" text="Produces Darts" class="sandbox-toggle" />
+                        <ui:Label name="productionNote" class="sandbox-note" />
+                        <ui:Label name="worldProblemLabel" class="sandbox-problem" />
+                    </ui:VisualElement>
+
+                    <ui:Label text="PLAYERS" class="sandbox-heading" />
+                    <ui:VisualElement name="playerRows" />
+
+                    <ui:Label text="TUNING" class="sandbox-heading" />
+                    <ui:Label text="For this run only. Default follows the game." class="sandbox-note" />
+                    <ui:VisualElement name="tuningRows" />
+
+                    <ui:Label name="setupProblemsLabel" class="sandbox-problem" />
+                </ui:ScrollView>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

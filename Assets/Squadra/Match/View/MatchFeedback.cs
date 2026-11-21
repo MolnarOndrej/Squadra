@@ -8,7 +8,8 @@ namespace Squadra
     /// What the scene shows and plays when something happens in the match: a fleet leaving or
     /// arriving, a Dart produced, a world captured, a battle beginning, its casualties and its end.
     /// It listens to the match and tells the fleet layer, the effects, the sounds, the worlds and
-    /// the camera; it changes nothing in the match. The end of the match is not handled here: that
+    /// the camera; it changes nothing in the match. A fleet a sandbox puts on its way is only shown: it
+    /// left no world, so there is no departure to see or hear. The end of the match is not handled here: that
     /// belongs to the campaign and the results screen, which the game controller looks after.
     /// </summary>
     sealed class MatchFeedback
@@ -32,6 +33,7 @@ namespace Squadra
         public void Attach(Match match)
         {
             match.FleetLaunched += OnFleetLaunched;
+            match.FleetPlaced += fleets.BeginTransit;
             match.FleetArrived += OnFleetArrived;
             match.DartProduced += OnDartProduced;
             match.CaptureCompleted += OnCaptureCompleted;

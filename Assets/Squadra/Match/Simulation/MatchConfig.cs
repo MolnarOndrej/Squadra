@@ -36,6 +36,20 @@ namespace Squadra.Simulation
         /// <summary>How long battles last: one second when decisive, five between equal forces.</summary>
         public BattleTiming BattleTiming = new BattleTiming();
 
+        /// <summary>
+        /// True for a mission: it ends once the human or every opponent is out. A sandbox sets it false and
+        /// plays on whoever is left, with no victory or defeat.
+        /// </summary>
+        public bool EndsOnElimination = true;
+
+        /// <summary>
+        /// What a fleet does that reaches a battle between two other sides. A battle has two sides and no
+        /// rule for a third was agreed, so a mission refuses it with an error. A sandbox, with three players
+        /// to order, sets this true: the fleet waits just outside until the battle is over and then arrives
+        /// as usual, in the same instant.
+        /// </summary>
+        public bool ThirdSideWaits;
+
         /// <summary>Adds the route between two objects, by index into <see cref="Nodes"/>.</summary>
         public void Connect(int a, int b)
         {

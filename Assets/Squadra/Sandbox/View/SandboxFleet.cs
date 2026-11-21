@@ -5,8 +5,9 @@ using UnityEngine;
 namespace Squadra
 {
     /// <summary>
-    /// A fleet of the sandbox held still on its way from one world to another: shown with its swarm,
-    /// course, wake and count, never flown and never arriving.
+    /// A fleet of the sandbox already on its way from one world to another when it starts. Its Darts are
+    /// its own, apart from those stationed at the world it set out from. Edit Mode shows it where it is;
+    /// Play Mode flies it on from there, and it arrives by the rules like any fleet.
     /// </summary>
     [Serializable]
     public sealed class SandboxFleet

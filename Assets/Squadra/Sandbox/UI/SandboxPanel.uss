@@ -1,0 +1,376 @@
+/*
+ * The sandbox's controls. Laid out for a 1920 x 1080 panel, like the menu: a row of icon buttons in the
+ * top right corner, the hint line under it, and below them the panel, which slides off to the right when
+ * collapsed and leaves only its arrow. The battlefield is framed beside the panel while it is out.
+ * Everything else lets the pointer through to the worlds.
+ */
+
+:root {
+    --panel: rgba(8, 11, 28, 0.55);
+    --panel-solid: rgba(10, 14, 34, 0.85);
+    --line: rgba(135, 145, 176, 0.4);
+    --line-faint: rgba(135, 145, 176, 0.22);
+    --text: #E6ECFF;
+    --text-dim: #8791B0;
+    --text-off: #4D5570;
+    --accent: #FFD166;
+    --accent-wash: rgba(255, 209, 102, 0.18);
+    --problem: #FF4D5E;
+}
+
+.sandbox-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: var(--text);
+    font-size: 18px;
+}
+
+.sandbox-side {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 500px;
+    align-items: flex-end;
+}
+
+/* ------------------------------------------------------------------ the menu */
+
+.sandbox-menu {
+    flex-direction: row;
+    margin: 12px 12px 0 0;
+    padding: 4px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--line-faint);
+    background-color: var(--panel);
+}
+
+.sandbox-menu-button {
+    width: 52px;
+    height: 48px;
+    margin: 2px;
+    padding: 9px;
+    border-width: 1px;
+    border-radius: 6px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--text);
+}
+
+.sandbox-menu-button--wide {
+    width: 92px;
+}
+
+.sandbox-menu-button:hover,
+.sandbox-menu-button:focus {
+    border-color: var(--accent);
+}
+
+.sandbox-menu-button:active {
+    background-color: var(--accent-wash);
+}
+
+.sandbox-menu-button--on {
+    color: var(--accent);
+}
+
+.sandbox-menu-button--off {
+    color: var(--text-off);
+}
+
+.sandbox-icon {
+    flex-grow: 1;
+}
+
+.sandbox-hint {
+    max-width: 476px;
+    min-height: 44px;
+    margin: 4px 12px 4px 0;
+    white-space: normal;
+    -unity-text-align: upper-right;
+    font-size: 16px;
+    color: var(--text);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* ------------------------------------------------------------------ the panel */
+
+.sandbox-panel {
+    flex-grow: 1;
+    width: 500px;
+    background-color: var(--panel);
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-top-left-radius: 8px;
+    border-color: var(--line-faint);
+    transition-property: translate;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-in-out;
+}
+
+.sandbox-panel--collapsed {
+    translate: 100% 0;
+}
+
+.sandbox-panel-toggle {
+    position: absolute;
+    left: -44px;
+    top: -1px;
+    width: 44px;
+    height: 52px;
+    margin: 0;
+    padding: 12px 8px;
+    border-width: 1px;
+    border-right-width: 0;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-color: var(--line-faint);
+    background-color: var(--panel);
+    color: var(--text);
+}
+
+.sandbox-panel-toggle:hover,
+.sandbox-panel-toggle:focus {
+    color: var(--accent);
+}
+
+.sandbox-scroll {
+    flex-grow: 1;
+    padding: 4px 18px 16px 18px;
+}
+
+.sandbox-heading {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top-width: 1px;
+    border-color: var(--line-faint);
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+}
+
+.sandbox-heading--first {
+    margin-top: 4px;
+    border-top-width: 0;
+}
+
+.sandbox-world-name {
+    font-size: 24px;
+    -unity-font-style: bold;
+}
+
+.sandbox-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.sandbox-row--wrap {
+    flex-wrap: wrap;
+}
+
+.sandbox-label {
+    font-size: 17px;
+    margin: 4px 0 2px 0;
+    min-width: 200px;
+}
+
+.sandbox-note {
+    white-space: normal;
+    font-size: 15px;
+    color: var(--text-dim);
+}
+
+.sandbox-problem {
+    white-space: normal;
+    font-size: 15px;
+    color: var(--problem);
+}
+
+.sandbox-button {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 36px;
+    margin: 3px;
+    padding: 0 8px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: var(--line);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.sandbox-button:hover,
+.sandbox-button:focus {
+    border-color: var(--accent);
+}
+
+.sandbox-button:active {
+    background-color: var(--accent-wash);
+}
+
+.sandbox-button:disabled {
+    opacity: 0.4;
+}
+
+.sandbox-button--chosen {
+    background-color: var(--accent-wash);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.sandbox-button--small {
+    flex-grow: 0;
+    flex-basis: auto;
+    min-width: 92px;
+}
+
+.sandbox-button--tight {
+    height: 26px;
+    min-width: 76px;
+    margin: 1px 0 1px 4px;
+    padding: 0 6px;
+    font-size: 12px;
+}
+
+.sandbox-field {
+    flex-grow: 1;
+    margin: 3px;
+    font-size: 17px;
+}
+
+.sandbox-field > .unity-base-text-field__input {
+    background-color: var(--panel-solid);
+    border-color: var(--line);
+    color: var(--text);
+    padding: 2px 6px;
+}
+
+.sandbox-field:focus > .unity-base-text-field__input {
+    border-color: var(--accent);
+}
+
+.sandbox-toggle {
+    margin: 6px 0 2px 0;
+}
+
+.sandbox-toggle .unity-toggle__text {
+    color: var(--text);
+    font-size: 17px;
+}
+
+/* ------------------------------------------------------------------ players */
+
+.sandbox-player {
+    margin: 2px 0;
+}
+
+.sandbox-swatch {
+    width: 34px;
+    height: 28px;
+    margin: 3px 8px 3px 0;
+    padding: 0;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--line);
+}
+
+.sandbox-swatch:hover,
+.sandbox-swatch:focus,
+.sandbox-swatch--open {
+    border-color: var(--accent);
+}
+
+.sandbox-player__name {
+    font-size: 17px;
+    -unity-font-style: bold;
+    min-width: 72px;
+}
+
+.sandbox-player__count {
+    font-size: 15px;
+    color: var(--text-dim);
+    flex-grow: 1;
+}
+
+.sandbox-player__picker {
+    margin: 2px 0 6px 42px;
+}
+
+.sandbox-picker__square {
+    height: 110px;
+    border-radius: 3px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.sandbox-picker__marker {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-width: 2px;
+    border-radius: 7px;
+    border-color: #FFFFFF;
+}
+
+.sandbox-picker__hues {
+    height: 18px;
+    margin-top: 6px;
+    border-radius: 3px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.sandbox-picker__hue-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 6px;
+    margin-left: -3px;
+    border-width: 2px;
+    border-radius: 2px;
+    border-color: #FFFFFF;
+}
+
+.sandbox-picker__hex {
+    flex-grow: 1;
+    font-size: 15px;
+    color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ tuning */
+
+.sandbox-tuning {
+    flex-direction: row;
+    align-items: center;
+    height: 30px;
+}
+
+.sandbox-tuning__name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sandbox-tuning__name--overridden {
+    color: var(--accent);
+}
+
+.sandbox-tuning__field {
+    flex-grow: 0;
+    width: 96px;
+    margin: 1px 0;
+    font-size: 15px;
+}
+
+.sandbox-tuning__problem {
+    margin: 0 0 4px 0;
+}

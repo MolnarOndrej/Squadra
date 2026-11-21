@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Squadra.Sandbox;
 using Squadra.Simulation;
 using TMPro;
 using UnityEngine;
@@ -7,27 +8,32 @@ using UnityEngine.SceneManagement;
 namespace Squadra
 {
     /// <summary>
-    /// The Sandbox scene's battlefield, shown without pressing Play so that how worlds, rings, fleets,
-    /// routes and the backdrop look can be tuned in context. It is drawn by the game's own renderers with
-    /// the shared looks: <see cref="WorldView"/> for the worlds, <see cref="RouteLanes"/> for the lanes
-    /// and the order preview, and the mission fleet layer's swarms and formations for the Darts, so an
-    /// edit to a shared style shows here and in every mission alike.
+    /// The Sandbox scene's starting moment, as its author lays it down, and its picture in Edit Mode, so
+    /// that how worlds, rings, fleets, routes and the backdrop look can be tuned in context. It is drawn
+    /// by the game's own renderers with the shared looks: <see cref="WorldView"/> for the worlds,
+    /// <see cref="RouteLanes"/> for the lanes and the order preview, and the mission fleet layer's swarms
+    /// and formations for the Darts, so an edit to a shared style shows here and in every mission alike.
     ///
     /// The worlds are the <see cref="SandboxWorld"/> objects under the worlds root, moved and edited like
-    /// any scene object. Here are the routes between them, the order preview, the fleets held on their
-    /// way, the backdrop and the sandbox's own behavior overrides; all of it is saved with the scene. The
-    /// rule values the samples show, such as a world's production or a flight's length, come from a match
-    /// set up from the samples with the game's defaults, or the overrides, and never started: nothing is
-    /// produced, captured, fought or flown, and nothing makes a sound, in the editor or in Play Mode.
+    /// any scene object, with the captures and battles under way at them. Here are the routes between
+    /// them, the fleets already on their way, the order preview, the backdrop and the sandbox's own
+    /// behavior overrides; all of it is saved with the scene and read into one <see cref="SandboxSetup"/>.
+    /// Edit Mode shows the first moment of a <see cref="SandboxSession"/> set up from it, frozen: nothing is
+    /// produced, captured, fought or flown, and nothing makes a sound. In Play Mode the scene's
+    /// <see cref="SandboxRun"/> plays on from that same moment and this draws nothing. What of the setup
+    /// cannot be laid down, such as a fleet without a route, is named in a warning and left out.
     ///
     /// The lines, dots and labels are made afresh when the scene opens, after scripts reload and when the
-    /// samples change in number, and are never saved: they live in a separate object marked as not saved.
+    /// setup changes in shape, and are never saved: they live in a separate object marked as not saved.
     /// </summary>
     [ExecuteAlways]
     public sealed class SandboxPreview : MonoBehaviour
     {
         const string PreviewName = "Sandbox Preview (made on load, not saved)";
         const HideFlags Transient = HideFlags.DontSave | HideFlags.NotEditable;
+
+        // The sandbox's three players, every one of them under the user's orders.
+        static readonly Faction[] Players = { Faction.Blue, Faction.Red, Faction.Green };
 
         [Header("Shared looks")]
         [Tooltip("The surfaces and space backdrops of the game.")]
@@ -45,14 +51,16 @@ namespace Squadra
         [Tooltip("Inactive template copied for the Dart count of each fleet on its way.")]
         [SerializeField] TextMeshPro fleetLabelTemplate;
 
-        [Header("Samples")]
+        [Header("Starting setup")]
         [Tooltip("ID of the space backdrop in the world looks, such as space.")]
         [SerializeField] string backdropId = "space";
         [SerializeField] SandboxRoute[] routes = new SandboxRoute[0];
-        [Tooltip("Where the preview of an order about to be given starts. Leave either end empty for none.")]
+        [Tooltip("Edit Mode only: where the preview of an order about to be given starts. Leave either end "
+            + "empty for none.")]
         [SerializeField] SandboxWorld orderFrom;
-        [Tooltip("Where the preview of an order about to be given ends.")]
+        [Tooltip("Edit Mode only: where the preview of an order about to be given ends.")]
         [SerializeField] SandboxWorld orderTo;
+        [Tooltip("Fleets already on their way when the sandbox starts.")]
         [SerializeField] SandboxFleet[] fleets = new SandboxFleet[0];
 
         [Header("Behavior")]
@@ -69,9 +77,20 @@ namespace Squadra
         RouteLanes lanes;
         SandboxDarts darts;
         Material shownBackdrop;
+        string reportedProblems;
+
+        public WorldLooks Looks => looks;
+        public RouteStyle RouteStyle => routeStyle;
+        public Material LineMaterial => lineMaterial;
+        public CameraRig Rig => rig;
+
+        /// <summary>The behavior overrides saved with the scene.</summary>
+        public SandboxBehavior Behavior => behavior;
 
         void OnEnable()
         {
+            if (Application.isPlaying) return;
+
             shownBackdrop = null;
             Redraw();
         }
@@ -89,29 +108,108 @@ namespace Squadra
 
         void Update()
         {
-            Redraw();
+            if (!Application.isPlaying) Redraw();
         }
 
+        // ------------------------------------------------------------------ the starting setup
+
         /// <summary>
-        /// Draws the samples as they are now. It runs every frame the scene updates; the editor also calls
-        /// it after an edit, which outside Play Mode does not always bring an update with it.
+        /// The starting moment as the scene lays it down now: the sandbox's players, its active worlds in
+        /// hierarchy order (also put into <paramref name="sceneWorlds"/>), their routes, the captures and
+        /// battles under way at them, the fleets on their way and the rules overridden. An entry that names
+        /// a world that is missing or inactive is kept with no world, for the session to name and leave out.
+        /// </summary>
+        public SandboxSetup Setup(List<SandboxWorld> sceneWorlds)
+        {
+            sceneWorlds.Clear();
+            if (worldsRoot != null) worldsRoot.GetComponentsInChildren(false, sceneWorlds);
+
+            var setup = new SandboxSetup();
+            setup.Players.AddRange(Players);
+            for (int i = 0; i < sceneWorlds.Count; i++)
+            {
+                SandboxWorld world = sceneWorlds[i];
+                setup.Worlds.Add(world.ToNode());
+                StartingCapture capture = world.ToCapture(i);
+                if (capture != null) setup.Captures.Add(capture);
+                StartingBattle battle = world.ToBattle(i);
+                if (battle != null) setup.Battles.Add(battle);
+            }
+
+            foreach (SandboxRoute route in routes)
+                setup.Routes.Add(new Route(IndexOf(sceneWorlds, route.From), IndexOf(sceneWorlds, route.To)));
+
+            foreach (SandboxFleet fleet in fleets)
+            {
+                setup.Fleets.Add(new StartingFleet
+                {
+                    Faction = fleet.Faction,
+                    Darts = fleet.Darts,
+                    From = IndexOf(sceneWorlds, fleet.From),
+                    To = IndexOf(sceneWorlds, fleet.To),
+                    Progress = fleet.Progress,
+                });
+            }
+
+            setup.Rules = behavior.Rules();
+            return setup;
+        }
+
+        /// <summary>Where the fronts of a battle at each of <paramref name="sceneWorlds"/> meet, in radians.</summary>
+        public static float[] FrontAngles(List<SandboxWorld> sceneWorlds)
+        {
+            var angles = new float[sceneWorlds.Count];
+            for (int i = 0; i < angles.Length; i++)
+                angles[i] = sceneWorlds[i].FrontAngle;
+            return angles;
+        }
+
+        /// <summary>Shows the space backdrop the setup names, unless it is already shown.</summary>
+        public void ShowBackdrop()
+        {
+            if (backdrop == null || looks == null) return;
+            if (!looks.TryGetBackdrop(backdropId, out Material material) || material == shownBackdrop) return;
+
+            backdrop.Show(material);
+            shownBackdrop = material;
+        }
+
+        /// <summary>Names in the Console what of the setup was left out, once for each set of problems.</summary>
+        public void Report(IReadOnlyList<string> problems)
+        {
+            string all = string.Join("\n", problems);
+            if (all == reportedProblems) return;
+
+            reportedProblems = all;
+            foreach (string problem in problems)
+                Debug.LogWarning("Squadra: in the sandbox's setup, " + problem, this);
+        }
+
+        static int IndexOf(List<SandboxWorld> sceneWorlds, SandboxWorld world)
+        {
+            return world != null ? sceneWorlds.IndexOf(world) : -1;
+        }
+
+        // ------------------------------------------------------------------ the Edit Mode picture
+
+        /// <summary>
+        /// Draws the starting moment as it is now. It runs every frame the scene updates outside Play Mode;
+        /// the editor also calls it after an edit, which outside Play Mode does not always bring an update.
         /// </summary>
         public void Redraw()
         {
-            if (worldsRoot == null || routeStyle == null || fleetStyle == null) return;
+            if (Application.isPlaying || worldsRoot == null || routeStyle == null || fleetStyle == null) return;
 
-            worlds.Clear();
-            worldsRoot.GetComponentsInChildren(false, worlds);
+            var session = new SandboxSession(Setup(worlds));
+            Report(session.Problems);
+            Match match = session.Match;
+
             views.Clear();
-            foreach (SandboxWorld world in worlds)
-                views.Add(world.View);
-
-            MatchOverrides rules = behavior.Rules();
-            Match match = SetUp(rules);
             states.Clear();
             for (int i = 0; i < worlds.Count; i++)
             {
-                WorldState state = worlds[i].Sample(match.Nodes[i], match.CaptureDuration);
+                views.Add(worlds[i].View);
+                WorldState state = WorldState.Of(match.Nodes[i]);
                 states.Add(state);
                 worlds[i].Present(looks, state);
             }
@@ -122,32 +220,11 @@ namespace Squadra
             if (!SameShape(match)) Rebuild(match);
 
             busy.Clear();
-            foreach (SandboxFleet fleet in fleets)
-            {
-                if (TryGetFlight(fleet, out int source, out int target)) busy.Add(new Route(source, target));
-            }
+            foreach (Fleet fleet in match.Fleets)
+                busy.Add(new Route(fleet.SourceId, fleet.TargetId));
 
-            lanes.Draw(IndexOf(orderFrom), IndexOf(orderTo), busy);
+            lanes.Draw(IndexOf(worlds, orderFrom), IndexOf(worlds, orderTo), busy);
             DrawDarts(match);
-        }
-
-        // A match laid down as a mission would be, from the samples, by the game's rules but for the
-        // overridden ones. It is never started: only what it says before the first moment is read.
-        Match SetUp(MatchOverrides rules)
-        {
-            var config = new MatchConfig();
-            foreach (SandboxWorld world in worlds)
-                config.Nodes.Add(world.ToNode());
-
-            foreach (SandboxRoute route in routes)
-            {
-                int a = IndexOf(route.From);
-                int b = IndexOf(route.To);
-                if (a >= 0 && b >= 0 && a != b) config.Connect(a, b);
-            }
-
-            rules.ApplyTo(config);
-            return new Match(config);
         }
 
         void DrawDarts(Match match)
@@ -157,37 +234,14 @@ namespace Squadra
             for (int i = 0; i < worlds.Count; i++)
                 darts.Garrison(views[i], states[i], worlds[i].FrontAngle, display, fleetStyle);
 
-            for (int slot = 0; slot < fleets.Length; slot++)
+            for (int slot = 0; slot < match.Fleets.Count; slot++)
             {
-                SandboxFleet fleet = fleets[slot];
-                if (!TryGetFlight(fleet, out int source, out int target)) continue;
-
-                darts.Transit(slot, views[source], views[target], states[target], fleet.Faction, fleet.Darts,
-                    fleet.Progress, match.TravelTime(source, target), display, fleetStyle, routeStyle);
+                Fleet fleet = match.Fleets[slot];
+                darts.Transit(slot, views[fleet.SourceId], views[fleet.TargetId], states[fleet.TargetId],
+                    fleet.Faction, fleet.Darts, fleet.Progress, fleet.Duration, display, fleetStyle, routeStyle);
             }
 
             darts.End();
-        }
-
-        void ShowBackdrop()
-        {
-            if (backdrop == null || looks == null) return;
-            if (!looks.TryGetBackdrop(backdropId, out Material material) || material == shownBackdrop) return;
-
-            backdrop.Show(material);
-            shownBackdrop = material;
-        }
-
-        bool TryGetFlight(SandboxFleet fleet, out int source, out int target)
-        {
-            source = IndexOf(fleet.From);
-            target = IndexOf(fleet.To);
-            return source >= 0 && target >= 0 && source != target && fleet.Darts > 0;
-        }
-
-        int IndexOf(SandboxWorld world)
-        {
-            return world != null ? worlds.IndexOf(world) : -1;
         }
 
         // ------------------------------------------------------------------ the objects drawn with

@@ -7,8 +7,9 @@ namespace Squadra
 {
     /// <summary>
     /// The behavior the sandbox plays by where it does not take the game's own: how Darts are drawn and
-    /// the rules a sandbox match would use. Each value left unticked follows the default in code, so a
-    /// later change to the game reaches the sandbox; normal missions never see any of these.
+    /// the rules the sandbox's match uses. Each value left unticked follows the default in code, so a
+    /// later change to the game reaches the sandbox; normal missions never see any of these. A run starts
+    /// from what is saved here and can tune a copy of it while it lasts; game speed is never saved here.
     /// </summary>
     [Serializable]
     public sealed class SandboxBehavior
@@ -49,6 +50,16 @@ namespace Squadra
         public DartDisplay Darts()
         {
             return new DartDisplay(orbitSpeed.Value, AtLeast(oneDotPerDartUpTo.WholeValue, 0),
+                Limit(mostStationedDots.WholeValue), Limit(mostTravellingDots.WholeValue));
+        }
+
+        /// <summary>
+        /// The Dart overrides as a run starts with them, held in range as by <see cref="Darts"/>, for the run
+        /// to tune further. Nothing done to the copy comes back here.
+        /// </summary>
+        public SandboxDartTuning DartTuning()
+        {
+            return new SandboxDartTuning(orbitSpeed.Value, AtLeast(oneDotPerDartUpTo.WholeValue, 0),
                 Limit(mostStationedDots.WholeValue), Limit(mostTravellingDots.WholeValue));
         }
 

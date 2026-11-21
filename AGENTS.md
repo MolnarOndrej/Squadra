@@ -17,6 +17,7 @@ All code is in `Assets/Squadra`, one folder per feature (`README.md` > Project l
 | `Squadra.Campaign` | `Campaign/Rules` | |
 | `Squadra.Pause` | `Pause/Rules` | Also holds `AudioMix`; leave it there |
 | `Squadra.Menus` | `Menus/Rules` | Where a keyboard move goes along a declared line of menu controls |
+| `Squadra.Sandbox` | `Sandbox/Rules` | Sandbox starting setup and session commands; references `Squadra.Simulation` |
 | `Squadra.Missions` | `MissionEditor/Missions` | Mission file format |
 | `Squadra.MissionEditing` | `MissionEditor/Editing` | References `Squadra.Missions` only |
 | `Assembly-CSharp` (ns `Squadra`) | everything else | Unity, UI Toolkit, audio, `PlayerPrefs`, OS dialogs |
