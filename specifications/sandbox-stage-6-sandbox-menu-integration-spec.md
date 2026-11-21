@@ -8,7 +8,7 @@ An Editor-only scene cannot be used independently in a built game. Players and t
 
 Add a Sandbox entry to the main menu and include the playable scene in game builds. Enter a fresh sandbox run using the saved game-speed preference and provide a clear return to the main menu.
 
-This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/53482e473a9d8dfd311e1e2addbd50d2a5bcf881/specifications/sandbox-stage-5-playable-sandbox-spec.md), including its resolved validation items. It completes the sequence beginning with [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md). This stage adds navigation and packaging, not another sandbox implementation.
+This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/d50aff40fce20b302fbf8daf4608cf6225cd41ac/specifications/sandbox-stage-5-playable-sandbox-spec.md), including its resolved validation items. It completes the sequence beginning with [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md). This stage adds navigation and packaging, not another sandbox implementation.
 
 ## User Stories
 
@@ -26,7 +26,7 @@ This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarO
 - Add the Sandbox entry to the main menu's existing control line and navigator. Reuse the current style, focus/highlight rules, hover/selection/back sounds and keyboard/pointer behavior. Update builder wiring with the UI change.
 - Package the scene, shared visuals and runtime controls in game builds. Runtime sandbox code must not require UnityEditor, the source checkout, absolute local paths, external mission JSON or editor-only authoring UI.
 - Scene construction and build inclusion belong in the existing builder/build setup. Keep the normal main menu entry scene and existing campaign selection flow.
-- Every entry creates a fresh sandbox session from the saved setup. Reset runtime node edits, colors, fleets, captures, battles and non-speed run overrides. Apply saved scene-authored sandbox behavior overrides; initialize game speed solely from the current saved Settings preference.
+- Every main-menu entry starts a fresh sandbox session from the same authored starting conditions as pressing Play directly on the Sandbox scene. Fleets continue from their authored route progress, captures continue from their authored progress, and battles start with their authored forces and front direction. Discard battlefield changes, color changes and temporary overrides from the previous run. Apply saved scene-authored sandbox behavior overrides and initialize game speed solely from the current saved Settings preference.
 - Entering or playing the sandbox does not change selected campaign identity, campaign completion or unlock reveals. Never route sandbox completion through campaign results; sandbox completion is disabled.
 - Provide Back to Main Menu from the sandbox. It returns to the root main menu, not the campaign map. Reuse existing pause/Settings conventions where applicable, including temporary speed override replacement by an explicit Settings speed choice.
 - On exit, drop runtime overrides and paused state. Preserve explicit Settings changes, restore menu timing/audio behavior and prevent duplicate scene navigation. A later normal mission must use normal source defaults plus the saved global speed.
@@ -36,7 +36,8 @@ This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarO
 ## Testing Decisions
 
 - Use the full main menu to sandbox to main menu flow as the primary integration seam. Extend existing menu navigation tests where they cover declared control order/focus, without asserting visual implementation details.
-- In Editor Play Mode and a standalone game build, enter by pointer and keyboard, use three-player controls, change temporary speed, leave and reenter. Confirm fresh state and initialization from saved Settings.
+- In Editor Play Mode, compare direct Sandbox scene entry with main-menu entry. Verify both start with the same authored fleet positions, capture progress, and battle forces and front direction, and that the activity continues as the simulation advances. Verify the same authored start when entering from the menu in a standalone build.
+- In Editor Play Mode and a standalone game build, enter by pointer and keyboard, use three-player controls to change the battlefield, and change the temporary game speed. Leave and reenter through the main menu. Confirm the authored battlefield returns, including activity already underway, and the new run starts at the saved Settings speed.
 - Change global speed from sandbox Settings, then make another temporary sandbox change. Exit and start a normal mission: the global choice persists, the temporary choice does not. Repeat while leaving a paused sandbox.
 - Verify prior campaign completion, selected mission and pending unlock information remain unchanged across sandbox use. Launch a campaign mission afterward and check ordinary order restrictions, time, results and pause behavior.
 - Verify return to root main menu, correct focus, audio, no stacked overlays, no inherited dimming and no accidental action from the activating input. Test rapid repeated activation for a single scene transition.
