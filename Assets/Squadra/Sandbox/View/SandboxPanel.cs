@@ -11,28 +11,31 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// The sandbox's controls. A menu in the top right corner switches Order mode on and off, pauses and
-    /// resumes, steps the game speed and resets the setup, with the hint line under it. The panel below it
-    /// edits the selected world's Darts, owner, type and production, each player's color, and the run's
+    /// The sandbox's controls. A menu in the top right corner switches between Inspect and Order mode,
+    /// pauses and resumes, steps the game speed and resets the setup. The panel below it
+    /// edits the inspected world's Darts, owner, type and production, each player's color, and the run's
     /// tuning; its arrow slides it off to the right and back. It shows the live state every frame and hands
     /// every edit to the <see cref="SandboxRun"/> or its session, which carries it out or says why not; the
     /// reason is shown and nothing changes. Nothing here is saved, and nothing here decides a rule.
     ///
     /// The pointer over the menu or the panel and the keys while one of their controls has the keyboard are
     /// theirs, never the battlefield's. Keys while nothing in them has the keyboard: Space pauses or
-    /// resumes, M switches Order mode on and off, Esc puts the selection away.
+    /// resumes, M switches Order mode on and off, Esc puts an order's selection away. The Set Default
+    /// icons explain themselves beside the pointer, drawn by a <see cref="SandboxTooltip"/>.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public sealed class SandboxPanel : MonoBehaviour
     {
-        const string ChosenClass = "sandbox-button--chosen";
         const string OnClass = "sandbox-menu-button--on";
-        const string OffClass = "sandbox-menu-button--off";
         const string CollapsedClass = "sandbox-panel--collapsed";
         const string OpenSwatchClass = "sandbox-swatch--open";
         const string OverriddenClass = "sandbox-tuning__name--overridden";
 
         static readonly NodeKind[] Kinds = { NodeKind.Planet, NodeKind.Moon, NodeKind.Asteroid };
+
+        // The popup list of a dropdown is laid over the whole screen, outside the panel; it is the panel's too.
+        const string DropdownClass = "unity-base-dropdown";
+        const string StyleSheetName = "SandboxPanel";
 
         [SerializeField] UIDocument document;
 
@@ -50,13 +53,13 @@ namespace Squadra
             public Label Problem;
         }
 
-        // One player: its Darts, its color and handing it the selected world.
+        // One player: its Darts and its color.
         sealed class PlayerRow
         {
             public Faction Faction;
             public Button Swatch;
             public Label Count;
-            public Button GiveWorld;
+            public Button ResetColor;
             public VisualElement PickerBox;
             public SandboxColorPicker Picker;
             public Label Hex;
@@ -64,8 +67,7 @@ namespace Squadra
 
         readonly List<TuningRow> tuning = new List<TuningRow>();
         readonly List<PlayerRow> players = new List<PlayerRow>();
-        readonly Dictionary<Faction, Button> ownerButtons = new Dictionary<Faction, Button>();
-        readonly Dictionary<NodeKind, Button> kindButtons = new Dictionary<NodeKind, Button>();
+        readonly List<Faction> owners = new List<Faction>();
 
         SandboxRun run;
         VisualElement panelElement;
@@ -73,27 +75,27 @@ namespace Squadra
         Button orderButton;
         Button pauseButton;
         Button speedButton;
+        SandboxIcon orderIcon;
         SandboxIcon pauseIcon;
-        SandboxIcon speedIcon;
         SandboxIcon toggleIcon;
-        Label hintLabel;
         Label noWorldLabel;
         VisualElement worldSection;
         Label worldNameLabel;
         Label worldStateLabel;
         TextField dartsField;
+        DropdownField ownerField;
+        DropdownField kindField;
         Toggle productionToggle;
         Label productionNote;
         Label worldProblemLabel;
         Label setupProblemsLabel;
         PlayerRow openPicker;
+        VisualElement sharedTree;
+        StyleSheet sharedSheet;
         int shownWorld = -2;
         bool expanded = true;
 
         SandboxSession Session => run.Session;
-
-        /// <summary>True while the panel is out; false while it is slid away and only its arrow shows.</summary>
-        public bool Expanded => expanded;
 
         /// <summary>Connects the panel to the run it controls and lays out its rows.</summary>
         public void Bind(SandboxRun boundRun)
@@ -107,22 +109,23 @@ namespace Squadra
             orderButton = root.Q<Button>("orderModeButton");
             pauseButton = root.Q<Button>("pauseButton");
             speedButton = root.Q<Button>("speedButton");
-            hintLabel = root.Q<Label>("hintLabel");
             noWorldLabel = root.Q<Label>("noWorldLabel");
             worldSection = root.Q("worldSection");
             worldNameLabel = root.Q<Label>("worldNameLabel");
             worldStateLabel = root.Q<Label>("worldStateLabel");
             dartsField = root.Q<TextField>("dartsField");
+            ownerField = root.Q<DropdownField>("ownerField");
+            kindField = root.Q<DropdownField>("kindField");
             productionToggle = root.Q<Toggle>("productionToggle");
             productionNote = root.Q<Label>("productionNote");
             worldProblemLabel = root.Q<Label>("worldProblemLabel");
             setupProblemsLabel = root.Q<Label>("setupProblemsLabel");
 
-            orderButton.Add(new SandboxIcon(SandboxIconShape.Hand));
+            // The icon itself says the mode: the hand in Order mode, the arrow pointer in Inspect mode.
+            orderIcon = new SandboxIcon(SandboxIconShape.Hand);
+            orderButton.Add(orderIcon);
             pauseIcon = new SandboxIcon(SandboxIconShape.Pause);
             pauseButton.Add(pauseIcon);
-            speedIcon = new SandboxIcon(SandboxIconShape.Speed);
-            speedButton.Add(speedIcon);
             Button resetButton = root.Q<Button>("resetButton");
             resetButton.Add(new SandboxIcon(SandboxIconShape.Reset));
             Button toggleButton = root.Q<Button>("panelToggleButton");
@@ -132,15 +135,20 @@ namespace Squadra
             orderButton.clicked += () => run.SetOrderMode(!run.OrderMode);
             pauseButton.clicked += () => run.SetPaused(!run.Paused);
             speedButton.clicked += NextSpeed;
-            resetButton.clicked += ResetSetup;
+            resetButton.clicked += run.ResetSetup;
             toggleButton.clicked += () => SetExpanded(!expanded);
             dartsField.RegisterValueChangedCallback(e => SetDarts(e.newValue));
             productionToggle.RegisterValueChangedCallback(e => SetProducing(e.newValue));
 
-            BuildOwners(root.Q("ownerChoices"));
-            BuildKinds(root.Q("kindChoices"));
+            BuildOwners();
+            BuildKinds();
             BuildPlayers(root.Q("playerRows"));
             BuildTuning(root.Q("tuningRows"));
+            new SandboxTooltip(root);
+            ShareStyleWithDropdowns(root);
+
+            // A run starts with the panel slid away, the battlefield in full view.
+            SetExpanded(false);
 
             Session.Started += ShowSetupProblems;
             ShowSetupProblems();
@@ -153,6 +161,25 @@ namespace Squadra
         {
             if (run == null) return;
             GameSettings.Clock.Changed -= ShowSpeed;
+            if (sharedTree != null) sharedTree.styleSheets.Remove(sharedSheet);
+        }
+
+        // The list a dropdown opens is laid over the whole panel, outside this document, so it only takes
+        // the sandbox's look from this document's style sheet hung on the panel's root as well. Its rules
+        // name the sandbox's own classes and the dropdown list's, so nothing else on the panel changes.
+        void ShareStyleWithDropdowns(VisualElement root)
+        {
+            VisualElement tree = root.panel?.visualTree;
+            if (tree == null) return;
+
+            for (int i = 0; i < root.styleSheets.count; i++)
+            {
+                if (root.styleSheets[i].name != StyleSheetName) continue;
+                sharedSheet = root.styleSheets[i];
+                sharedTree = tree;
+                tree.styleSheets.Add(sharedSheet);
+                return;
+            }
         }
 
         // ------------------------------------------------------------------ input
@@ -176,8 +203,15 @@ namespace Squadra
         bool IsOurs(VisualElement element)
         {
             if (element == null) return false;
-            return element == panelElement || panelElement.Contains(element)
-                || element == menuElement || menuElement.Contains(element);
+            if (element == panelElement || panelElement.Contains(element)
+                || element == menuElement || menuElement.Contains(element)) return true;
+
+            for (VisualElement at = element; at != null; at = at.parent)
+            {
+                if (at.ClassListContains(DropdownClass)) return true;
+            }
+
+            return false;
         }
 
         /// <summary>Slides the panel out, or away to the right so that only its arrow shows.</summary>
@@ -214,11 +248,9 @@ namespace Squadra
         {
             if (run == null) return;
 
-            orderButton.EnableInClassList(OnClass, run.OrderMode);
-            orderButton.EnableInClassList(OffClass, !run.OrderMode);
+            orderIcon.Shape = run.OrderMode ? SandboxIconShape.Hand : SandboxIconShape.Cursor;
             pauseIcon.Shape = run.Paused ? SandboxIconShape.Play : SandboxIconShape.Pause;
             pauseButton.EnableInClassList(OnClass, run.Paused);
-            hintLabel.text = run.Hint;
 
             ShowWorld();
             foreach (PlayerRow row in players)
@@ -229,12 +261,14 @@ namespace Squadra
 
         void ShowWorld()
         {
-            int selected = run.SelectedWorld;
+            int selected = run.InspectedWorld;
             if (selected != shownWorld)
             {
                 shownWorld = selected;
                 worldProblemLabel.text = string.Empty;
             }
+
+            worldProblemLabel.style.display = worldProblemLabel.text.Length == 0 ? DisplayStyle.None : DisplayStyle.Flex;
 
             bool any = selected >= 0;
             worldSection.style.display = any ? DisplayStyle.Flex : DisplayStyle.None;
@@ -247,10 +281,8 @@ namespace Squadra
             worldStateLabel.text = Describe(node);
             if (!IsFocused(dartsField)) dartsField.SetValueWithoutNotify(node.Darts.ToString(CultureInfo.InvariantCulture));
 
-            foreach (KeyValuePair<Faction, Button> owner in ownerButtons)
-                SetChosen(owner.Value, owner.Key == node.Owner);
-            foreach (KeyValuePair<NodeKind, Button> kind in kindButtons)
-                SetChosen(kind.Value, kind.Key == node.Kind);
+            ownerField.SetValueWithoutNotify(ownerField.choices[owners.IndexOf(node.Owner)]);
+            kindField.SetValueWithoutNotify(kindField.choices[Array.IndexOf(Kinds, node.Kind)]);
 
             bool asteroid = node.Kind == NodeKind.Asteroid;
             productionToggle.SetEnabled(!asteroid);
@@ -284,9 +316,7 @@ namespace Squadra
         void ShowSpeed()
         {
             GameSpeed speed = GameSettings.Clock.Speed;
-            speedIcon.Arrows = SpeedStep(speed) + 1;
-            speedButton.tooltip = "Game speed: " + GameClock.NameOf(speed)
-                + ". Press for the next; Settings keeps its own choice";
+            speedButton.text = "×" + GameClock.Multiplier(speed).ToString("0.##", CultureInfo.InvariantCulture);
         }
 
         static int SpeedStep(GameSpeed speed)
@@ -306,7 +336,6 @@ namespace Squadra
             IReadOnlyList<GameSpeed> speeds = GameClock.Speeds;
             GameSpeed next = speeds[(SpeedStep(GameSettings.Clock.Speed) + 1) % speeds.Count];
             run.SetSpeed(next);
-            run.Notify("Game speed: " + GameClock.NameOf(next));
         }
 
         void ShowSetupProblems()
@@ -315,11 +344,7 @@ namespace Squadra
             setupProblemsLabel.text = problems.Count == 0
                 ? string.Empty
                 : "Left out of the setup:\n" + string.Join("\n", problems);
-        }
-
-        static void SetChosen(VisualElement element, bool chosen)
-        {
-            element.EnableInClassList(ChosenClass, chosen);
+            setupProblemsLabel.style.display = problems.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
         static bool IsFocused(VisualElement field)
@@ -338,7 +363,7 @@ namespace Squadra
 
         void SetDarts(string text)
         {
-            int selected = run.SelectedWorld;
+            int selected = run.InspectedWorld;
             if (selected < 0) return;
 
             string problem = "Darts must be a whole number from 0 to " + SandboxSession.MostDarts + ".";
@@ -349,7 +374,7 @@ namespace Squadra
 
         void SetOwner(Faction owner)
         {
-            int selected = run.SelectedWorld;
+            int selected = run.InspectedWorld;
             if (selected < 0) return;
 
             Session.TrySetOwner(selected, owner, out string problem);
@@ -358,7 +383,7 @@ namespace Squadra
 
         void SetKind(NodeKind kind)
         {
-            int selected = run.SelectedWorld;
+            int selected = run.InspectedWorld;
             if (selected < 0) return;
 
             Session.TrySetKind(selected, kind, out string problem);
@@ -367,49 +392,43 @@ namespace Squadra
 
         void SetProducing(bool producing)
         {
-            int selected = run.SelectedWorld;
+            int selected = run.InspectedWorld;
             if (selected < 0) return;
 
             Session.TrySetProducing(selected, producing, out string problem);
             worldProblemLabel.text = problem ?? string.Empty;
         }
 
-        // ------------------------------------------------------------------ the menu
-
-        void ResetSetup()
-        {
-            run.ResetSetup();
-            run.Notify("The starting setup is laid down again");
-        }
-
         // ------------------------------------------------------------------ building the rows
 
-        void BuildOwners(VisualElement parent)
+        void BuildOwners()
         {
-            AddOwner(parent, Faction.Neutral);
+            owners.Add(Faction.Neutral);
             foreach (MatchPlayer player in Session.Players)
-                AddOwner(parent, player.Faction);
-        }
+                owners.Add(player.Faction);
 
-        void AddOwner(VisualElement parent, Faction owner)
-        {
-            var button = new Button(() => SetOwner(owner)) { text = Palette.NameOf(owner) };
-            button.AddToClassList("sandbox-button");
-            button.AddToClassList("sandbox-button--small");
-            parent.Add(button);
-            ownerButtons[owner] = button;
-        }
-
-        void BuildKinds(VisualElement parent)
-        {
-            foreach (NodeKind kind in Kinds)
+            var names = new List<string>();
+            foreach (Faction owner in owners)
+                names.Add(owner.ToString());
+            ownerField.choices = names;
+            ownerField.RegisterValueChangedCallback(e =>
             {
-                NodeKind chosen = kind;
-                var button = new Button(() => SetKind(chosen)) { text = kind.ToString().ToUpperInvariant() };
-                button.AddToClassList("sandbox-button");
-                parent.Add(button);
-                kindButtons[kind] = button;
-            }
+                int index = names.IndexOf(e.newValue);
+                if (index >= 0) SetOwner(owners[index]);
+            });
+        }
+
+        void BuildKinds()
+        {
+            var names = new List<string>();
+            foreach (NodeKind kind in Kinds)
+                names.Add(kind.ToString());
+            kindField.choices = names;
+            kindField.RegisterValueChangedCallback(e =>
+            {
+                int index = names.IndexOf(e.newValue);
+                if (index >= 0) SetKind(Kinds[index]);
+            });
         }
 
         void BuildPlayers(VisualElement parent)
@@ -422,23 +441,17 @@ namespace Squadra
 
                 var top = new VisualElement();
                 top.AddToClassList("sandbox-row");
-                row.Swatch = new Button(() => TogglePicker(row)) { tooltip = "Pick another color for " + player.Name };
+                row.Swatch = new Button(() => TogglePicker(row));
                 row.Swatch.AddToClassList("sandbox-swatch");
                 var name = new Label(player.Name);
                 name.AddToClassList("sandbox-player__name");
                 row.Count = new Label();
                 row.Count.AddToClassList("sandbox-player__count");
-                row.GiveWorld = new Button(() => SetOwner(row.Faction))
-                {
-                    text = "GIVE WORLD",
-                    tooltip = "Hand the selected world to " + player.Name,
-                };
-                row.GiveWorld.AddToClassList("sandbox-button");
-                row.GiveWorld.AddToClassList("sandbox-button--small");
+                row.ResetColor = ResetButton(() => ResetColor(row));
                 top.Add(row.Swatch);
                 top.Add(name);
                 top.Add(row.Count);
-                top.Add(row.GiveWorld);
+                top.Add(row.ResetColor);
 
                 row.PickerBox = new VisualElement();
                 row.PickerBox.AddToClassList("sandbox-player__picker");
@@ -449,15 +462,7 @@ namespace Squadra
                 under.AddToClassList("sandbox-row");
                 row.Hex = new Label();
                 row.Hex.AddToClassList("sandbox-picker__hex");
-                var reset = new Button(() => ResetColor(row))
-                {
-                    text = "RESET COLOR",
-                    tooltip = "Back to " + player.Name + "'s own color",
-                };
-                reset.AddToClassList("sandbox-button");
-                reset.AddToClassList("sandbox-button--small");
                 under.Add(row.Hex);
-                under.Add(reset);
                 row.PickerBox.Add(row.Picker);
                 row.PickerBox.Add(under);
 
@@ -472,12 +477,11 @@ namespace Squadra
         {
             Color color = Palette.Of(row.Faction);
             row.Swatch.style.backgroundColor = color;
+            bool recolored = Palette.IsRecolored(row.Faction);
             row.Count.text = Session.Match.TotalDarts(row.Faction) + " Darts"
-                + (Palette.IsRecolored(row.Faction) ? "  -  recolored" : string.Empty);
+                + (recolored ? "  -  recolored" : string.Empty);
+            row.ResetColor.style.display = recolored ? DisplayStyle.Flex : DisplayStyle.None;
             row.Hex.text = "#" + ColorUtility.ToHtmlStringRGB(color);
-
-            int selected = run.SelectedWorld;
-            row.GiveWorld.SetEnabled(selected >= 0 && Session.Match.Nodes[selected].Owner != row.Faction);
         }
 
         // One picker is open at a time; opening another closes it.
@@ -589,15 +593,8 @@ namespace Squadra
             row.Field = new TextField { isDelayed = true };
             row.Field.AddToClassList("sandbox-field");
             row.Field.AddToClassList("sandbox-tuning__field");
-            row.Field.RegisterValueChangedCallback(e => ShowProblem(row, row.Apply(e.newValue)));
-            row.ResetButton = new Button(() => ShowProblem(row, row.Reset()))
-            {
-                text = "DEFAULT",
-                tooltip = "Back to the game's value as the code has it now",
-            };
-            row.ResetButton.AddToClassList("sandbox-button");
-            row.ResetButton.AddToClassList("sandbox-button--small");
-            row.ResetButton.AddToClassList("sandbox-button--tight");
+            row.Field.RegisterValueChangedCallback(e => ShowProblem(row, Set(row, e.newValue)));
+            row.ResetButton = ResetButton(() => ShowProblem(row, row.Reset()));
             line.Add(row.Name);
             line.Add(row.Field);
             line.Add(row.ResetButton);
@@ -611,6 +608,23 @@ namespace Squadra
             tuning.Add(row);
         }
 
+        // A value typed in as the game's own is no override: the row goes back to following the game.
+        static string Set(TuningRow row, string text)
+        {
+            string problem = row.Apply(text);
+            if (problem == null && row.Overridden() && row.Shown() == row.Default()) problem = row.Reset();
+            return problem;
+        }
+
+        // The circling arrow that sets a value back to the game's, as the menu's reset icon draws it.
+        static Button ResetButton(Action clicked)
+        {
+            var button = new Button(clicked) { tooltip = "Set Default" };
+            button.AddToClassList("sandbox-reset");
+            button.Add(new SandboxIcon(SandboxIconShape.Reset));
+            return button;
+        }
+
         static void ShowProblem(TuningRow row, string problem)
         {
             row.Problem.text = problem ?? string.Empty;
@@ -622,7 +636,6 @@ namespace Squadra
             if (!IsFocused(row.Field)) row.Field.SetValueWithoutNotify(row.Shown());
             bool overridden = row.Overridden();
             row.Name.EnableInClassList(OverriddenClass, overridden);
-            row.Name.tooltip = overridden ? "Overridden; the game plays " + row.Default() : "The game's value";
             row.ResetButton.SetEnabled(overridden);
         }
 

@@ -5,16 +5,13 @@ namespace Squadra
 {
     /// <summary>
     /// A small icon on the sandbox's controls, drawn as shapes in the element's text color, so a USS class
-    /// can light it up or fade it. It is laid out on a 24 by 24 grid scaled to the element's height; the
-    /// speed arrows grow sideways, one arrow per step.
+    /// can light it up or fade it. It is laid out on a 24 by 24 grid scaled to fit the element.
     /// </summary>
     public sealed class SandboxIcon : VisualElement
     {
         const float Grid = 24f;
-        const float ArrowWidth = 9f;
 
         SandboxIconShape shape;
-        int arrows = 1;
 
         // Where the grid's origin is on the element and how large one grid unit is, for this drawing.
         Vector2 origin;
@@ -39,27 +36,13 @@ namespace Squadra
             }
         }
 
-        /// <summary>How many arrows <see cref="SandboxIconShape.Speed"/> shows, from 1.</summary>
-        public int Arrows
-        {
-            get => arrows;
-            set
-            {
-                value = Mathf.Max(1, value);
-                if (arrows == value) return;
-                arrows = value;
-                MarkDirtyRepaint();
-            }
-        }
-
         void Draw(MeshGenerationContext context)
         {
             Rect box = contentRect;
             if (box.width <= 0f || box.height <= 0f) return;
 
-            float width = shape == SandboxIconShape.Speed ? arrows * ArrowWidth + 2f : Grid;
-            unit = Mathf.Min(box.height / Grid, box.width / width);
-            origin = box.center - new Vector2(width, Grid) * (0.5f * unit);
+            unit = Mathf.Min(box.height, box.width) / Grid;
+            origin = box.center - new Vector2(Grid, Grid) * (0.5f * unit);
 
             Painter2D painter = context.painter2D;
             Color color = resolvedStyle.color;
@@ -71,18 +54,12 @@ namespace Squadra
             switch (shape)
             {
                 case SandboxIconShape.Hand: DrawHand(painter); break;
+                case SandboxIconShape.Cursor: DrawCursor(painter); break;
                 case SandboxIconShape.Pause:
                     Bar(painter, 6.5f, 5f, 4f, 14f, 1.2f);
                     Bar(painter, 13.5f, 5f, 4f, 14f, 1.2f);
                     break;
                 case SandboxIconShape.Play: Triangle(painter, P(8f, 5f), P(19.5f, 12f), P(8f, 19f)); break;
-                case SandboxIconShape.Speed:
-                    for (int i = 0; i < arrows; i++)
-                    {
-                        float x = 1f + i * ArrowWidth;
-                        Triangle(painter, P(x, 6f), P(x + ArrowWidth - 0.5f, 12f), P(x, 18f));
-                    }
-                    break;
                 case SandboxIconShape.Reset: DrawReset(painter); break;
                 case SandboxIconShape.Collapse: Chevron(painter, 9.5f, 15.5f); break;
                 case SandboxIconShape.Expand: Chevron(painter, 14.5f, 8.5f); break;
@@ -99,6 +76,21 @@ namespace Squadra
             Line(painter, 3.3f, 20f, 12.2f, 20f, 15.5f);
             Line(painter, 3.3f, 5.4f, 12.4f, 8.8f, 16.6f);
             Bar(painter, 8.2f, 13f, 13.45f, 8.5f, 3.4f);
+        }
+
+        // The arrow pointer: its tip at the top left, and a short tail down to the right.
+        void DrawCursor(Painter2D painter)
+        {
+            painter.BeginPath();
+            painter.MoveTo(P(6f, 3f));
+            painter.LineTo(P(6f, 19.5f));
+            painter.LineTo(P(10f, 15.6f));
+            painter.LineTo(P(12.8f, 21.6f));
+            painter.LineTo(P(15.6f, 20.3f));
+            painter.LineTo(P(12.8f, 14.4f));
+            painter.LineTo(P(18.2f, 14.4f));
+            painter.ClosePath();
+            painter.Fill();
         }
 
         // Most of a circle, with an arrowhead where it ends.

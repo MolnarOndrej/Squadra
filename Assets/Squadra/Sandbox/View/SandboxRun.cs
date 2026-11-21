@@ -24,12 +24,9 @@ namespace Squadra
     [DisallowMultipleComponent]
     public sealed class SandboxRun : MonoBehaviour
     {
-        // The part of the screen's width the panel covers on the right; the battlefield is framed beside it
-        // while the panel is out, and across the whole screen while it is slid away.
-        const float PanelShare = 0.27f;
-
-        // Seconds the framing takes to follow the panel, as long as the panel takes to slide (its USS).
-        const float PanelSlide = 0.25f;
+        // The part of the screen's width the panel covers on the right. The battlefield is framed beside
+        // it, and the camera stays put while the panel slides away and back.
+        const float PanelShare = 0.23f;
 
         [SerializeField] SandboxPreview preview;
         [SerializeField] FleetLayer fleets;
@@ -45,7 +42,6 @@ namespace Squadra
         SandboxDartTuning darts;
         RouteLanes lanes;
         Rect battlefield;
-        float panelShown = 1f;
         bool paused;
         bool running;
         int inputHeldFrame = -1;
@@ -62,14 +58,11 @@ namespace Squadra
         /// <summary>True while gameplay is frozen.</summary>
         public bool Paused => paused;
 
-        /// <summary>The selected world's index, or -1.</summary>
-        public int SelectedWorld => orders.Selected;
+        /// <summary>The index of the world the panel edits, or -1.</summary>
+        public int InspectedWorld => orders.Inspected;
 
         /// <summary>True in Order mode, where clicks on worlds send fleets.</summary>
         public bool OrderMode => orders.OrderMode;
-
-        /// <summary>What the hint line says now.</summary>
-        public string Hint => orders.Hint;
 
         void Awake()
         {
@@ -96,7 +89,6 @@ namespace Squadra
             fronts = SandboxPreview.FrontAngles(worlds);
             preview.ShowBackdrop();
             battlefield = Battlefield.Frame(views);
-            panelShown = panel != null ? 1f : 0f;
             FitBattlefield();
 
             darts = preview.Behavior.DartTuning();
@@ -144,14 +136,13 @@ namespace Squadra
                 if (panel != null && !panel.HasFocus) panel.ReadShortcuts();
             }
 
-            orders.CountDownNotice(Time.unscaledDeltaTime);
             if (!paused) session.Advance(deltaTime);
             orders.DropUnusableSelection();
 
             // Paused, a world still answers an edit or a selection on real time: its ring takes a new owner's
             // color and its outline follows the selection. Nothing of the match moves.
             float worldBlend = paused ? Time.unscaledDeltaTime : deltaTime;
-            int selected = orders.Selected;
+            int selected = orders.Outlined;
             int hovered = orders.Hovered;
             for (int i = 0; i < views.Length; i++)
             {
@@ -165,20 +156,13 @@ namespace Squadra
             Faction issuer = selected >= 0 ? match.Nodes[selected].Owner : Faction.Neutral;
             lanes.Refresh(match, issuer, orders.OrderMode ? selected : -1, hovered);
             if (panel != null) panel.Refresh();
-
-            float panelTarget = panel != null && panel.Expanded ? 1f : 0f;
-            if (panelShown != panelTarget)
-            {
-                panelShown = Mathf.MoveTowards(panelShown, panelTarget, Time.unscaledDeltaTime / PanelSlide);
-                FitBattlefield();
-            }
         }
 
-        // Frames the battlefield in the part of the screen the panel leaves free, wider as the panel goes.
+        // Frames the battlefield in the part of the screen the panel leaves free.
         void FitBattlefield()
         {
             Rect frame = battlefield;
-            frame.width /= Mathf.Lerp(1f, 1f - PanelShare, Mathf.SmoothStep(0f, 1f, panelShown));
+            if (panel != null) frame.width /= 1f - PanelShare;
             preview.Rig.Fit(frame);
         }
 
@@ -232,14 +216,13 @@ namespace Squadra
         }
 
         /// <summary>
-        /// Selects a world for the panel to edit, or nothing for a negative index. It switches to Inspect
-        /// mode, where a selection never sends a fleet.
+        /// Makes a world the one the panel edits. It switches to Inspect mode, where a click never sends a
+        /// fleet; a negative index changes nothing.
         /// </summary>
         public void Select(int index)
         {
             if (orders.OrderMode) orders.SetOrderMode(false);
-            orders.Click(-1, false);
-            if (index >= 0) orders.Click(index, false);
+            orders.Click(index, false);
         }
 
         /// <summary>
@@ -249,12 +232,6 @@ namespace Squadra
         public void ResetSetup()
         {
             session.Reset();
-        }
-
-        /// <summary>Shows a short notice on the hint line.</summary>
-        public void Notify(string text)
-        {
-            orders.Notify(text);
         }
     }
 }

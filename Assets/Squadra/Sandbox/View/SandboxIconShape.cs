@@ -6,16 +6,16 @@ namespace Squadra
         /// <summary>A pointing hand: Order mode, where clicks send fleets.</summary>
         Hand,
 
+        /// <summary>An arrow pointer: Inspect mode, where clicks select worlds to edit.</summary>
+        Cursor,
+
         /// <summary>Two bars: the battlefield is running, and pressing pauses it.</summary>
         Pause,
 
         /// <summary>A triangle: the battlefield is paused, and pressing resumes it.</summary>
         Play,
 
-        /// <summary>A row of arrows, one for each step of game speed.</summary>
-        Speed,
-
-        /// <summary>A circling arrow: lay the starting setup down again.</summary>
+        /// <summary>A circling arrow: lay the starting setup down again, or set a value back to its default.</summary>
         Reset,
 
         /// <summary>An arrow to the right: slide the panel away.</summary>

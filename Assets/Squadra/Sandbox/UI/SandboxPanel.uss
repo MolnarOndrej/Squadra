@@ -1,7 +1,8 @@
 /*
  * The sandbox's controls. Laid out for a 1920 x 1080 panel, like the menu: a row of icon buttons in the
- * top right corner, the hint line under it, and below them the panel, which slides off to the right when
- * collapsed and leaves only its arrow. The battlefield is framed beside the panel while it is out.
+ * top right corner and below it the panel, as tall as what it shows, which slides off to the right when
+ * collapsed and leaves only its arrow. The battlefield stays framed beside it. The list a dropdown opens
+ * is laid over the whole panel; this sheet is hung on the panel's root for it (SandboxPanel).
  * Everything else lets the pointer through to the worlds.
  */
 
@@ -33,20 +34,17 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: 500px;
+    width: 420px;
     align-items: flex-end;
 }
 
 /* ------------------------------------------------------------------ the menu */
 
+/* Just the buttons, on the battlefield. */
 .sandbox-menu {
     flex-direction: row;
     margin: 12px 12px 0 0;
     padding: 4px;
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: var(--line-faint);
-    background-color: var(--panel);
 }
 
 .sandbox-menu-button {
@@ -61,8 +59,12 @@
     color: var(--text);
 }
 
-.sandbox-menu-button--wide {
-    width: 92px;
+/* The game speed, as its multiplier. */
+.sandbox-menu-button--text {
+    padding: 0;
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
 }
 
 .sandbox-menu-button:hover,
@@ -78,34 +80,24 @@
     color: var(--accent);
 }
 
-.sandbox-menu-button--off {
-    color: var(--text-off);
-}
-
 .sandbox-icon {
     flex-grow: 1;
 }
 
-.sandbox-hint {
-    max-width: 476px;
-    min-height: 44px;
-    margin: 4px 12px 4px 0;
-    white-space: normal;
-    -unity-text-align: upper-right;
-    font-size: 16px;
-    color: var(--text);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-}
-
 /* ------------------------------------------------------------------ the panel */
 
+/* As tall as its rows, and no taller than the screen leaves it: then it scrolls. */
 .sandbox-panel {
-    flex-grow: 1;
-    width: 500px;
+    flex-grow: 0;
+    flex-shrink: 1;
+    width: 420px;
+    margin-top: 8px;
     background-color: var(--panel);
     border-left-width: 1px;
     border-top-width: 1px;
+    border-bottom-width: 1px;
     border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
     border-color: var(--line-faint);
     transition-property: translate;
     transition-duration: 0.25s;
@@ -116,23 +108,34 @@
     translate: 100% 0;
 }
 
+/* Halfway down the panel's left edge: a small tab, with the arrow at its full size over it. */
 .sandbox-panel-toggle {
     position: absolute;
-    left: -44px;
-    top: -1px;
-    width: 44px;
-    height: 52px;
+    left: -22px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 22px;
+    height: 26px;
     margin: 0;
-    padding: 12px 8px;
+    padding: 0;
+    overflow: visible;
     border-width: 1px;
     border-right-width: 0;
-    border-top-left-radius: 8px;
-    border-bottom-left-radius: 8px;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
     border-color: var(--line-faint);
     background-color: var(--panel);
     color: var(--text);
+}
+
+.sandbox-panel-toggle > .sandbox-icon {
+    position: absolute;
+    left: -4px;
+    top: -2px;
+    width: 28px;
+    height: 28px;
 }
 
 .sandbox-panel-toggle:hover,
@@ -141,8 +144,51 @@
 }
 
 .sandbox-scroll {
-    flex-grow: 1;
-    padding: 4px 18px 16px 18px;
+    flex-grow: 0;
+    flex-shrink: 1;
+    padding: 4px 12px 14px 16px;
+}
+
+/* A thin bar in the panel's colors, without the arrow buttons at its ends. */
+.sandbox-scroll .unity-scroller--vertical {
+    width: 6px;
+    min-width: 6px;
+    margin-left: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.sandbox-scroll .unity-scroller__low-button,
+.sandbox-scroll .unity-scroller__high-button {
+    display: none;
+}
+
+.sandbox-scroll .unity-scroller--vertical > .unity-scroller__slider {
+    width: 6px;
+    min-width: 6px;
+    margin: 0;
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__tracker {
+    left: 0;
+    width: 6px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 3px;
+    background-color: rgba(135, 145, 176, 0.12);
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__dragger {
+    left: 0;
+    width: 6px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 3px;
+    background-color: var(--line);
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__dragger:hover {
+    background-color: var(--accent);
 }
 
 .sandbox-heading {
@@ -170,14 +216,10 @@
     align-items: center;
 }
 
-.sandbox-row--wrap {
-    flex-wrap: wrap;
-}
-
 .sandbox-label {
     font-size: 17px;
     margin: 4px 0 2px 0;
-    min-width: 200px;
+    min-width: 160px;
 }
 
 .sandbox-note {
@@ -192,52 +234,102 @@
     color: var(--problem);
 }
 
-.sandbox-button {
+.sandbox-dropdown {
     flex-grow: 1;
-    flex-basis: 0;
-    height: 36px;
     margin: 3px;
-    padding: 0 8px;
-    border-width: 1px;
-    border-radius: 4px;
-    border-color: var(--line);
-    background-color: rgba(255, 255, 255, 0.05);
-    color: var(--text);
-    font-size: 16px;
-    -unity-font-style: bold;
+    font-size: 17px;
 }
 
-.sandbox-button:hover,
-.sandbox-button:focus {
+.sandbox-dropdown > .unity-base-field__input {
+    background-color: var(--panel-solid);
+    border-color: var(--line);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 2px 6px;
+}
+
+.sandbox-dropdown:hover > .unity-base-field__input,
+.sandbox-dropdown:focus > .unity-base-field__input {
     border-color: var(--accent);
 }
 
-.sandbox-button:active {
-    background-color: var(--accent-wash);
+.sandbox-dropdown .unity-base-popup-field__text {
+    color: var(--text);
 }
 
-.sandbox-button:disabled {
-    opacity: 0.4;
+.sandbox-dropdown .unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: var(--text-dim);
 }
 
-.sandbox-button--chosen {
-    background-color: var(--accent-wash);
+/* The world's text box and dropdowns: the same height, side and text. */
+.sandbox-row > .sandbox-field > .unity-base-text-field__input,
+.sandbox-row > .sandbox-dropdown > .unity-base-field__input {
+    height: 30px;
+    min-height: 30px;
+    margin: 0;
+    padding: 0 6px;
+    border-width: 1px;
+    border-radius: 3px;
+    -unity-text-align: middle-left;
+}
+
+/* The list a dropdown opens: its values as large as the one shown closed, the tick in line with them. */
+.unity-base-dropdown .unity-base-dropdown__item {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 6px;
+    align-items: center;
+}
+
+.unity-base-dropdown .unity-base-dropdown__label {
+    font-size: 17px;
+    -unity-text-align: middle-left;
+}
+
+.unity-base-dropdown .unity-base-dropdown__checkmark {
+    align-self: center;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.sandbox-tooltip {
+    position: absolute;
+    max-width: 380px;
+    padding: 5px 9px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: var(--line);
+    background-color: rgb(10, 14, 34);
+    color: var(--text);
+    font-size: 15px;
+    white-space: normal;
+}
+
+/* The circling arrow that sets a value back to the game's: the menu's reset icon, smaller. */
+.sandbox-reset {
+    width: 30px;
+    height: 28px;
+    margin: 1px 0 1px 4px;
+    padding: 2px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--text);
+}
+
+.sandbox-reset:hover,
+.sandbox-reset:focus {
     border-color: var(--accent);
     color: var(--accent);
 }
 
-.sandbox-button--small {
-    flex-grow: 0;
-    flex-basis: auto;
-    min-width: 92px;
+.sandbox-reset:active {
+    background-color: var(--accent-wash);
 }
 
-.sandbox-button--tight {
-    height: 26px;
-    min-width: 76px;
-    margin: 1px 0 1px 4px;
-    padding: 0 6px;
-    font-size: 12px;
+.sandbox-reset:disabled {
+    color: var(--text-off);
 }
 
 .sandbox-field {
@@ -257,13 +349,28 @@
     border-color: var(--accent);
 }
 
+/* A box in the look of the text box and dropdowns, where they start. */
 .sandbox-toggle {
-    margin: 6px 0 2px 0;
+    margin: 3px;
 }
 
-.sandbox-toggle .unity-toggle__text {
-    color: var(--text);
-    font-size: 17px;
+.sandbox-toggle .unity-toggle__checkmark {
+    width: 24px;
+    height: 24px;
+    border-width: 1px;
+    border-radius: 3px;
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+    -unity-background-image-tint-color: var(--text);
+}
+
+.sandbox-toggle:hover .unity-toggle__checkmark,
+.sandbox-toggle:focus .unity-toggle__checkmark {
+    border-color: var(--accent);
+}
+
+.sandbox-toggle:disabled {
+    opacity: 0.4;
 }
 
 /* ------------------------------------------------------------------ players */
@@ -300,8 +407,9 @@
     flex-grow: 1;
 }
 
+/* Room on the right for the markers, which sit half outside the square and the strip at their ends. */
 .sandbox-player__picker {
-    margin: 2px 0 6px 42px;
+    margin: 2px 8px 6px 42px;
 }
 
 .sandbox-picker__square {
