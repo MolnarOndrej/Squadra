@@ -480,9 +480,9 @@
 /* Dropdowns */
 
 .setting-row__control .unity-base-popup-field__input {
-    height: 56px;
+    height: var(--control-height);
     padding: 0 18px;
-    font-size: 24px;
+    font-size: var(--control-font-size);
     color: var(--text);
     background-color: var(--panel-solid);
     border-width: 2px;
@@ -513,11 +513,11 @@
 /* Volume sliders */
 
 .setting-row__control .unity-base-slider__input {
-    height: 56px;
+    height: var(--control-height);
 }
 
 .setting-row__control .unity-base-slider__drag-container {
-    height: 56px;
+    height: var(--control-height);
 }
 
 .setting-row__control .unity-base-slider__tracker {

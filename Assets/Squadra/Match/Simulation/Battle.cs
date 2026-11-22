@@ -121,6 +121,15 @@ namespace Squadra.Simulation
             return pairs;
         }
 
+        /// <summary>
+        /// Replaces the stationed side's count by hand, as a sandbox edit does. Nobody is lost or credited;
+        /// the caller gives the battle a fresh schedule, or ends it when the side is gone.
+        /// </summary>
+        internal void SetStationedDarts(int darts)
+        {
+            StationedDarts = darts;
+        }
+
         internal void End()
         {
             IsOver = true;

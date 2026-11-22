@@ -10,7 +10,7 @@ Add Game Speed to the shared Settings screen's General tab with exactly four opt
 
 | Option | Multiplier |
 | --- | ---: |
-| Slow | 0.75 |
+| Slow | 0.5 |
 | Normal | 1.0 |
 | Fast | 1.5 |
 | Turbo | 2.0 |
@@ -33,7 +33,7 @@ Normal is the default. This is stage 4 and can be implemented independently of t
 ## Implementation Decisions
 
 - Settings owns the persistent preference and shared General-tab control. Use the existing GameSettings load/save lifecycle and shared SettingsScreen, including immediate application and existing menu navigation conventions. No additional settings tab is needed.
-- Offer exactly Slow 0.75, Normal 1.0, Fast 1.5 and Turbo 2.0 in that order. A new or unsupported stored value resolves to Normal. Store a stable supported choice rather than accepting arbitrary floats through the UI.
+- Offer exactly Slow 0.5, Normal 1.0, Fast 1.5 and Turbo 2.0 in that order. A new or unsupported stored value resolves to Normal. Store a stable supported choice rather than accepting arbitrary floats through the UI.
 - Load the preference before gameplay starts. Save completed Settings interactions. Changes from main menu Settings affect subsequent missions; changes from pause Settings update the selected pace immediately while the match remains frozen until resumed.
 - Maintain distinct saved preference, optional sandbox-run override and paused state. Effective gameplay speed is zero while paused; otherwise it is the sandbox override when present, or the saved preference. Pausing must not save zero or erase the chosen speed.
 - A new sandbox run starts from the current saved preference with no speed override, including direct Editor scene entry. Game speed is explicitly excluded from scene-saved sandbox behavior overrides.

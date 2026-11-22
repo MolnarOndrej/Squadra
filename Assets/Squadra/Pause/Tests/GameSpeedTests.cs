@@ -29,7 +29,7 @@ namespace Squadra.Tests
         [Test]
         public void Each_choice_has_its_multiplier()
         {
-            Assert.AreEqual(0.75f, GameClock.Multiplier(GameSpeed.Slow));
+            Assert.AreEqual(0.5f, GameClock.Multiplier(GameSpeed.Slow));
             Assert.AreEqual(1f, GameClock.Multiplier(GameSpeed.Normal));
             Assert.AreEqual(1.5f, GameClock.Multiplier(GameSpeed.Fast));
             Assert.AreEqual(2f, GameClock.Multiplier(GameSpeed.Turbo));
@@ -140,7 +140,7 @@ namespace Squadra.Tests
 
             clock.Choose(GameSpeed.Slow);
 
-            Assert.AreEqual(0.75f, clock.Scale);
+            Assert.AreEqual(0.5f, clock.Scale);
         }
 
         [Test]
@@ -276,7 +276,7 @@ namespace Squadra.Tests
             Assert.AreEqual(0f, clock.Scale);
 
             clock.SetPaused(false);
-            Assert.AreEqual(0.75f, clock.Scale);
+            Assert.AreEqual(0.5f, clock.Scale);
         }
 
         [Test]
@@ -322,7 +322,7 @@ namespace Squadra.Tests
             Assert.AreEqual(1f, clock.Scale, "the menu is not sped up");
 
             clock.BeginRun();
-            Assert.AreEqual(0.75f, clock.Scale);
+            Assert.AreEqual(0.5f, clock.Scale);
         }
 
         [Test]

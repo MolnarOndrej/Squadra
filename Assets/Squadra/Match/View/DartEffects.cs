@@ -107,6 +107,13 @@ namespace Squadra
         }
 
         /// <summary>Ages and draws every shot, then every spark. With no time passing nothing ages.</summary>
+        /// <summary>Drops every shot and spark at once, as when the battlefield is laid down afresh.</summary>
+        public void Clear()
+        {
+            shots.Clear();
+            sparks.Clear();
+        }
+
         public void Draw(DotBatch batch, float deltaTime, float dotRadius)
         {
             DrawShots(batch, deltaTime, dotRadius);

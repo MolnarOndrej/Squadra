@@ -44,7 +44,7 @@ namespace Squadra
 
             Vector2 screen = pointer.position.ReadValue();
             Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
-            Hovered = WorldAt(world);
+            Hovered = WorldAt(worlds, world);
 
             // Escape belongs to the pause menu; a right-click, or a click on the selected world, cancels.
             Mouse mouse = Mouse.current;
@@ -53,7 +53,8 @@ namespace Squadra
             if (pointer.press.wasPressedThisFrame) Click(Hovered);
         }
 
-        int WorldAt(Vector2 point)
+        /// <summary>The index of the world whose orbit <paramref name="point"/> is in, the nearest one first; -1 for none.</summary>
+        internal static int WorldAt(IReadOnlyList<WorldView> worlds, Vector2 point)
         {
             int best = -1;
             float bestDistance = float.MaxValue;

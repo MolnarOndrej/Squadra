@@ -281,7 +281,7 @@ namespace Squadra.EditorTools
             return view;
         }
 
-        static FleetLayer BuildFleets(SceneMaterials materials, SceneStyles styles)
+        internal static FleetLayer BuildFleets(SceneMaterials materials, SceneStyles styles)
         {
             var go = new GameObject("Fleets");
             go.AddComponent<MeshFilter>();
@@ -308,7 +308,7 @@ namespace Squadra.EditorTools
             return label;
         }
 
-        static EffectsLayer BuildEffects(SceneMaterials materials)
+        internal static EffectsLayer BuildEffects(SceneMaterials materials)
         {
             var go = new GameObject("Effects");
             TextMeshPro floating = Text("Floating Text Template", go.transform, "-20", 4f, Palette.Text,
@@ -432,7 +432,7 @@ namespace Squadra.EditorTools
             return pause;
         }
 
-        static SoundLayer BuildSounds(CameraRig rig)
+        internal static SoundLayer BuildSounds(CameraRig rig)
         {
             var sounds = new GameObject("Sounds").AddComponent<SoundLayer>();
             WireSounds(sounds, rig);

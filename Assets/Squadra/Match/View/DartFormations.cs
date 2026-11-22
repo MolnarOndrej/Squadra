@@ -39,14 +39,16 @@ namespace Squadra
 
         /// <summary>
         /// The place of Dart number <paramref name="index"/> on its orbit at a moment, turning at its
-        /// <see cref="LaneSpeed"/>.
+        /// <see cref="LaneSpeed"/>. <paramref name="orbitShift"/> turns every lane on by as many radians: it
+        /// keeps the Darts where they are when the orbit speed changes, instead of where the new speed would
+        /// have put them by now.
         /// </summary>
-        public static void OrbitPlace(WorldView world, int index, float time, float orbitSpeed, FleetStyle style,
-            out float angle, out float radius)
+        public static void OrbitPlace(WorldView world, int index, float time, float orbitSpeed, float orbitShift,
+            FleetStyle style, out float angle, out float radius)
         {
             int lane = index % 3;
             int slot = index / 3;
-            angle = slot * GoldenAngle + lane * 2.1f + time * LaneSpeed(index, orbitSpeed);
+            angle = slot * GoldenAngle + lane * 2.1f + time * LaneSpeed(index, orbitSpeed) + orbitShift;
             radius = world.OrbitRadius + (lane - 1) * style.LaneSpacing + 0.018f * Mathf.Sin(time * 1.3f + index * 1.7f);
         }
 

@@ -129,7 +129,7 @@ namespace Squadra.Pause
         {
             switch (speed)
             {
-                case GameSpeed.Slow: return 0.75f;
+                case GameSpeed.Slow: return 0.5f;
                 case GameSpeed.Fast: return 1.5f;
                 case GameSpeed.Turbo: return 2f;
                 default: return 1f;

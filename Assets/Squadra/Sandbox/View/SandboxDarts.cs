@@ -83,7 +83,7 @@ namespace Squadra
                 if (state.Fighting)
                     DartFormations.FormationPlace(world, i, count, frontAngle, true, style, out angle, out radius);
                 else
-                    DartFormations.OrbitPlace(world, i, Moment, display.OrbitSpeed, style, out angle, out radius);
+                    DartFormations.OrbitPlace(world, i, Moment, display.OrbitSpeed, 0f, style, out angle, out radius);
                 bodies.Add(world.Position + DartFormations.Polar(angle, radius),
                     DartFormations.Heading(angle, i, true, formed, display.OrbitSpeed), style.DotSize, stationed);
             }

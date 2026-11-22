@@ -58,6 +58,7 @@ namespace Squadra
         float flash;
         long shownCountKey = long.MinValue;
         long shownCaptionKey = long.MinValue;
+        int shownPalette = -1;
 
         /// <summary>The Dart count as shown under the world. Both sides' counts during a battle.</summary>
         public string CountText => countLabel != null ? countLabel.GetParsedText() : string.Empty;
@@ -253,6 +254,14 @@ namespace Squadra
 
         void RenderLabels(WorldState state, float time)
         {
+            // A player shown in another color has its labels written again in it.
+            if (shownPalette != Palette.Version)
+            {
+                shownPalette = Palette.Version;
+                shownCountKey = long.MinValue;
+                shownCaptionKey = long.MinValue;
+            }
+
             if (countLabel != null)
             {
                 bool show = state.Fighting || state.Occupant != Faction.Neutral;
@@ -333,9 +342,12 @@ namespace Squadra
                 }
                 else
                 {
+                    // Faster than a Dart a second, as a sandbox can tune it, it reads as Darts per second.
                     string rate = Mathf.Approximately(state.Interval, 1f)
                         ? "+1 / s"
-                        : "+1 / " + state.Interval.ToString("0.#", CultureInfo.InvariantCulture) + "s";
+                        : state.Interval < 1f
+                            ? "+" + (1f / state.Interval).ToString("0.#", CultureInfo.InvariantCulture) + " / s"
+                            : "+1 / " + state.Interval.ToString("0.#", CultureInfo.InvariantCulture) + "s";
                     captionLabel.text = displayName.ToUpperInvariant() + "  -  " + rate;
                     captionLabel.color = Palette.TextDim;
                 }

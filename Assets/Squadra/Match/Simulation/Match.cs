@@ -25,6 +25,8 @@ namespace Squadra.Simulation
         readonly List<Route> routes = new List<Route>();
         readonly HashSet<Route> routeSet = new HashSet<Route>();
         readonly MatchRoster roster;
+        readonly bool endsOnElimination;
+        readonly bool thirdSideWaits;
         int nextFleetId = 1;
 
         public Match(MatchConfig config)
@@ -47,6 +49,8 @@ namespace Squadra.Simulation
 
             Human = config.Human;
             roster = new MatchRoster(config, nodes);
+            endsOnElimination = config.EndsOnElimination;
+            thirdSideWaits = config.ThirdSideWaits;
         }
 
         public IReadOnlyList<Node> Nodes => nodes;
@@ -58,7 +62,8 @@ namespace Squadra.Simulation
         /// <summary>The battles being fought right now, at most one per map object.</summary>
         public IReadOnlyList<Battle> Battles => battles;
 
-        public double FleetSpeed { get; }
+        /// <summary>Common fleet speed in map units per second. Only a sandbox edit changes it.</summary>
+        public double FleetSpeed { get; private set; }
         public double CaptureDuration { get; }
 
         /// <summary>How long battles last. Changing it affects the battles and reinforcements that follow.</summary>
@@ -84,6 +89,12 @@ namespace Squadra.Simulation
         public MatchResults Results { get; private set; }
 
         public event Action<Fleet> FleetLaunched;
+
+        /// <summary>
+        /// Raised for a fleet put on its way by <see cref="TryPlaceFleet"/> rather than launched: nothing
+        /// left a world, so nothing should look or sound as if it had.
+        /// </summary>
+        public event Action<Fleet> FleetPlaced;
 
         /// <summary>
         /// Raised for every fleet that reaches its destination, whether it merged, landed, started a
@@ -169,7 +180,8 @@ namespace Squadra.Simulation
 
         /// <summary>
         /// Advances the match. Events inside the interval are resolved in time order, so one large step gives
-        /// the same result as many small ones. Time stops once the match has a result.
+        /// the same result as many small ones. Time stops once the match has a result; a match that does
+        /// not end on elimination never has one.
         /// </summary>
         public void Advance(double seconds)
         {
@@ -193,7 +205,11 @@ namespace Squadra.Simulation
                 next = Math.Min(next, node.TimeToNextEvent);
 
             foreach (Fleet fleet in fleets)
+            {
+                // A fleet waiting outside a battle has no event of its own: the battle's end releases it.
+                if (fleet.HasArrived && MustWait(fleet)) continue;
                 next = Math.Min(next, fleet.Duration - fleet.Elapsed);
+            }
 
             return Math.Max(0, next);
         }
@@ -211,6 +227,8 @@ namespace Squadra.Simulation
         // Order within one instant: production, then capture completion, then arrivals in launch order,
         // then the casualties of battles. A fleet therefore meets every Dart produced up to and including
         // its moment of arrival, and a reinforcement is counted before a casualty due at the same moment.
+        // Where third sides wait (a sandbox), a fleet that waited outside a battle arrives right after the
+        // casualties that ended it, still in launch order, and the battles are settled again after it.
         void ResolveDueEvents()
         {
             foreach (Node node in nodes)
@@ -238,21 +256,59 @@ namespace Squadra.Simulation
 
             foreach (Fleet fleet in arrivals)
             {
+                if (MustWait(fleet)) continue; // also a battle that began earlier in this instant
                 RequireTwoSides(fleet);
                 fleets.Remove(fleet);
                 ResolveArrival(fleet);
             }
 
-            foreach (Node node in nodes)
+            do
             {
-                if (node.IsContested) ResolveBattle(node);
+                foreach (Node node in nodes)
+                {
+                    if (node.IsContested) ResolveBattle(node);
+                }
             }
+            while (ReleaseWaitingFleets());
         }
 
         // ------------------------------------------------------------------ arrivals
 
+        // True for a fleet that must wait outside its target: a battle between two other sides is being
+        // fought there and the match lets third sides wait.
+        bool MustWait(Fleet fleet)
+        {
+            if (!thirdSideWaits) return false;
+            Battle battle = nodes[fleet.TargetId].Battle;
+            return battle != null && !battle.Involves(fleet.Faction);
+        }
+
+        // The fleets still in transit that have reached their target are the ones waiting outside a
+        // battle. Those whose battle is over now arrive, in launch order; returns whether any did.
+        bool ReleaseWaitingFleets()
+        {
+            if (!thirdSideWaits) return false;
+
+            arrivals.Clear();
+            foreach (Fleet fleet in fleets)
+            {
+                if (fleet.HasArrived) arrivals.Add(fleet);
+            }
+
+            bool released = false;
+            foreach (Fleet fleet in arrivals)
+            {
+                if (MustWait(fleet)) continue;
+                fleets.Remove(fleet);
+                ResolveArrival(fleet);
+                released = true;
+            }
+
+            return released;
+        }
+
         // A battle has exactly two sides. What a third faction's arrival at a battle should do has not
-        // been decided, so it is refused loudly rather than given a rule nobody agreed to.
+        // been decided, so a mission refuses it loudly rather than giving it a rule nobody agreed to.
         void RequireTwoSides(Fleet fleet)
         {
             Battle battle = nodes[fleet.TargetId].Battle;
@@ -335,6 +391,14 @@ namespace Squadra.Simulation
 
         void EndBattle(Node node, Battle battle)
         {
+            BattleOutcome outcome = FinishBattle(node, battle);
+            BattleEnded?.Invoke(new BattleReport(node.Id, battle.Arriving, battle.Stationed, outcome,
+                battle.LossesPerSide, node.Darts, battle.Elapsed));
+        }
+
+        // Takes a decided battle off the object and leaves the object to whoever is left.
+        BattleOutcome FinishBattle(Node node, Battle battle)
+        {
             node.Battle = null;
             battles.Remove(battle);
             battle.End();
@@ -371,8 +435,214 @@ namespace Squadra.Simulation
                 outcome = BattleOutcome.Tie;
             }
 
-            BattleEnded?.Invoke(new BattleReport(node.Id, battle.Arriving, battle.Stationed, outcome,
-                battle.LossesPerSide, node.Darts, battle.Elapsed));
+            return outcome;
+        }
+
+        // ------------------------------------------------------------------ setting up and editing (sandbox)
+
+        // A sandbox lays down a moment of play and edits it while it runs. These are administrative: nothing
+        // is fought, produced or captured by them, no casualty is counted, and no match event is raised but
+        // FleetPlaced. Each checks everything first and changes nothing when it refuses, saying why.
+
+        /// <summary>
+        /// Puts a fleet of <paramref name="darts"/> on its way from one object to another as if it had
+        /// already flown <paramref name="progress"/> of the route (0 to 1). Nothing leaves the source.
+        /// </summary>
+        public bool TryPlaceFleet(Faction faction, int darts, int sourceId, int targetId, double progress,
+            out Fleet fleet, out string problem)
+        {
+            fleet = null;
+            problem = null;
+            if (!IsPlayer(faction)) problem = faction + " is not a player of this match.";
+            else if (!IsNode(sourceId) || !IsNode(targetId)) problem = "It needs a world to set out from and one to fly to.";
+            else if (sourceId == targetId) problem = "It sets out from and flies to " + nodes[sourceId].Name + ".";
+            else if (!AreConnected(sourceId, targetId))
+                problem = "No route from " + nodes[sourceId].Name + " to " + nodes[targetId].Name + ".";
+            else if (darts < 1) problem = "A fleet needs at least one Dart.";
+            else if (!(progress >= 0 && progress <= 1)) problem = "How far along it is must be from 0 to 1.";
+            if (problem != null) return false;
+
+            fleet = new Fleet(nextFleetId++, faction, darts, sourceId, targetId, TravelTime(sourceId, targetId));
+            fleet.Elapsed = progress * fleet.Duration;
+            fleets.Add(fleet);
+            FleetPlaced?.Invoke(fleet);
+            return true;
+        }
+
+        /// <summary>
+        /// Starts a capture of an object by <paramref name="captor"/> as if it had run for
+        /// <paramref name="progress"/> of its time (0 to 1). The Darts stationed there are the captor's.
+        /// With no Darts there nobody can capture: any capture is cleared and the owner keeps the object.
+        /// </summary>
+        public bool TryStageCapture(int nodeId, Faction captor, double progress, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (!IsPlayer(captor)) problem = captor + " is not a player of this match.";
+            else if (nodes[nodeId].Owner == captor) problem = captor + " already owns " + nodes[nodeId].Name + ".";
+            else if (nodes[nodeId].IsContested) problem = "A battle is being fought at " + nodes[nodeId].Name + ".";
+            else if (!(progress >= 0 && progress <= 1)) problem = "Capture progress must be from 0 to 1.";
+            if (problem != null) return false;
+
+            Node node = nodes[nodeId];
+            if (node.Darts == 0) node.ClearCapture();
+            else node.StageCapture(captor, progress * CaptureDuration);
+            return true;
+        }
+
+        /// <summary>
+        /// Starts a battle at an object between the Darts stationed there and <paramref name="darts"/> of
+        /// <paramref name="attacker"/>, on the normal casualty schedule. With no attackers there is no battle.
+        /// With nobody stationed there the attackers land as any fleet would: an owner takes its object back,
+        /// anyone else starts a fresh capture.
+        /// </summary>
+        public bool TryStageBattle(int nodeId, Faction attacker, int darts, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (!IsPlayer(attacker)) problem = attacker + " is not a player of this match.";
+            else if (nodes[nodeId].IsContested) problem = "A battle is already being fought at " + nodes[nodeId].Name + ".";
+            else if (darts < 0) problem = "The attackers cannot be fewer than none.";
+            else if (darts > 0 && nodes[nodeId].Darts > 0 && nodes[nodeId].Occupant == attacker)
+                problem = "The Darts stationed at " + nodes[nodeId].Name + " are " + attacker + "'s own.";
+            if (problem != null) return false;
+
+            Node node = nodes[nodeId];
+            if (darts == 0) return true;
+
+            if (node.Darts == 0)
+            {
+                node.Darts = darts;
+                if (attacker == node.Owner) node.ClearCapture();
+                else node.BeginCapture(attacker);
+                return true;
+            }
+
+            var battle = new Battle(node.Id, node.Occupant, node.Darts, attacker, darts);
+            node.Battle = battle;
+            battles.Add(battle);
+            battle.Schedule(BattleTiming);
+            return true;
+        }
+
+        /// <summary>
+        /// Replaces the number of Darts stationed at an object: the owner's, the captor's during a capture,
+        /// or the defenders' during a battle, which is then timed afresh for the forces present, as after a
+        /// reinforcement. With none left a capture is cleared and the owner keeps the object, and a battle
+        /// ends with the attackers landing as on an empty object.
+        /// </summary>
+        public bool TrySetStationedDarts(int nodeId, int darts, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (darts < 0) problem = "Darts cannot be fewer than none.";
+            if (problem != null) return false;
+
+            Node node = nodes[nodeId];
+            Battle battle = node.Battle;
+            if (battle != null)
+            {
+                battle.SetStationedDarts(darts);
+                if (darts == 0)
+                {
+                    FinishBattle(node, battle);
+                    return true;
+                }
+
+                battle.Schedule(BattleTiming);
+            }
+
+            node.Darts = darts;
+            if (darts == 0 && node.IsBeingCaptured) node.ClearCapture();
+            return true;
+        }
+
+        /// <summary>
+        /// Hands an object to <paramref name="owner"/>, or makes it neutral, at once. A battle or capture
+        /// there is called off: the attackers are gone, without counting as casualties, and the Darts
+        /// stationed there are the new owner's. Fleets on their way are left alone.
+        /// </summary>
+        public bool TrySetOwner(int nodeId, Faction owner, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (owner != Faction.Neutral && !IsPlayer(owner)) problem = owner + " is not a player of this match.";
+            if (problem != null) return false;
+
+            Node node = nodes[nodeId];
+            Battle battle = node.Battle;
+            if (battle != null)
+            {
+                node.Battle = null;
+                battles.Remove(battle);
+                battle.End();
+            }
+
+            node.SetOwner(owner);
+            return true;
+        }
+
+        /// <summary>
+        /// Makes an object another kind, producing a Dart every <paramref name="productionInterval"/>
+        /// seconds unless it is an asteroid, and with its production switched on, as for a new object of that
+        /// kind. Owner, Darts, a capture and a battle there stay as they are, and so do routes and fleets.
+        /// </summary>
+        public bool TrySetKind(int nodeId, NodeKind kind, double productionInterval, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (kind != NodeKind.Planet && kind != NodeKind.Moon && kind != NodeKind.Asteroid)
+                problem = "A world is a planet, a moon or an asteroid.";
+            else if (kind != NodeKind.Asteroid && !(productionInterval >= Node.MinProductionInterval))
+                problem = "Production needs at least " + Node.MinProductionInterval + " seconds per Dart.";
+            if (problem != null) return false;
+
+            nodes[nodeId].ChangeKind(kind, productionInterval);
+            return true;
+        }
+
+        /// <summary>Switches an object's production off or on again. An asteroid never produces.</summary>
+        public bool TrySetProducing(int nodeId, bool producing, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (producing && nodes[nodeId].Kind == NodeKind.Asteroid) problem = "Asteroids never produce Darts.";
+            if (problem != null) return false;
+
+            nodes[nodeId].SetProductionStopped(!producing);
+            return true;
+        }
+
+        /// <summary>
+        /// Sets an object's seconds per produced Dart. The Dart in progress keeps how far along it is and
+        /// is finished at the new pace. An asteroid keeps producing nothing.
+        /// </summary>
+        public bool TrySetProductionInterval(int nodeId, double seconds, out string problem)
+        {
+            problem = null;
+            if (!IsNode(nodeId)) problem = "There is no such world.";
+            else if (!(seconds >= Node.MinProductionInterval))
+                problem = "Production needs at least " + Node.MinProductionInterval + " seconds per Dart.";
+            if (problem != null) return false;
+
+            Node node = nodes[nodeId];
+            if (node.Kind != NodeKind.Asteroid) node.RetimeProduction(seconds);
+            return true;
+        }
+
+        /// <summary>
+        /// Sets the common fleet speed. Fleets on their way keep how far along they are and fly the rest
+        /// at the new speed; fleets launched from now on take the new speed throughout.
+        /// </summary>
+        public bool TrySetFleetSpeed(double speed, out string problem)
+        {
+            problem = speed > 0 && !double.IsInfinity(speed) ? null : "Fleet speed must be above zero.";
+            if (problem != null) return false;
+
+            FleetSpeed = speed;
+            foreach (Fleet fleet in fleets)
+                fleet.Retime(TravelTime(fleet.SourceId, fleet.TargetId));
+            return true;
         }
 
         // ------------------------------------------------------------------ result
@@ -441,7 +711,7 @@ namespace Squadra.Simulation
         // the human has not survived to win: that is a defeat.
         void EvaluateStatus()
         {
-            if (Status != MatchStatus.InProgress) return;
+            if (Status != MatchStatus.InProgress || !endsOnElimination) return;
 
             if (!IsAlive(Human))
                 SetStatus(MatchStatus.BlueDefeat);

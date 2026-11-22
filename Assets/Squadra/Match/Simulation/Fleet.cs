@@ -20,12 +20,23 @@ namespace Squadra.Simulation
         public int TargetId { get; }
 
         /// <summary>Total travel time in seconds: route distance divided by the common fleet speed.</summary>
-        public double Duration { get; }
+        public double Duration { get; private set; }
         public double Elapsed { get; internal set; }
 
         public double Remaining => System.Math.Max(0, Duration - Elapsed);
 
         internal bool HasArrived => Duration - Elapsed <= Match.Epsilon;
+
+        /// <summary>
+        /// Gives the flight a new total time, as when the fleet speed changes on the way. The fleet keeps
+        /// how far along it is and covers the rest at the new pace.
+        /// </summary>
+        internal void Retime(double duration)
+        {
+            double progress = Duration > 0 ? System.Math.Min(1, Elapsed / Duration) : 1;
+            Duration = duration;
+            Elapsed = progress * duration;
+        }
 
         public float Progress
         {

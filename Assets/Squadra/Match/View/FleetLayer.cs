@@ -102,8 +102,10 @@ namespace Squadra
         Material lineMaterial;
         RouteStyle routeStyle;
         DartDisplay display;
+        float orbitShift;
         SoundLayer sounds;
         Garrison[] garrisons;
+        int paintedPalette;
 
         /// <summary>Dots drawn for the fleet stationed at a world right now, the ones fading out aside.</summary>
         public int StationedDots(int world) => garrisons[world].Stationed.Count;
@@ -118,17 +120,22 @@ namespace Squadra
         public int SparkCount => effects.SparkCount;
 
         /// <summary>
-        /// Starts drawing a match. Leave <paramref name="dartDisplay"/> out for the game's own Dart
-        /// behavior; a sandbox may pass other values.
+        /// Starts drawing a match, in place of any match drawn before. Leave <paramref name="dartDisplay"/>
+        /// out for the game's own Dart behavior; a sandbox may pass other values. A match can be bound with
+        /// fleets already on their way and battles already being fought, as a sandbox starts: the fleets are
+        /// shown where they are, and the two fronts of each battle stand formed up where
+        /// <paramref name="battleFronts"/> says, in radians by world (0, to the right, when it says nothing).
         /// </summary>
         public void Bind(Match boundMatch, IReadOnlyList<WorldView> boundWorlds, Material routeMaterial,
-            RouteStyle routes, SoundLayer battleSounds = null, DartDisplay dartDisplay = null)
+            RouteStyle routes, SoundLayer battleSounds = null, DartDisplay dartDisplay = null,
+            IReadOnlyList<float> battleFronts = null)
         {
+            Unbind();
             match = boundMatch;
             worlds = boundWorlds;
             lineMaterial = routeMaterial;
             routeStyle = routes;
-            display = dartDisplay ?? DartDisplay.Default;
+            UseDisplay(dartDisplay);
 
             // Like a world without its surface, Darts without their look cannot be played.
             string problem = style != null ? style.DartProblem() : "The fleet layer has no fleet style.";
@@ -140,23 +147,93 @@ namespace Squadra
             {
                 var garrison = new Garrison();
                 garrisons[n] = garrison;
-
-                // The starting fleets are simply there: nothing fades in.
-                int count = DartFormations.StationedDots(match.Nodes[n].Darts, display);
-                for (int i = 0; i < count; i++)
+                Node node = match.Nodes[n];
+                Battle battle = node.Battle;
+                if (battle != null)
                 {
-                    Dot dot = RentDot();
-                    DartFormations.OrbitPlace(worlds[n], i, 0f, display.OrbitSpeed, style, out dot.Angle,
-                        out dot.Radius);
-                    dot.Heading = DartFormations.Heading(dot.Angle, i, true, 0f, display.OrbitSpeed);
-                    dot.Shown = 1f;
-                    dot.Position = worlds[n].Position + DartFormations.Polar(dot.Angle, dot.Radius);
-                    garrison.Stationed.Add(dot);
+                    garrison.ArrivingFaction = battle.Arriving;
+                    garrison.FrontAngle = battleFronts != null && n < battleFronts.Count ? battleFronts[n] : 0f;
+                    garrison.Engaged = 1f;
+                    garrison.ShotIn = 0.25f;
                 }
+
+                // The starting fleets are simply there: nothing fades in, and a battle is already formed up.
+                AddStartingDots(garrison, n, garrison.Stationed, node.Darts, battle != null, true);
+                if (battle != null) AddStartingDots(garrison, n, garrison.Arriving, battle.ArrivingDarts, true, false);
             }
 
             if (batch == null) batch = new DotBatch(GetComponent<MeshFilter>());
             if (bodies == null) bodies = MakeBodies();
+
+            paintedPalette = Palette.Version;
+            foreach (Fleet fleet in match.Fleets)
+                BeginTransit(fleet);
+        }
+
+        void AddStartingDots(Garrison garrison, int world, List<Dot> dots, int darts, bool formed, bool stationed)
+        {
+            int count = DartFormations.StationedDots(darts, display);
+            for (int i = 0; i < count; i++)
+            {
+                Dot dot = RentDot();
+                if (formed)
+                    DartFormations.FormationPlace(worlds[world], i, count, garrison.FrontAngle, stationed, style,
+                        out dot.Angle, out dot.Radius);
+                else
+                    DartFormations.OrbitPlace(worlds[world], i, 0f, display.OrbitSpeed, 0f, style, out dot.Angle,
+                        out dot.Radius);
+                dot.Heading = DartFormations.Heading(dot.Angle, i, stationed, formed ? 1f : 0f, display.OrbitSpeed);
+                dot.Shown = 1f;
+                dot.Position = worlds[world].Position + DartFormations.Polar(dot.Angle, dot.Radius);
+                dots.Add(dot);
+            }
+        }
+
+        // Puts away everything drawn for the match bound before: its fleets in transit, its dots, shots
+        // and sparks. Nothing of it fades out; the new battlefield takes its place at once.
+        void Unbind()
+        {
+            foreach (Transit transit in transits.Values)
+            {
+                transit.Label.gameObject.SetActive(false);
+                labelPool.Push(transit.Label);
+                transit.Course.Hide();
+                coursePool.Push(transit.Course);
+            }
+
+            transits.Clear();
+            if (garrisons != null)
+            {
+                foreach (Garrison garrison in garrisons)
+                {
+                    foreach (Dot dot in garrison.Stationed) dotPool.Push(dot);
+                    foreach (Dot dot in garrison.Arriving) dotPool.Push(dot);
+                    foreach (Dot dot in garrison.Leaving) dotPool.Push(dot);
+                }
+            }
+
+            garrisons = null;
+            effects.Clear();
+        }
+
+        /// <summary>
+        /// Draws the Darts by other values from now on, as the sandbox tuning does: the dots at a world
+        /// follow at once, a fleet already in transit keeps the dots it set out with.
+        /// </summary>
+        public void SetDisplay(DartDisplay dartDisplay)
+        {
+            UseDisplay(dartDisplay);
+        }
+
+        void UseDisplay(DartDisplay dartDisplay)
+        {
+            DartDisplay next = dartDisplay ?? DartDisplay.Default;
+
+            // A new orbit speed carries on from where every Dart is now. Without the shift, the orbit would
+            // jump to where the new speed would have put it by now, and the dots would swing back to it.
+            if (display != null && next.OrbitSpeed != display.OrbitSpeed)
+                orbitShift += Time.time * (display.OrbitSpeed - next.OrbitSpeed);
+            display = next;
         }
 
         void OnDestroy()
@@ -401,7 +478,9 @@ namespace Squadra
 
         /// <summary>
         /// Moves and draws everything for one frame. With no time passing, as under the pause menu,
-        /// the same picture is drawn again: no dot moves, no shot is fired and no spark ages.
+        /// the same picture is drawn again: no dot moves, no shot is fired and no spark ages. A count that
+        /// changes with no time passing, as a sandbox edit while paused, is drawn at once: new dots stand in
+        /// their places and surplus ones are gone, while every other dot stays where it was.
         /// </summary>
         public void Tick(float deltaTime)
         {
@@ -409,6 +488,7 @@ namespace Squadra
 
             float time = Time.time;
             bool playing = match.Status == MatchStatus.InProgress;
+            if (paintedPalette != Palette.Version) Repaint();
             batch.Begin();
             bodies.Begin(style);
             FindApproaches();
@@ -418,6 +498,18 @@ namespace Squadra
             effects.Draw(batch, deltaTime, style.DotRadius);
             bodies.End();
             batch.End();
+        }
+
+        // The lines and labels of fleets in transit keep the color they were given. When a sandbox shows a
+        // player in another color, they are painted again.
+        void Repaint()
+        {
+            paintedPalette = Palette.Version;
+            foreach (Transit transit in transits.Values)
+            {
+                transit.Course.Paint(transit.Fleet.Faction, routeStyle);
+                ShowCount(transit.Label, transit.Fleet.Faction, transit.Fleet.Darts);
+            }
         }
 
         // Defenders turn toward a hostile fleet during the last part of its approach. It is read from
@@ -464,8 +556,9 @@ namespace Squadra
             Color arrivingColor = Palette.Of(garrison.ArrivingFaction);
             int stationedDots = DartFormations.StationedDots(node.Darts, display);
             int arrivingDots = fighting ? DartFormations.StationedDots(battle.ArrivingDarts, display) : 0;
-            Resize(garrison, garrison.Stationed, stationedDots, stationedColor, world, time, gathered, true);
-            Resize(garrison, garrison.Arriving, arrivingDots, arrivingColor, world, time, 1f, false);
+            bool frozen = deltaTime <= 0f;
+            Resize(garrison, garrison.Stationed, stationedDots, stationedColor, world, time, gathered, true, frozen);
+            Resize(garrison, garrison.Arriving, arrivingDots, arrivingColor, world, time, 1f, false, frozen);
 
             DrawSide(garrison, garrison.Stationed, world, time, deltaTime, gathered, true,
                 style.StationedTint(stationedColor));
@@ -478,12 +571,14 @@ namespace Squadra
 
         // Brings a side to the number of dots its Darts call for. New dots appear in their places one
         // after another; surplus ones fade out. Dots destroyed in battle never get here: they explode.
+        // Frozen, with no time to appear or fade in, new dots are drawn whole at once and surplus ones go.
         void Resize(Garrison garrison, List<Dot> dots, int target, Color color, WorldView world, float time,
-            float gathered, bool stationed)
+            float gathered, bool stationed, bool frozen)
         {
             if (dots.Count > target)
             {
-                Retire(garrison, dots, target, color);
+                if (frozen) Drop(dots, target);
+                else Retire(garrison, dots, target, color);
                 return;
             }
 
@@ -494,7 +589,7 @@ namespace Squadra
                 Place(garrison, world, dots.Count - 1, target, time, gathered, stationed, out dot.Angle, out dot.Radius);
                 dot.Heading = DartFormations.Heading(dot.Angle, dots.Count - 1, stationed, stationed ? gathered : 1f,
                     display.OrbitSpeed);
-                dot.Shown = -0.1f * added;
+                dot.Shown = frozen ? 1f : -0.1f * added;
                 dot.Position = world.Position + DartFormations.Polar(dot.Angle, dot.Radius);
             }
         }
@@ -509,6 +604,15 @@ namespace Squadra
                 dot.Tint = tint;
                 dot.Shown = Mathf.Min(dot.Shown, 1f) + 0.03f * faded;
                 garrison.Leaving.Add(dot);
+            }
+        }
+
+        void Drop(List<Dot> dots, int target)
+        {
+            while (dots.Count > target)
+            {
+                dotPool.Push(dots[dots.Count - 1]);
+                dots.RemoveAt(dots.Count - 1);
             }
         }
 
@@ -588,7 +692,7 @@ namespace Squadra
                 return;
             }
 
-            DartFormations.OrbitPlace(world, index, time, display.OrbitSpeed, style, out angle, out radius);
+            DartFormations.OrbitPlace(world, index, time, display.OrbitSpeed, orbitShift, style, out angle, out radius);
             if (gathered <= 0f) return;
 
             DartFormations.FormationPlace(world, index, count, garrison.FrontAngle, true, style,

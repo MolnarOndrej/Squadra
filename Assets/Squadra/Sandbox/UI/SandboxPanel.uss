@@ -1,0 +1,474 @@
+/*
+ * The sandbox's controls. Laid out for a 1920 x 1080 panel, like the menu: a row of icon buttons in the
+ * top right corner and below it the panel, as tall as what it shows, which slides off to the right when
+ * collapsed and leaves only its arrow. The battlefield stays framed beside it. The list a dropdown opens
+ * is laid over the whole panel; this sheet is hung on the panel's root for it (SandboxPanel).
+ * Everything else lets the pointer through to the worlds.
+ */
+
+:root {
+    --panel: rgba(8, 11, 28, 0.55);
+    --panel-solid: rgba(10, 14, 34, 0.85);
+    --line: rgba(135, 145, 176, 0.4);
+    --line-faint: rgba(135, 145, 176, 0.22);
+    --text: #E6ECFF;
+    --text-dim: #8791B0;
+    --text-off: #4D5570;
+    --accent: #FFD166;
+    --accent-wash: rgba(255, 209, 102, 0.18);
+    --problem: #FF4D5E;
+
+    /* Smaller than the menu's controls (MenuTheme): the world's text box, its dropdowns and their lists. */
+    --control-height: 30px;
+    --control-font-size: 17px;
+}
+
+.sandbox-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: var(--text);
+    font-size: 18px;
+}
+
+.sandbox-side {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    align-items: flex-end;
+}
+
+/* ------------------------------------------------------------------ the menu */
+
+/* Just the buttons, on the battlefield. */
+.sandbox-menu {
+    flex-direction: row;
+    margin: 12px 12px 0 0;
+    padding: 4px;
+}
+
+.sandbox-menu-button {
+    width: 52px;
+    height: 48px;
+    margin: 2px;
+    padding: 9px;
+    border-width: 1px;
+    border-radius: 6px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--text);
+}
+
+/* The game speed, as its multiplier. */
+.sandbox-menu-button--text {
+    padding: 0;
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.sandbox-menu-button:hover,
+.sandbox-menu-button:focus {
+    border-color: var(--accent);
+}
+
+.sandbox-menu-button:active {
+    background-color: var(--accent-wash);
+}
+
+.sandbox-menu-button--on {
+    color: var(--accent);
+}
+
+.sandbox-icon {
+    flex-grow: 1;
+}
+
+/* ------------------------------------------------------------------ the panel */
+
+/* As tall as its rows, and no taller than the screen leaves it: then it scrolls. */
+.sandbox-panel {
+    flex-grow: 0;
+    flex-shrink: 1;
+    width: 420px;
+    margin-top: 8px;
+    background-color: var(--panel);
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-color: var(--line-faint);
+    transition-property: translate;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-in-out;
+}
+
+.sandbox-panel--collapsed {
+    translate: 100% 0;
+}
+
+/* Halfway down the panel's left edge: a small tab, with the arrow at its full size over it. */
+.sandbox-panel-toggle {
+    position: absolute;
+    left: -22px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 22px;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border-width: 1px;
+    border-right-width: 0;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-color: var(--line-faint);
+    background-color: var(--panel);
+    color: var(--text);
+}
+
+.sandbox-panel-toggle > .sandbox-icon {
+    position: absolute;
+    left: -4px;
+    top: -2px;
+    width: 28px;
+    height: 28px;
+}
+
+.sandbox-panel-toggle:hover,
+.sandbox-panel-toggle:focus {
+    color: var(--accent);
+}
+
+.sandbox-scroll {
+    flex-grow: 0;
+    flex-shrink: 1;
+    padding: 4px 12px 14px 16px;
+}
+
+/* A thin bar in the panel's colors, without the arrow buttons at its ends. */
+.sandbox-scroll .unity-scroller--vertical {
+    width: 6px;
+    min-width: 6px;
+    margin-left: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.sandbox-scroll .unity-scroller__low-button,
+.sandbox-scroll .unity-scroller__high-button {
+    display: none;
+}
+
+.sandbox-scroll .unity-scroller--vertical > .unity-scroller__slider {
+    width: 6px;
+    min-width: 6px;
+    margin: 0;
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__tracker {
+    left: 0;
+    width: 6px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 3px;
+    background-color: rgba(135, 145, 176, 0.12);
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__dragger {
+    left: 0;
+    width: 6px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 3px;
+    background-color: var(--line);
+}
+
+.sandbox-scroll .unity-scroller--vertical .unity-base-slider__dragger:hover {
+    background-color: var(--accent);
+}
+
+.sandbox-heading {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top-width: 1px;
+    border-color: var(--line-faint);
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+}
+
+.sandbox-heading--first {
+    margin-top: 4px;
+    border-top-width: 0;
+}
+
+.sandbox-world-name {
+    font-size: 24px;
+    -unity-font-style: bold;
+}
+
+.sandbox-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.sandbox-label {
+    font-size: 17px;
+    margin: 4px 0 2px 0;
+    min-width: 160px;
+}
+
+.sandbox-note {
+    white-space: normal;
+    font-size: 15px;
+    color: var(--text-dim);
+}
+
+.sandbox-problem {
+    white-space: normal;
+    font-size: 15px;
+    color: var(--problem);
+}
+
+.sandbox-dropdown {
+    flex-grow: 1;
+    margin: 3px;
+    font-size: var(--control-font-size);
+}
+
+.sandbox-dropdown > .unity-base-field__input {
+    background-color: var(--panel-solid);
+    border-color: var(--line);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 2px 6px;
+}
+
+.sandbox-dropdown:hover > .unity-base-field__input,
+.sandbox-dropdown:focus > .unity-base-field__input {
+    border-color: var(--accent);
+}
+
+.sandbox-dropdown .unity-base-popup-field__text {
+    color: var(--text);
+}
+
+.sandbox-dropdown .unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: var(--text-dim);
+}
+
+/* The world's text box and dropdowns: the same height, side and text. */
+.sandbox-row > .sandbox-field > .unity-base-text-field__input,
+.sandbox-row > .sandbox-dropdown > .unity-base-field__input {
+    height: var(--control-height);
+    min-height: var(--control-height);
+    margin: 0;
+    padding: 0 6px;
+    border-width: 1px;
+    border-radius: 3px;
+    -unity-text-align: middle-left;
+}
+
+/* The list a dropdown opens is sized by the values above (MenuTheme), its values as close to the side as here. */
+.unity-base-dropdown .unity-base-dropdown__item {
+    padding: 0 6px;
+}
+
+.sandbox-tooltip {
+    position: absolute;
+    max-width: 380px;
+    padding: 5px 9px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: var(--line);
+    background-color: rgb(10, 14, 34);
+    color: var(--text);
+    font-size: 15px;
+    white-space: normal;
+}
+
+/* The circling arrow that sets a value back to the game's: the menu's reset icon, smaller. */
+.sandbox-reset {
+    width: 30px;
+    height: 28px;
+    margin: 1px 0 1px 4px;
+    padding: 2px;
+    border-width: 1px;
+    border-radius: 4px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--text);
+}
+
+.sandbox-reset:hover,
+.sandbox-reset:focus {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.sandbox-reset:active {
+    background-color: var(--accent-wash);
+}
+
+.sandbox-reset:disabled {
+    color: var(--text-off);
+}
+
+.sandbox-field {
+    flex-grow: 1;
+    margin: 3px;
+    font-size: 17px;
+}
+
+.sandbox-field > .unity-base-text-field__input {
+    background-color: var(--panel-solid);
+    border-color: var(--line);
+    color: var(--text);
+    padding: 2px 6px;
+}
+
+.sandbox-field:focus > .unity-base-text-field__input {
+    border-color: var(--accent);
+}
+
+/* A box in the look of the text box and dropdowns, where they start. */
+.sandbox-toggle {
+    margin: 3px;
+}
+
+.sandbox-toggle .unity-toggle__checkmark {
+    width: 24px;
+    height: 24px;
+    border-width: 1px;
+    border-radius: 3px;
+    border-color: var(--line);
+    background-color: var(--panel-solid);
+    -unity-background-image-tint-color: var(--text);
+}
+
+.sandbox-toggle:hover .unity-toggle__checkmark,
+.sandbox-toggle:focus .unity-toggle__checkmark {
+    border-color: var(--accent);
+}
+
+.sandbox-toggle:disabled {
+    opacity: 0.4;
+}
+
+/* ------------------------------------------------------------------ players */
+
+.sandbox-player {
+    margin: 2px 0;
+}
+
+.sandbox-swatch {
+    width: 34px;
+    height: 28px;
+    margin: 3px 8px 3px 0;
+    padding: 0;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--line);
+}
+
+.sandbox-swatch:hover,
+.sandbox-swatch:focus,
+.sandbox-swatch--open {
+    border-color: var(--accent);
+}
+
+.sandbox-player__name {
+    font-size: 17px;
+    -unity-font-style: bold;
+    min-width: 72px;
+}
+
+.sandbox-player__count {
+    font-size: 15px;
+    color: var(--text-dim);
+    flex-grow: 1;
+}
+
+/* Room on the right for the markers, which sit half outside the square and the strip at their ends. */
+.sandbox-player__picker {
+    margin: 2px 8px 6px 42px;
+}
+
+.sandbox-picker__square {
+    height: 110px;
+    border-radius: 3px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.sandbox-picker__marker {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-width: 2px;
+    border-radius: 7px;
+    border-color: #FFFFFF;
+}
+
+.sandbox-picker__hues {
+    height: 18px;
+    margin-top: 6px;
+    border-radius: 3px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.sandbox-picker__hue-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 6px;
+    margin-left: -3px;
+    border-width: 2px;
+    border-radius: 2px;
+    border-color: #FFFFFF;
+}
+
+.sandbox-picker__hex {
+    flex-grow: 1;
+    font-size: 15px;
+    color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ tuning */
+
+.sandbox-tuning {
+    flex-direction: row;
+    align-items: center;
+    height: 30px;
+}
+
+.sandbox-tuning__name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sandbox-tuning__name--overridden {
+    color: var(--accent);
+}
+
+.sandbox-tuning__field {
+    flex-grow: 0;
+    width: 96px;
+    margin: 1px 0;
+    font-size: 15px;
+}
+
+.sandbox-tuning__problem {
+    margin: 0 0 4px 0;
+}
