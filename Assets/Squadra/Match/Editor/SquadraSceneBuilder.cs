@@ -405,8 +405,8 @@ namespace Squadra.EditorTools
         }
 
         // The pause menu is another UI document on the menu's panel, above the results, with its own
-        // copy of the interface cues.
-        static PauseMenu BuildPause(GameController game)
+        // copy of the interface cues. It pauses the mission's game controller or the sandbox run.
+        internal static PauseMenu BuildPause(MonoBehaviour game)
         {
             var layout = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(PauseLayoutPath);
             PanelSettings panel = SquadraMenuBuilder.EnsurePanel();

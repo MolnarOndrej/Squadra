@@ -200,6 +200,10 @@ namespace Squadra
         {
             if (Application.isPlaying || worldsRoot == null || routeStyle == null || fleetStyle == null) return;
 
+            // A player build enables the scene's objects outside any open scene. There is nothing to show
+            // then, and nothing drawn here may change what is built: a run lays its moment down itself.
+            if (!gameObject.scene.IsValid()) return;
+
             var session = new SandboxSession(Setup(worlds));
             Report(session.Problems);
             Match match = session.Match;

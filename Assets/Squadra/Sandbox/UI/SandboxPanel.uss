@@ -42,6 +42,26 @@
     align-items: flex-end;
 }
 
+/*
+ * Under the pause menu, the battlefield and these controls are dimmed as a mission is (HudView.DimOpacity,
+ * over Palette.Void); the pause menu's own document is drawn above it and adds no dimming of its own.
+ */
+.sandbox-scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(5, 6, 15, 0.72);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.25s;
+}
+
+.sandbox-scrim--on {
+    opacity: 1;
+}
+
 /* ------------------------------------------------------------------ the menu */
 
 /* Just the buttons, on the battlefield. */

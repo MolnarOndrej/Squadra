@@ -20,7 +20,8 @@ namespace Squadra
     ///
     /// The pointer over the menu or the panel and the keys while one of their controls has the keyboard are
     /// theirs, never the battlefield's. Keys while nothing in them has the keyboard: Space pauses or
-    /// resumes, M switches Order mode on and off, Esc puts an order's selection away. The Set Default
+    /// resumes and M switches Order mode on and off; Esc is the pause menu's. While the pause menu is open
+    /// the panel is dimmed with the battlefield and takes no pointer or keys at all. The Set Default
     /// icons explain themselves beside the pointer, drawn by a <see cref="SandboxTooltip"/>.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -30,6 +31,7 @@ namespace Squadra
         const string CollapsedClass = "sandbox-panel--collapsed";
         const string OpenSwatchClass = "sandbox-swatch--open";
         const string OverriddenClass = "sandbox-tuning__name--overridden";
+        const string ScrimOnClass = "sandbox-scrim--on";
 
         static readonly NodeKind[] Kinds = { NodeKind.Planet, NodeKind.Moon, NodeKind.Asteroid };
 
@@ -70,6 +72,8 @@ namespace Squadra
         readonly List<Faction> owners = new List<Faction>();
 
         SandboxRun run;
+        VisualElement sideElement;
+        VisualElement scrimElement;
         VisualElement panelElement;
         VisualElement menuElement;
         Button orderButton;
@@ -104,6 +108,8 @@ namespace Squadra
             if (document == null) document = GetComponent<UIDocument>();
             VisualElement root = document.rootVisualElement;
 
+            sideElement = root.Q("sandboxSide");
+            scrimElement = root.Q("sandboxScrim");
             panelElement = root.Q("sandboxPanel");
             menuElement = root.Q("sandboxMenu");
             orderButton = root.Q<Button>("orderModeButton");
@@ -228,6 +234,29 @@ namespace Squadra
             toggleIcon.Shape = value ? SandboxIconShape.Collapse : SandboxIconShape.Expand;
         }
 
+        /// <summary>
+        /// Dims the battlefield and the controls under the pause menu, or lifts the dimming. Held, the menu
+        /// and the panel take neither the pointer nor the keyboard; a value being typed is applied first.
+        /// </summary>
+        public void SetHeld(bool value)
+        {
+            if (sideElement == null) return;
+
+            if (value) Blur();
+            sideElement.SetEnabled(!value);
+
+            // The pause menu shares this panel. Its Settings and their dropdown lists keep the menu's own
+            // sizes only while the sandbox's sheet is off the panel's root; no sandbox list is open now.
+            if (sharedTree != null)
+            {
+                if (value) sharedTree.styleSheets.Remove(sharedSheet);
+                else if (!sharedTree.styleSheets.Contains(sharedSheet)) sharedTree.styleSheets.Add(sharedSheet);
+            }
+
+            scrimElement.pickingMode = value ? PickingMode.Position : PickingMode.Ignore;
+            scrimElement.EnableInClassList(ScrimOnClass, value);
+        }
+
         /// <summary>Takes the keyboard away from the panel. A value being typed is applied first.</summary>
         public void Blur()
         {
@@ -242,7 +271,6 @@ namespace Squadra
 
             if (keys.spaceKey.wasPressedThisFrame) run.SetPaused(!run.Paused);
             if (keys.mKey.wasPressedThisFrame) run.SetOrderMode(!run.OrderMode);
-            if (keys.escapeKey.wasPressedThisFrame) run.Click(-1);
         }
 
         // ------------------------------------------------------------------ showing the state

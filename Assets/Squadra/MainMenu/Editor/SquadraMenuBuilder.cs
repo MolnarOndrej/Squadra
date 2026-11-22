@@ -11,7 +11,8 @@ namespace Squadra.EditorTools
     /// <summary>
     /// Assembles the main menu scene from code: camera, space backdrop and scenery, the menu's UI
     /// document, the mission map, the interface cues and the menu music. Run it again from
-    /// <c>Squadra &gt; Rebuild Main Menu Scene</c>; it overwrites the scene and puts it first in the build.
+    /// <c>Squadra &gt; Rebuild Main Menu Scene</c>; it overwrites the scene and puts it first in the build,
+    /// followed by the mission scene and the Sandbox scene.
     /// The layout and look live in <c>Assets/Squadra/MainMenu/UI</c> and the mission list in the catalog asset;
     /// those are created when missing and otherwise left alone. Materials and the post-processing
     /// profile are shared with the mission scene, so build that one first. The panel settings and the
@@ -112,7 +113,7 @@ namespace Squadra.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
-            PutFirstInBuild();
+            ArrangeBuild();
             Debug.Log("Squadra: rebuilt " + ScenePath);
         }
 
@@ -179,15 +180,36 @@ namespace Squadra.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        // The game opens on the menu, and a mission can only be launched when the mission scene is in the build.
-        static void PutFirstInBuild()
+        /// <summary>
+        /// Puts the game's scenes in the build: the menu first, since the game opens on it, then the mission
+        /// scene, which every mission is launched into, and the Sandbox scene, which the menu's Sandbox opens,
+        /// once it exists. Each is listed once and enabled; other scenes in the list are kept as they are.
+        /// </summary>
+        internal static void ArrangeBuild()
         {
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
             scenes.RemoveAll(entry => entry.path == ScenePath);
             scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));
-            if (!scenes.Exists(entry => entry.path == SquadraSceneBuilder.ScenePath))
-                scenes.Add(new EditorBuildSettingsScene(SquadraSceneBuilder.ScenePath, true));
+            IncludeOnce(scenes, SquadraSceneBuilder.ScenePath);
+            if (File.Exists(SquadraSandboxBuilder.ScenePath)) IncludeOnce(scenes, SquadraSandboxBuilder.ScenePath);
             EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        // Keeps the first entry of the scene where it is, enabled, and drops any later ones.
+        static void IncludeOnce(List<EditorBuildSettingsScene> scenes, string path)
+        {
+            int first = scenes.FindIndex(entry => entry.path == path);
+            if (first < 0)
+            {
+                scenes.Add(new EditorBuildSettingsScene(path, true));
+                return;
+            }
+
+            scenes[first] = new EditorBuildSettingsScene(path, true);
+            for (int i = scenes.Count - 1; i > first; i--)
+            {
+                if (scenes[i].path == path) scenes.RemoveAt(i);
+            }
         }
 
         static T Load<T>(string path) where T : Object
