@@ -159,9 +159,13 @@ namespace Squadra
 
         void OnDestroy()
         {
-            if (run == null) return;
-            GameSettings.Clock.Changed -= ShowSpeed;
+            // The run may already be destroyed, as when play mode ends, and then compares equal to null; so
+            // this asks only whether the panel was bound. Every menu shares the panel's root: a sheet left
+            // hung there would give the main menu's dropdown lists the sandbox's sizes.
             if (sharedTree != null) sharedTree.styleSheets.Remove(sharedSheet);
+            sharedTree = null;
+            if (ReferenceEquals(run, null)) return;
+            GameSettings.Clock.Changed -= ShowSpeed;
         }
 
         // The list a dropdown opens is laid over the whole panel, outside this document, so it only takes

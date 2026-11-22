@@ -17,6 +17,10 @@
     --accent: #FFD166;
     --accent-wash: rgba(255, 209, 102, 0.18);
     --problem: #FF4D5E;
+
+    /* Smaller than the menu's controls (MenuTheme): the world's text box, its dropdowns and their lists. */
+    --control-height: 30px;
+    --control-font-size: 17px;
 }
 
 .sandbox-root {
@@ -237,7 +241,7 @@
 .sandbox-dropdown {
     flex-grow: 1;
     margin: 3px;
-    font-size: 17px;
+    font-size: var(--control-font-size);
 }
 
 .sandbox-dropdown > .unity-base-field__input {
@@ -264,8 +268,8 @@
 /* The world's text box and dropdowns: the same height, side and text. */
 .sandbox-row > .sandbox-field > .unity-base-text-field__input,
 .sandbox-row > .sandbox-dropdown > .unity-base-field__input {
-    height: 30px;
-    min-height: 30px;
+    height: var(--control-height);
+    min-height: var(--control-height);
     margin: 0;
     padding: 0 6px;
     border-width: 1px;
@@ -273,23 +277,9 @@
     -unity-text-align: middle-left;
 }
 
-/* The list a dropdown opens: its values as large as the one shown closed, the tick in line with them. */
+/* The list a dropdown opens is sized by the values above (MenuTheme), its values as close to the side as here. */
 .unity-base-dropdown .unity-base-dropdown__item {
-    height: 30px;
-    min-height: 30px;
     padding: 0 6px;
-    align-items: center;
-}
-
-.unity-base-dropdown .unity-base-dropdown__label {
-    font-size: 17px;
-    -unity-text-align: middle-left;
-}
-
-.unity-base-dropdown .unity-base-dropdown__checkmark {
-    align-self: center;
-    margin-top: 0;
-    margin-bottom: 0;
 }
 
 .sandbox-tooltip {

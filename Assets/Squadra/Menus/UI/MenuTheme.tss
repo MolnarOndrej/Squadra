@@ -1,5 +1,15 @@
 @import url("unity-theme://default");
 
+/*
+ * How large a menu's controls are. A dropdown's field and the list it opens read the same values, so the
+ * open list's values stay as large as the one shown closed. A screen with smaller controls, as the sandbox
+ * panel, sets them again for itself.
+ */
+:root {
+    --control-height: 56px;
+    --control-font-size: 24px;
+}
+
 /* The open list of a dropdown is attached to the panel, outside the menu's own tree, so its look is set here. */
 
 .unity-base-dropdown__container-outer {
@@ -16,8 +26,10 @@
 }
 
 .unity-base-dropdown__item {
-    height: 52px;
+    height: var(--control-height);
+    min-height: var(--control-height);
     padding: 0 14px;
+    align-items: center;
     background-color: rgba(0, 0, 0, 0);
 }
 
@@ -28,12 +40,16 @@
 }
 
 .unity-base-dropdown__label {
-    font-size: 24px;
+    font-size: var(--control-font-size);
+    -unity-text-align: middle-left;
     color: #E6ECFF;
 }
 
 .unity-base-dropdown__checkmark {
     width: 24px;
     height: 24px;
+    align-self: center;
+    margin-top: 0;
+    margin-bottom: 0;
     -unity-background-image-tint-color: #FFD166;
 }
