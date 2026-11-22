@@ -7,11 +7,11 @@ namespace Squadra
 {
     /// <summary>
     /// The sandbox user's side of the battlefield: which world the panel edits, which one is selected to
-    /// send a fleet, which one the pointer is over and what a click means. In Inspect mode a click on any
-    /// world, neutral or fought over, makes it the one the panel edits, and never sends a fleet. In Order
-    /// mode clicks work as in a mission, for whichever player owns the world: select a world, then click a
-    /// destination to send every Dart stationed there; a click on a world that is not a destination selects
-    /// it for the panel too. A click on empty space never takes the panel's world away, and a click that
+    /// send a fleet, which one the pointer is over and what a click means. A run starts in Order mode. In
+    /// Inspect mode a click on any world, neutral or fought over, makes it the one the panel edits, and never
+    /// sends a fleet. In Order mode clicks work as in a mission, for whichever player owns the world: select
+    /// a world, then click a destination to send every Dart stationed there; a click on a world that is not
+    /// a destination selects it for the panel too. A click on empty space never takes the panel's world away, and a click that
     /// sends a fleet never changes it. A click that cannot be carried out does nothing.
     /// The session decides whether an order is allowed; nothing here decides a rule.
     /// </summary>
@@ -27,7 +27,7 @@ namespace Squadra
         }
 
         /// <summary>True in Order mode, where clicks send fleets; false in Inspect mode, where they only select.</summary>
-        public bool OrderMode { get; private set; }
+        public bool OrderMode { get; private set; } = true;
 
         /// <summary>In Order mode, the index of the world selected to send a fleet, or -1.</summary>
         public int Selected { get; private set; } = -1;

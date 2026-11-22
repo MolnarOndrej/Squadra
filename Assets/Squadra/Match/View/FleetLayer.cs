@@ -478,7 +478,9 @@ namespace Squadra
 
         /// <summary>
         /// Moves and draws everything for one frame. With no time passing, as under the pause menu,
-        /// the same picture is drawn again: no dot moves, no shot is fired and no spark ages.
+        /// the same picture is drawn again: no dot moves, no shot is fired and no spark ages. A count that
+        /// changes with no time passing, as a sandbox edit while paused, is drawn at once: new dots stand in
+        /// their places and surplus ones are gone, while every other dot stays where it was.
         /// </summary>
         public void Tick(float deltaTime)
         {
@@ -554,8 +556,9 @@ namespace Squadra
             Color arrivingColor = Palette.Of(garrison.ArrivingFaction);
             int stationedDots = DartFormations.StationedDots(node.Darts, display);
             int arrivingDots = fighting ? DartFormations.StationedDots(battle.ArrivingDarts, display) : 0;
-            Resize(garrison, garrison.Stationed, stationedDots, stationedColor, world, time, gathered, true);
-            Resize(garrison, garrison.Arriving, arrivingDots, arrivingColor, world, time, 1f, false);
+            bool frozen = deltaTime <= 0f;
+            Resize(garrison, garrison.Stationed, stationedDots, stationedColor, world, time, gathered, true, frozen);
+            Resize(garrison, garrison.Arriving, arrivingDots, arrivingColor, world, time, 1f, false, frozen);
 
             DrawSide(garrison, garrison.Stationed, world, time, deltaTime, gathered, true,
                 style.StationedTint(stationedColor));
@@ -568,12 +571,14 @@ namespace Squadra
 
         // Brings a side to the number of dots its Darts call for. New dots appear in their places one
         // after another; surplus ones fade out. Dots destroyed in battle never get here: they explode.
+        // Frozen, with no time to appear or fade in, new dots are drawn whole at once and surplus ones go.
         void Resize(Garrison garrison, List<Dot> dots, int target, Color color, WorldView world, float time,
-            float gathered, bool stationed)
+            float gathered, bool stationed, bool frozen)
         {
             if (dots.Count > target)
             {
-                Retire(garrison, dots, target, color);
+                if (frozen) Drop(dots, target);
+                else Retire(garrison, dots, target, color);
                 return;
             }
 
@@ -584,7 +589,7 @@ namespace Squadra
                 Place(garrison, world, dots.Count - 1, target, time, gathered, stationed, out dot.Angle, out dot.Radius);
                 dot.Heading = DartFormations.Heading(dot.Angle, dots.Count - 1, stationed, stationed ? gathered : 1f,
                     display.OrbitSpeed);
-                dot.Shown = -0.1f * added;
+                dot.Shown = frozen ? 1f : -0.1f * added;
                 dot.Position = world.Position + DartFormations.Polar(dot.Angle, dot.Radius);
             }
         }
@@ -599,6 +604,15 @@ namespace Squadra
                 dot.Tint = tint;
                 dot.Shown = Mathf.Min(dot.Shown, 1f) + 0.03f * faded;
                 garrison.Leaving.Add(dot);
+            }
+        }
+
+        void Drop(List<Dot> dots, int target)
+        {
+            while (dots.Count > target)
+            {
+                dotPool.Push(dots[dots.Count - 1]);
+                dots.RemoveAt(dots.Count - 1);
             }
         }
 
