@@ -2,13 +2,13 @@
 
 ## Problem Statement
 
-An Editor-only scene cannot be used independently in a built game. Players and testers need a discoverable way to enter the same sandbox without launching a campaign mission or relying on Unity.
+The playable Sandbox currently starts from its scene in the Unity Editor. Players and testers need a way to open that same battlefield in a standalone build without starting a campaign mission.
 
 ## Solution
 
-Add a Sandbox entry to the main menu and include the playable scene in game builds. Enter a fresh sandbox run using the saved game-speed preference and provide a clear return to the main menu.
+Add a Sandbox entry to the main menu and include the playable scene in game builds. Enter a fresh sandbox run using the saved game-speed preference. Provide shared Settings and a clear return to the main menu.
 
-This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/d50aff40fce20b302fbf8daf4608cf6225cd41ac/specifications/sandbox-stage-5-playable-sandbox-spec.md), including its resolved validation items. It completes the sequence beginning with [shared visual tuning](sandbox-stage-1-shared-visual-tuning-spec.md). This stage adds navigation and packaging, not another sandbox implementation.
+Stage 6 integrates the Stage 5 playable scene and the Stage 4 shared game clock. It adds main-menu entry, build inclusion, and access to shared Settings and a return action from the Sandbox. The existing session, controls and battlefield presentation carry over. [Stage 5 playable sandbox](https://github.com/MolnarOndrej/Squadra/blob/6c5862f6bc9793b5617b04da544e91f1eef51e93/specifications/sandbox-stage-5-playable-sandbox-spec.md) · [Stage 4 game speed](https://github.com/MolnarOndrej/Squadra/blob/6c5862f6bc9793b5617b04da544e91f1eef51e93/specifications/sandbox-stage-4-game-speed-settings-spec.md)
 
 ## User Stories
 
@@ -24,11 +24,13 @@ This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarO
 ## Implementation Decisions
 
 - Add the Sandbox entry to the main menu's existing control line and navigator. Reuse the current style, focus/highlight rules, hover/selection/back sounds and keyboard/pointer behavior. Update builder wiring with the UI change.
-- Package the scene, shared visuals and runtime controls in game builds. Runtime sandbox code must not require UnityEditor, the source checkout, absolute local paths, external mission JSON or editor-only authoring UI.
-- Scene construction and build inclusion belong in the existing builder/build setup. Keep the normal main menu entry scene and existing campaign selection flow.
-- Every main-menu entry starts a fresh sandbox session from the same authored starting conditions as pressing Play directly on the Sandbox scene. Fleets continue from their authored route progress, captures continue from their authored progress, and battles start with their authored forces and front direction. Discard battlefield changes, color changes and temporary overrides from the previous run. Apply saved scene-authored sandbox behavior overrides and initialize game speed solely from the current saved Settings preference.
+- Package `Assets/Squadra/Sandbox/Scenes/Sandbox.unity` with its shared visual assets and runtime controls. Use the scene's serialized setup and build-included assets so the run works independently of the Unity Editor and source checkout.
+- Register the Sandbox scene once in the game build and preserve that registration when rebuilding. Keep MainMenu first and Mission enabled. Preserve the Sandbox scene's authored worlds, routes, starting activity and behavior overrides when running its builder.
+- Each main-menu entry starts the same authored moment as direct Play Mode entry, including fleet route progress, capture progress, battle forces and front directions, and scene-authored behavior overrides. Start unpaused, in Order mode, with the edit panel collapsed. Earlier runs' edits, colors and tuning are discarded. Reset Setup within a run restores the authored battlefield and keeps the current tuning, colors and speed.
+- Initialize the shared game clock from the saved Settings preference. The existing Sandbox multiplier button cycles through the shared choices and changes the current run only.
 - Entering or playing the sandbox does not change selected campaign identity, campaign completion or unlock reveals. Never route sandbox completion through campaign results; sandbox completion is disabled.
-- Provide Back to Main Menu from the sandbox. It returns to the root main menu, not the campaign map. Reuse existing pause/Settings conventions where applicable, including temporary speed override replacement by an explicit Settings speed choice.
+- Provide access to the shared Settings screen and a Back to Main Menu action from the Sandbox. Back to Main Menu returns to the root screen without requesting the campaign map. Keep gameplay frozen while Settings is open and follow the existing pause menu's resume behavior.
+- Preserve the Sandbox's Space pause shortcut and battlefield selection behavior. While a menu or dialog has focus, consume its navigation input before it reaches the battlefield. An explicit Game Speed choice in Settings saves the global preference and clears the run override, including when the selected value is already saved. Saving another setting preserves the run override.
 - On exit, drop runtime overrides and paused state. Preserve explicit Settings changes, restore menu timing/audio behavior and prevent duplicate scene navigation. A later normal mission must use normal source defaults plus the saved global speed.
 - Preserve the main menu's existing Single Player, disabled Multiplayer, Settings and Quit behavior. The sandbox remains independent of whether any campaign entry is playable.
 - Keep Edit Mode authoring controls separate from the supported runtime controls, while using the same sandbox setup, rule commands and production presentation.
@@ -37,12 +39,12 @@ This is stage 6 and depends on the [playable sandbox](https://github.com/MolnarO
 
 - Use the full main menu to sandbox to main menu flow as the primary integration seam. Extend existing menu navigation tests where they cover declared control order/focus, without asserting visual implementation details.
 - In Editor Play Mode, compare direct Sandbox scene entry with main-menu entry. Verify both start with the same authored fleet positions, capture progress, and battle forces and front direction, and that the activity continues as the simulation advances. Verify the same authored start when entering from the menu in a standalone build.
-- In Editor Play Mode and a standalone game build, enter by pointer and keyboard, use three-player controls to change the battlefield, and change the temporary game speed. Leave and reenter through the main menu. Confirm the authored battlefield returns, including activity already underway, and the new run starts at the saved Settings speed.
-- Change global speed from sandbox Settings, then make another temporary sandbox change. Exit and start a normal mission: the global choice persists, the temporary choice does not. Repeat while leaving a paused sandbox.
+- Enter by pointer and keyboard in Editor Play Mode and in a standalone build. Both start unpaused, in Order mode, with the edit panel collapsed. Use the three-player controls, change the battlefield and runtime tuning, then exit and reenter to verify a fresh run at the saved speed. Within a run, verify Reset Setup retains the current tuning, colors and speed.
+- Verify the battlefield stays frozen while Sandbox Settings is open and that menu input does not reach the battlefield. Override the speed, then save an unrelated setting and verify the override remains. Choose a speed explicitly in Settings, including the already-saved choice, and verify the multiplier updates. Set another temporary speed, exit while paused, and start a normal mission to verify it uses the saved speed.
 - Verify prior campaign completion, selected mission and pending unlock information remain unchanged across sandbox use. Launch a campaign mission afterward and check ordinary order restrictions, time, results and pause behavior.
 - Verify return to root main menu, correct focus, audio, no stacked overlays, no inherited dimming and no accidental action from the activating input. Test rapid repeated activation for a single scene transition.
-- Rebuild using the affected builders, verify scene inclusion and references, compile, run affected Edit Mode tests and formatting checks, and inspect the generated asset diff. Play MainMenu, Sandbox and Mission; include MissionEditor only if shared changes actually affect it.
-- Report standalone-build checks separately; an Editor scene transition is not evidence that the packaged game includes every required asset.
+- Run the affected builders and verify the build list keeps MainMenu first, includes Mission and Sandbox once each, and preserves the Sandbox scene's authored setup and asset references. Compile, run affected Edit Mode tests and formatting checks, and inspect the generated asset diff. Play MainMenu, Sandbox and Mission. Include MissionEditor if shared changes affect it.
+- Report standalone-build checks separately from Editor Play Mode checks.
 
 ## Out of Scope
 
@@ -53,6 +55,7 @@ Shipping the Unity Inspector, persistent sandbox saves, campaign unlock requirem
 ### Assumptions still to validate
 
 - Recommended root-menu placement is after Single Player and before Multiplayer, with initial focus remaining on Single Player. Confirm this small ordering choice during implementation against the current declared navigation line.
-- Confirm whether Back to Main Menu uses a leave-confirmation dialog. Reusing the existing pause quit convention is recommended; do not imply the temporary sandbox run can be saved.
+- Confirm where Settings and Back to Main Menu sit in the Sandbox controls and how they are reached by keyboard. The existing battlefield Escape action clears the current order selection when no menu or dialog has focus.
+- Confirm whether Back to Main Menu uses a leave-confirmation dialog. If it does, use the existing confirmation conventions and describe the loss of the temporary run.
 
 This is the final integration stage. Each earlier specification must be reviewable and verifiable without waiting for it.
