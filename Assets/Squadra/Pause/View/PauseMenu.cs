@@ -8,12 +8,13 @@ using UnityEngine.UIElements;
 namespace Squadra
 {
     /// <summary>
-    /// The mission's pause menu: Paused above Resume, Settings, Quit to Menu and Quit to Desktop, the
-    /// shared Settings screen, and the confirmation dialog over them. Escape opens it at any point of a
-    /// mission, a result included, and backs out of it one step at a time. It asks the game controller
-    /// to freeze and release the mission and to carry out a confirmed quit; <see cref="PauseFlow"/>
-    /// decides where each press leads. Everything it shows sits above the results panel and over the
-    /// battlefield the controller has dimmed, so it adds no dimming of its own.
+    /// The pause menu of a mission or a sandbox run: Paused above Resume, Settings, Quit to Menu and Quit
+    /// to Desktop, the shared Settings screen, and the confirmation dialog over them. Escape opens it at
+    /// any point of the run, a result included, and backs out of it one step at a time. It asks the run
+    /// (<see cref="IPausableRun"/>: the mission's game controller or the sandbox run) to freeze and
+    /// release itself, for the text of a quit confirmation and to carry out a confirmed quit;
+    /// <see cref="PauseFlow"/> decides where each press leads. Everything it shows sits above the results
+    /// panel and over the battlefield the run has dimmed, so it adds no dimming of its own.
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour, IDialogHost
     {
@@ -31,9 +32,12 @@ namespace Squadra
 
         [SerializeField] UIDocument document;
         [SerializeField] MenuAudio sounds;
-        [SerializeField] GameController game;
+        [Tooltip("The run this menu pauses: the mission's game controller or the sandbox run.")]
+        [SerializeField] MonoBehaviour game;
 
         readonly PauseFlow flow = new PauseFlow();
+
+        IPausableRun run;
 
         VisualElement root;
         VisualElement menuScreen;
@@ -102,13 +106,13 @@ namespace Squadra
         public EscapeStep PressEscape(bool usedByControl = false)
         {
             if (root == null) return EscapeStep.None;
-            if (!flow.IsOpen && (game == null || !game.CanPause)) return EscapeStep.None;
+            if (!flow.IsOpen && !run.CanPause) return EscapeStep.None;
 
             EscapeStep step = flow.Escape(usedByControl, DialogOpen);
             switch (step)
             {
                 case EscapeStep.Open:
-                    game.SetPaused(true);
+                    run.SetPaused(true);
                     navigation.SetKeyboard(true);
                     Refresh();
                     MenuFocus.Soon(root, ButtonOf(PauseFlow.InitialFocus));
@@ -219,7 +223,7 @@ namespace Squadra
 
         void AskToQuit(QuitDestination destination)
         {
-            QuitPrompt prompt = QuitPrompt.For(destination, game.Standing);
+            QuitPrompt prompt = run.QuitPromptFor(destination);
             ShowDialog(prompt.Title, _ => prompt.Message, () => Quit(destination), null);
         }
 
@@ -231,14 +235,14 @@ namespace Squadra
             Refresh();
             if (destination == QuitDestination.Desktop)
             {
-                game.QuitToDesktop();
+                run.QuitToDesktop();
                 return;
             }
 
             // Fade out under the selection cue; the cover also keeps the pointer off the menu.
             fade.pickingMode = PickingMode.Position;
             fade.AddToClassList(FadeClass);
-            root.schedule.Execute(game.BackToMenu).StartingIn(LeaveFadeMilliseconds);
+            root.schedule.Execute(run.BackToMenu).StartingIn(LeaveFadeMilliseconds);
         }
 
         void OnDialogOpened()
@@ -265,7 +269,7 @@ namespace Squadra
         void Close()
         {
             Refresh();
-            game.SetPaused(false);
+            run.SetPaused(false);
         }
 
         // Shows what the flow says is in front. A dialog replaces the screen it was opened from.
@@ -304,9 +308,11 @@ namespace Squadra
         {
             VisualElement tree = document != null ? document.rootVisualElement : null;
             VisualElement pauseRoot = tree?.Q("pauseRoot");
-            if (pauseRoot == null || sounds == null || game == null)
+            run = game as IPausableRun;
+            if (pauseRoot == null || sounds == null || run == null)
             {
-                Debug.LogError("Squadra: the pause menu needs its document, its sounds and the game controller.", this);
+                Debug.LogError("Squadra: the pause menu needs its document, its sounds and the run it pauses "
+                    + "(the game controller or the sandbox run).", this);
                 return;
             }
 

@@ -20,9 +20,15 @@ namespace Squadra
     /// <see cref="MatchFeedback"/>. Gameplay runs on the shared <see cref="GameClock"/>, at the saved game
     /// speed unless the panel picks another for this run; paused, neither the match nor anything drawn
     /// with it moves, while the camera, the panel and its edits keep working.
+    ///
+    /// Escape opens the shared <see cref="PauseMenu"/> over the run. It freezes the battlefield whether or
+    /// not the run was paused already, dims it and keeps every key and click away from the battlefield and
+    /// the panel until it closes; Resume gives back the run as it was, paused or not. Its Quit to Menu
+    /// throws the run away and returns to the main menu. A run counts for no campaign mission and never
+    /// ends, so nothing of it reaches the campaign.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class SandboxRun : MonoBehaviour
+    public sealed class SandboxRun : MonoBehaviour, IPausableRun
     {
         // The part of the screen's width the panel covers on the right. The battlefield is framed beside
         // it, and the camera stays put while the panel slides away and back.
@@ -43,7 +49,9 @@ namespace Squadra
         RouteLanes lanes;
         Rect battlefield;
         bool paused;
+        bool menuOpen;
         bool running;
+        bool leaving;
         int inputHeldFrame = -1;
 
         /// <summary>The run's session: its match, and every command the sandbox gives.</summary>
@@ -55,8 +63,17 @@ namespace Squadra
         /// <summary>The worlds, by match index.</summary>
         public IReadOnlyList<WorldView> Worlds => views;
 
-        /// <summary>True while gameplay is frozen.</summary>
+        /// <summary>True while the run is paused by its own Pause button or Space; the pause menu aside.</summary>
         public bool Paused => paused;
+
+        /// <summary>True while the pause menu holds the run: frozen, dimmed and out of reach of input.</summary>
+        public bool MenuOpen => menuOpen;
+
+        /// <summary>True while gameplay is frozen, by the run's own pause or under the pause menu.</summary>
+        public bool Frozen => paused || menuOpen;
+
+        /// <summary>False once the run is on its way out: there is nothing left to pause.</summary>
+        public bool CanPause => running && !leaving;
 
         /// <summary>The index of the world the panel edits, or -1.</summary>
         public int InspectedWorld => orders.Inspected;
@@ -123,12 +140,17 @@ namespace Squadra
 
             // Paused, game time stands still and the views below draw the same moment every frame. The
             // user can still select and edit worlds; a fleet cannot be sent until the run carries on.
-            float deltaTime = paused ? 0f : Time.deltaTime;
+            // Under the pause menu nothing can be selected or edited either: its keys and clicks are its own.
+            float deltaTime = Frozen ? 0f : Time.deltaTime;
 
             // The frame the run resumes on still belongs to the button that resumed it. What the pointer
             // does over the panel is the panel's, and keys are the panel's while one of its controls has
             // the keyboard, so typing a value never gives an order.
-            if (Time.frameCount != inputHeldFrame)
+            if (menuOpen)
+            {
+                orders.ReadPointer(preview.Rig.Camera, true, false); // over no world: nothing hovered
+            }
+            else if (Time.frameCount != inputHeldFrame)
             {
                 bool overPanel = panel != null && panel.IsPointerOver();
                 if (panel != null && !overPanel && PointerPressed()) panel.Blur();
@@ -136,12 +158,12 @@ namespace Squadra
                 if (panel != null && !panel.HasFocus) panel.ReadShortcuts();
             }
 
-            if (!paused) session.Advance(deltaTime);
+            if (!Frozen) session.Advance(deltaTime);
             orders.DropUnusableSelection();
 
             // Paused, a world still answers an edit or a selection on real time: its ring takes a new owner's
             // color and its outline follows the selection. Nothing of the match moves.
-            float worldBlend = paused ? Time.unscaledDeltaTime : deltaTime;
+            float worldBlend = Frozen ? Time.unscaledDeltaTime : deltaTime;
             int selected = orders.Outlined;
             int hovered = orders.Hovered;
             for (int i = 0; i < views.Length; i++)
@@ -174,10 +196,21 @@ namespace Squadra
 
         void OnDestroy()
         {
-            // However the scene goes, the next one gets normal time and the players' own colors.
-            if (running) GameSettings.Clock.EndRun();
-            running = false;
+            // However the scene goes, the next one gets normal time, the music at its own level and the
+            // players' own colors.
+            if (running) EndRun();
             Palette.ResetColors();
+        }
+
+        // Leaving the scene ends the run, its pause, its speed and its pause menu for whatever comes next.
+        // The game speed preference stays as it is.
+        void EndRun()
+        {
+            paused = false;
+            menuOpen = false;
+            running = false;
+            GameSettings.Clock.EndRun();
+            MusicPlayer.SetPaused(false);
         }
 
         // ------------------------------------------------------------------ commands
@@ -188,13 +221,32 @@ namespace Squadra
         /// </summary>
         public bool SetPaused(bool value)
         {
-            if (value == paused || !running) return false;
+            if (value == paused || !running || menuOpen) return false;
 
             paused = value;
-            GameSettings.Clock.SetPaused(value);
-            sounds.SetPaused(value);
+            ApplyFreeze();
             if (!value) inputHeldFrame = Time.frameCount;
             return true;
+        }
+
+        // The pause menu's hold, on top of the run's own pause: Resume gives the run back as it was.
+        bool IPausableRun.SetPaused(bool value)
+        {
+            if (value == menuOpen) return false;
+            if (value && !CanPause) return false;
+
+            menuOpen = value;
+            ApplyFreeze();
+            MusicPlayer.SetPaused(value);
+            if (panel != null) panel.SetHeld(value);
+            inputHeldFrame = Time.frameCount;
+            return true;
+        }
+
+        void ApplyFreeze()
+        {
+            GameSettings.Clock.SetPaused(Frozen);
+            sounds.SetPaused(Frozen);
         }
 
         /// <summary>Plays the rest of this run at <paramref name="speed"/>; the saved preference is not touched.</summary>
@@ -212,7 +264,7 @@ namespace Squadra
         /// <summary>Applies one click on a world, or on empty space when <paramref name="index"/> is negative.</summary>
         public void Click(int index)
         {
-            orders.Click(index, !paused);
+            if (!menuOpen) orders.Click(index, !paused);
         }
 
         /// <summary>
@@ -221,6 +273,7 @@ namespace Squadra
         /// </summary>
         public void Select(int index)
         {
+            if (menuOpen) return;
             if (orders.OrderMode) orders.SetOrderMode(false);
             orders.Click(index, false);
         }
@@ -232,6 +285,34 @@ namespace Squadra
         public void ResetSetup()
         {
             session.Reset();
+        }
+
+        // ------------------------------------------------------------------ leaving
+
+        /// <summary>The pause menu's quit confirmation: a sandbox run is thrown away, wherever the player goes.</summary>
+        public QuitPrompt QuitPromptFor(QuitDestination destination)
+        {
+            return QuitPrompt.ForSandbox(destination);
+        }
+
+        /// <summary>
+        /// Throws the run away and returns to the main menu's main screen, not the mission map. The
+        /// campaign is left as it was: a run is no campaign mission and never has a result.
+        /// </summary>
+        public void BackToMenu()
+        {
+            if (leaving) return;
+
+            leaving = true;
+            EndRun();
+            MainMenu.Open();
+        }
+
+        /// <summary>Closes the game from the sandbox. Settings are already saved; the run is not kept.</summary>
+        public void QuitToDesktop()
+        {
+            leaving = true;
+            MainMenu.QuitApplication();
         }
     }
 }

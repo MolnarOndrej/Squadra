@@ -67,11 +67,12 @@ namespace Squadra.Tests
         [Test]
         public void Stops_that_cannot_take_the_focus_are_passed_over()
         {
-            // Single Player, a disabled Multi Player, Settings, Quit.
-            var open = new[] { true, false, true, true };
+            // Single Player, Sandbox, a disabled Multi Player, Settings, Quit.
+            var open = new[] { true, true, false, true, true };
 
-            Assert.AreEqual(2, MenuStep.Next(open, 0, 1, true));
-            Assert.AreEqual(0, MenuStep.Next(open, 2, -1, true));
+            Assert.AreEqual(1, MenuStep.Next(open, 0, 1, true));
+            Assert.AreEqual(3, MenuStep.Next(open, 1, 1, true));
+            Assert.AreEqual(1, MenuStep.Next(open, 3, -1, true));
         }
 
         [Test]

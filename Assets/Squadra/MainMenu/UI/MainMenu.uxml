@@ -9,6 +9,7 @@
             <ui:VisualElement class="title-rule" />
             <ui:VisualElement class="main-buttons">
                 <ui:Button name="singlePlayerButton" text="SINGLE PLAYER" class="menu-button" />
+                <ui:Button name="sandboxButton" text="SANDBOX" class="menu-button" />
                 <ui:Button name="multiPlayerButton" text="MULTI PLAYER" enabled="false" class="menu-button" />
                 <ui:Button name="settingsButton" text="SETTINGS" class="menu-button" />
                 <ui:Button name="quitButton" text="QUIT" class="menu-button" />

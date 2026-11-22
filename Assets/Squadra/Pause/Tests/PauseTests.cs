@@ -285,6 +285,38 @@ namespace Squadra.Tests
                 QuitPrompt.For(QuitDestination.Menu, standing).Message);
         }
 
+        [Test]
+        public void Quitting_a_sandbox_run_to_the_menu_leads_to_the_main_menu_and_discards_the_run()
+        {
+            QuitPrompt prompt = QuitPrompt.ForSandbox(QuitDestination.Menu);
+
+            Assert.AreEqual(QuitPrompt.MenuTitle, prompt.Title);
+            StringAssert.Contains(QuitPrompt.SandboxMenuDestination, prompt.Message);
+            StringAssert.Contains(QuitPrompt.SandboxDiscarded, prompt.Message);
+            StringAssert.DoesNotContain(QuitPrompt.MenuDestination, prompt.Message,
+                "a sandbox run has no mission map to return to");
+        }
+
+        [Test]
+        public void Quitting_a_sandbox_run_to_the_desktop_discards_the_run_and_ends_the_campaign_session()
+        {
+            QuitPrompt prompt = QuitPrompt.ForSandbox(QuitDestination.Desktop);
+
+            Assert.AreEqual(QuitPrompt.DesktopTitle, prompt.Title);
+            StringAssert.Contains(QuitPrompt.DesktopDestination, prompt.Message);
+            StringAssert.Contains(QuitPrompt.SandboxDiscarded, prompt.Message);
+            StringAssert.Contains(QuitPrompt.SessionOnly, prompt.Message);
+        }
+
+        [Test]
+        public void A_sandbox_run_never_speaks_of_mission_progress_or_victories([Values] QuitDestination destination)
+        {
+            QuitPrompt prompt = QuitPrompt.ForSandbox(destination);
+
+            StringAssert.DoesNotContain(QuitPrompt.ProgressLost, prompt.Message);
+            StringAssert.DoesNotContain(QuitPrompt.VictoryKept, prompt.Message);
+        }
+
         // ------------------------------------------------------------ audio mix
 
         [Test]

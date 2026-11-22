@@ -10,12 +10,16 @@ namespace Squadra
     /// <summary>
     /// Runs the menu scene: the main menu, the mission map, Settings and the confirmation dialog over
     /// them. It moves between screens, keeps keyboard focus on something sensible, turns Escape into the
-    /// same action as the on-screen Back buttons, and loads a mission when the map launches one.
+    /// same action as the on-screen Back buttons, and loads a mission when the map launches one, or the
+    /// Sandbox scene when Sandbox is pressed.
     /// </summary>
     public sealed class MainMenu : MonoBehaviour, IDialogHost
     {
         /// <summary>Name of the menu scene in the build.</summary>
         public const string SceneName = "MainMenu";
+
+        /// <summary>Name of the Sandbox scene in the build.</summary>
+        const string SandboxSceneName = "Sandbox";
 
         const string HiddenClass = "hidden";
         const string ActiveScreenClass = "screen--active";
@@ -32,6 +36,7 @@ namespace Squadra
         VisualElement fade;
         VisualElement[] screens;
         Button singlePlayerButton;
+        Button sandboxButton;
         Button settingsButton;
         Button quitButton;
         Button mapBackButton;
@@ -52,7 +57,7 @@ namespace Squadra
         public bool KeyboardMode => navigation != null && navigation.Keyboard;
         public bool DialogOpen => dialog != null && dialog.IsOpen;
 
-        /// <summary>True from the moment a mission is launched until its scene replaces the menu.</summary>
+        /// <summary>True from the moment a mission or the sandbox is launched until its scene replaces the menu.</summary>
         public bool IsLoading => loading;
 
         /// <summary>
@@ -62,6 +67,15 @@ namespace Squadra
         public static void OpenCampaignMap()
         {
             CampaignSession.RequestMap();
+            SceneManager.LoadScene(SceneName);
+        }
+
+        /// <summary>
+        /// Loads the menu on its main screen, as the sandbox's Quit to Menu does. No campaign state is
+        /// touched.
+        /// </summary>
+        public static void Open()
+        {
             SceneManager.LoadScene(SceneName);
         }
 
@@ -112,13 +126,29 @@ namespace Squadra
             if (loading || DialogOpen) return;
             if (!CampaignSession.TryBeginMission(map.Catalog, missionIndex, out string scenePath)) return;
 
+            LoadScene(scenePath);
+        }
+
+        /// <summary>
+        /// Starts a fresh sandbox run. It is no campaign mission: the campaign, its progress and the
+        /// mission map's state are left as they are. Further calls are ignored while the scene loads.
+        /// </summary>
+        public void OpenSandbox()
+        {
+            if (loading || DialogOpen || screen != MenuScreen.Main) return;
+
+            LoadScene(SandboxSceneName);
+        }
+
+        void LoadScene(string scene)
+        {
             loading = true;
             sounds.Select();
 
             // Fade out under the selection cue; the cover also keeps the pointer off the menu.
             fade.pickingMode = PickingMode.Position;
             fade.AddToClassList(FadeClass);
-            root.schedule.Execute(() => SceneManager.LoadSceneAsync(scenePath)).StartingIn(LaunchFadeMilliseconds);
+            root.schedule.Execute(() => SceneManager.LoadSceneAsync(scene)).StartingIn(LaunchFadeMilliseconds);
         }
 
         // ------------------------------------------------------------------ dialog
@@ -224,6 +254,7 @@ namespace Squadra
             screens = new[] { root.Q("mainScreen"), root.Q("mapScreen"), root.Q("settingsScreen") };
 
             singlePlayerButton = root.Q<Button>("singlePlayerButton");
+            sandboxButton = root.Q<Button>("sandboxButton");
             settingsButton = root.Q<Button>("settingsButton");
             quitButton = root.Q<Button>("quitButton");
             mapBackButton = root.Q<Button>("mapBackButton");
@@ -235,6 +266,7 @@ namespace Squadra
                 sounds.Select();
                 OpenMap();
             };
+            sandboxButton.clicked += OpenSandbox;
             settingsButton.clicked += () =>
             {
                 sounds.Select();
@@ -252,7 +284,8 @@ namespace Squadra
             navigation = new MenuNavigation(sounds);
             navigation.Attach(root, menuRoot);
             navigation.SetKeyboard(false);
-            navigation.AddLine(MenuAxis.Column, true, singlePlayerButton, multiPlayerButton, settingsButton, quitButton);
+            navigation.AddLine(MenuAxis.Column, true, singlePlayerButton, sandboxButton, multiPlayerButton, settingsButton,
+                quitButton);
             navigation.AddLine(MenuAxis.Row, true, dialog.CancelButton, dialog.ConfirmButton);
             map.Bind(screens[(int)MenuScreen.Map], sounds, navigation, Launch);
             settings = new SettingsScreen(screens[(int)MenuScreen.Settings], this, sounds, navigation);

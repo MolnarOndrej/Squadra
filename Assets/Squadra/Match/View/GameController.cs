@@ -26,7 +26,7 @@ namespace Squadra
     /// <see cref="PlayerOrders"/>, the lines between worlds are <see cref="RouteLanes"/>, and what each
     /// match event looks and sounds like is <see cref="MatchFeedback"/>.
     /// </summary>
-    public sealed class GameController : MonoBehaviour
+    public sealed class GameController : MonoBehaviour, IPausableRun
     {
         const Faction Player = Faction.Blue;
 
@@ -112,6 +112,15 @@ namespace Squadra
                     default: return MissionStanding.Lost;
                 }
             }
+        }
+
+        /// <summary>
+        /// The text of the pause menu's quit confirmation: where the player is going and what leaving
+        /// the mission, as it stands, costs.
+        /// </summary>
+        public QuitPrompt QuitPromptFor(QuitDestination destination)
+        {
+            return QuitPrompt.For(destination, Standing);
         }
 
         // Everything is built and bound here, before the first frame: no frame ever sees a battlefield or

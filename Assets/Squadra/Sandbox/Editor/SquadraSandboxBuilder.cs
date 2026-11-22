@@ -13,14 +13,15 @@ namespace Squadra.EditorTools
 {
     /// <summary>
     /// Makes the Sandbox scene: camera, post-processing, space backdrop, the sandbox's worlds and its
-    /// preview, the fleet, effect and sound layers and the control panel its run plays with, built from
-    /// the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox Scene</c>. The first
+    /// preview, the fleet, effect and sound layers, the control panel its run plays with and the pause
+    /// menu, built from the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox Scene</c>. The first
     /// run lays down the starting setup: three planets, one per player, at the corners of a triangle and a
     /// neutral moon in its middle, with routes along the edges and to the moon, a capture and a battle
     /// under way and two fleets on their way. From then on the scene belongs to its author: a later run
     /// only adds what is missing of the scene's structure and points it at the shared looks again, and
     /// leaves the worlds, the starting activity and the overrides as they were saved. To start over,
-    /// delete the scene and run it again. The scene is not part of the game's build.
+    /// delete the scene and run it again. The scene is put in the game's build once, after the menu and the
+    /// mission scene, and stays there.
     /// </summary>
     public static class SquadraSandboxBuilder
     {
@@ -101,7 +102,12 @@ namespace Squadra.EditorTools
             Wire(run, "sounds", sounds);
             Wire(run, "panel", panel);
 
+            PauseMenu pause = Object.FindAnyObjectByType<PauseMenu>();
+            if (pause == null) SquadraSceneBuilder.BuildPause(run);
+            else Wire(pause, "game", run);
+
             if (!exists || scene.isDirty) EditorSceneManager.SaveScene(scene, ScenePath);
+            SquadraMenuBuilder.ArrangeBuild();
             Debug.Log(exists
                 ? "Squadra: checked the structure of " + ScenePath + "; its worlds, samples and overrides are as they were"
                 : "Squadra: built " + ScenePath);
