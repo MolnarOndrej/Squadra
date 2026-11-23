@@ -5,6 +5,7 @@ using System.Linq;
 using NUnit.Framework;
 using Squadra.Preparation;
 using Squadra.Simulation;
+using Regex = System.Text.RegularExpressions.Regex;
 
 namespace Squadra.Tests
 {
@@ -23,20 +24,26 @@ namespace Squadra.Tests
             new WorldPool(new[] { "rock-a", "rock-b" }, new[] { "Cairn", "Flint", "Shard" }),
             new[] { "nebula", "void" });
 
-        static string FirstContact()
+        const string NamesFolder = "Assets/Squadra/Visuals/WorldNames/";
+
+        static string FirstContact() => Bundled(FirstContactPath);
+
+        static string Bundled(string projectPath)
         {
             // Tests run from the project folder; look upward too, so they also run from a build folder.
             string folder = Directory.GetCurrentDirectory();
             while (folder != null)
             {
-                string path = Path.Combine(folder, FirstContactPath);
+                string path = Path.Combine(folder, projectPath);
                 if (File.Exists(path)) return File.ReadAllText(path);
                 folder = Path.GetDirectoryName(folder);
             }
 
-            Assert.Fail("Could not find " + FirstContactPath);
+            Assert.Fail("Could not find " + projectPath);
             return null;
         }
+
+        static List<string> BundledNames(string type) => WorldPool.ReadNames(Bundled(NamesFolder + type + ".txt")).ToList();
 
         static string Mission(string nodes, string edges, string players = null, double scale = 1, string id = "m-test",
             string name = "Test")
@@ -374,6 +381,58 @@ namespace Squadra.Tests
                 CollectionAssert.AreEquivalent(new[] { "Aster", "Boreas" }, first.Mission.Worlds.Select(w => w.Look.Name));
                 CollectionAssert.AreEquivalent(new[] { "Aster", "Boreas" }, second.Mission.Worlds.Select(w => w.Look.Name));
             }
+        }
+
+        // Each type's catalog designations have their own style, told apart from the names by their digits.
+        static readonly (string Type, string KeptName, Regex Designation)[] Dictionaries =
+        {
+            ("Planets", "Thalassa", new Regex(@"^[A-Z]{3}-[0-9]{2}$")),
+            ("Asteroids", "Cairn", new Regex(@"^[A-Z]{2}-[0-9]{3}$")),
+            ("Moons", "Lune", new Regex(@"^S/[0-9]{2} [A-Z][0-9]$")),
+        };
+
+        [Test]
+        public void Each_bundled_name_dictionary_holds_forty_names_of_which_eight_are_catalog_designations()
+        {
+            foreach ((string type, string keptName, Regex designation) in Dictionaries)
+            {
+                List<string> names = BundledNames(type);
+
+                Assert.AreEqual(40, names.Count, type);
+                Assert.AreEqual(40, new WorldPool(new string[0], names).Names.Count, type + ": every name is usable once");
+                CollectionAssert.Contains(names, keptName, type);
+                List<string> designations = names.Where(n => n.Any(char.IsDigit)).ToList();
+                Assert.AreEqual(8, designations.Count, type);
+                foreach (string code in designations) StringAssert.IsMatch(designation.ToString(), code, type);
+                Assert.IsTrue(names.Except(designations).All(n => n.All(char.IsLetter)), type + ": names are plain words");
+            }
+        }
+
+        [Test]
+        public void The_bundled_dictionaries_give_their_designations_to_worlds_intact()
+        {
+            var pools = new WorldPools(
+                new WorldPool(new[] { "planet-a" }, BundledNames("Planets")),
+                new WorldPool(new[] { "moon-a" }, BundledNames("Moons")),
+                new WorldPool(new[] { "rock-a" }, BundledNames("Asteroids")),
+                new[] { "nebula" });
+
+            var shown = new HashSet<string>();
+            foreach (int seed in Enumerable.Range(0, 300))
+            {
+                PreparationOutcome outcome = Prepare(Crowded(), seed: seed, pools: pools);
+                Assert.IsTrue(outcome.Ok, outcome.Explanation);
+                foreach (PreparedWorld world in outcome.Mission.Worlds) shown.Add(world.Look.Name);
+            }
+
+            // Designations are dealt on equal terms with the names, so over enough missions each one turns up.
+            foreach ((string type, _, Regex designation) in Dictionaries)
+            {
+                foreach (string code in BundledNames(type).Where(n => designation.IsMatch(n)))
+                    CollectionAssert.Contains(shown, code, type);
+            }
+
+            CollectionAssert.Contains(shown, "S/47 N2", "a moon designation keeps its slash and space");
         }
 
         [Test]
