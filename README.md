@@ -180,6 +180,8 @@ Every feature's tests are in its `Tests` folder. Run them all from **Window > Ge
 
 `AGENTS.md` holds the workflow, the architecture boundaries, the code conventions, the contracts a change must keep and how to verify and hand over a change. `.editorconfig` holds the formatting rules; `dotnet format whitespace --folder Assets/Squadra --verify-no-changes` checks them.
 
+The [visual catalog](docs/visual-catalog.md) shows every look the game has (planet, moon and asteroid surfaces, space backdrops and the Dart), each with a rendered picture, what makes it recognizable and the assets that define it; the pictures are in `docs/visual-catalog`.
+
 The specifications are in `specifications/`. `dart-battle-spec.md` is the current word on the basic unit's name and on combat; the older specifications keep their original wording and carry a note where it replaces them.
 
 ## Mission map
