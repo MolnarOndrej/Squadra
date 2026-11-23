@@ -26,11 +26,11 @@ Use Cinder's muted olive-gray rock and Ferrite's warmer copper-brown rock as bas
 
 | Concept | What reads at gameplay scale | What shows up close | Closest existing comparison |
 | --- | --- | --- | --- |
-| Slate Blade | A long, narrow slate-blue rock with one pale diagonal stripe | Fractured layers and chipped ends | Cinder shares its subdued palette. The elongated profile and pale stripe distinguish the Blade. |
-| Broken Wedge | A steep-sided charcoal wedge with a broad chalk-colored break and a few floating shards | Fresh fracture planes, chipped corners, and angular fragments tumbling at different speeds | Cinder shares its dark rock tones. The wedge and bright fracture face carry the look when individual shards are hard to see. |
-| Frost Pair | Two joined lobes with a deep notch and a broad pale-cyan frost patch | Granular frost along the neck and exposed dark rock on the outer faces | Cinder shares its uneven outline. The two lobes and pale frost distinguish the Pair. Check it beside a similarly sized moon. |
-| Iron Crest | A compact, angular wine-brown rock with a bright metallic ridge | Pitted ore, dull oxide patches, and smaller metallic veins | Ferrite shares its warm metallic tones. The bright ridge and compact outline distinguish the Crest from Ferrite's mottled rock. |
-| Ash Mantle | A broad, low dark-plum rock with a pale ash apron and a faint plume on one side | Loose ash around embedded stones and a soft dust plume that drifts slowly near the surface | Cinder shares its dark base. The wide profile and pale apron identify the Mantle even when the dust is faint. |
+| Slate Blade (Kyanite) | A long, narrow slate-blue rock with one pale diagonal stripe | Fractured layers and chipped ends | Cinder shares its subdued palette. The elongated profile and pale stripe distinguish the Blade. |
+| Broken Wedge (Flint) | A steep-sided charcoal wedge with a broad chalk-colored break and a few floating shards | Fresh fracture planes, chipped corners, and angular fragments tumbling at different speeds | Cinder shares its dark rock tones. The wedge and bright fracture face carry the look when individual shards are hard to see. |
+| Frost Pair (Sleet) | Two joined lobes with a deep notch and a broad pale-cyan frost patch | Granular frost along the neck and exposed dark rock on the outer faces | Cinder shares its uneven outline. The two lobes and pale frost distinguish the Pair. Check it beside a similarly sized moon. |
+| Iron Crest (Hematite) | A compact, angular wine-brown rock with a bright metallic ridge | Pitted ore, dull oxide patches, and smaller metallic veins | Ferrite shares its warm metallic tones. The bright ridge and compact outline distinguish the Crest from Ferrite's mottled rock. |
+| Ash Mantle (Tephra) | A broad, low dark-plum rock with a pale ash apron and a faint plume on one side | Loose ash around embedded stones and a soft dust plume that drifts slowly near the surface | Cinder shares its dark base. The wide profile and pale apron identify the Mantle even when the dust is faint. |
 
 ### Rendering and integration
 

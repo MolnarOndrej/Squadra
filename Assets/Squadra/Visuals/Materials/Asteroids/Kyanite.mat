@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Kyanite
+  m_Shader: {fileID: 4800000, guid: 8548d42606f199542a24115a3c6219e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FORM_BLADE
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.035
+    - _BodyRadius: 0.7
+    - _CraterAmount: 0.25
+    - _CraterScale: 7
+    - _DustAmount: 0
+    - _DustAngle: 0
+    - _DustReach: 1.6
+    - _DustSource: 0.8
+    - _DustSpeed: 0.05
+    - _FeatureScale: 9
+    - _FeatureWidth: 0.07
+    - _Form: 0
+    - _Lumps: 0.03
+    - _NoiseScale: 3.2
+    - _PreviewTime: -1
+    - _Rim: 0.12
+    - _Roll: 0.42
+    - _Roughness: 0.015
+    - _Seed: 3.7
+    - _ShardCount: 0
+    - _ShardDistance: 1.1
+    - _ShardDrift: 0.1
+    - _ShardSize: 0.09
+    - _ShardSpeed: 0.12
+    - _ShardSpread: 0.45
+    - _Shine: 0
+    - _SpinSpeed: 0.05
+    - _Sway: 0
+    - _Yaw: 0.25
+    m_Colors:
+    - _ColorHigh: {r: 0.42, g: 0.49, b: 0.58, a: 1}
+    - _ColorLow: {r: 0.12, g: 0.15, b: 0.2, a: 1}
+    - _ColorMid: {r: 0.29, g: 0.36, b: 0.46, a: 1}
+    - _DetailColor: {r: 0.5, g: 0.55, b: 0.6, a: 1}
+    - _DustColor: {r: 0.7, g: 0.65999997, b: 0.62, a: 1}
+    - _FeatureColor: {r: 0.84, g: 0.85, b: 0.8, a: 1}
+    - _LightDir: {r: -0.62, g: 0.45, b: 0.5, a: 0}
+    - _RimColor: {r: 0.45, g: 0.52, b: 0.62, a: 1}
+    - _ShardAnchor: {r: -0.4, g: 0.55, b: 0.7, a: 0}
+    - _SpinAxis: {r: 1, g: 0, b: 0, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
