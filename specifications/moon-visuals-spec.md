@@ -26,11 +26,11 @@ Use Lune as the comparison baseline. Its cool-gray disk and bright rayed crater 
 
 | Concept | Large feature at gameplay scale | Close-up detail | Closest existing comparison |
 | --- | --- | --- | --- |
-| Ice rifts | Pale cyan ice crossed by two or three long, dark-blue fractures | Frost along fracture edges and smaller branching cracks | Rime shares the ice and fissures. Check that the broad fractures and round moon disk read in a mixed scene with Rime's ringed globe. |
-| Basalt plains | Broad, smooth charcoal plains broken by islands of warm-gray highlands | Buried crater rims and overlapping lava flows | Halite also has a dark base. The highland islands have softer, darker edges than Halite's bright salt flats. |
-| Two-tone moon | Ivory terrain meeting a broad rust-brown region along a ragged boundary | Dust streaks and bright rock exposed by small impacts | Ember shares the warm rock tones. The large ivory region and irregular boundary distinguish the moon from Ember's glowing fractures. |
-| Terraced basin | A smoky violet moon with a wide, pale ring around one deep impact basin | Stepped walls, slumped debris, and nested craters | Lune shares the impact theme. The closed rim reads differently from Lune's bright radial ejecta. |
-| Sulfur deposits | Golden-ochre ground with broad vermilion fans | Fine mineral bands and dark vents | Solfatara shares the sulfur theme. The red fan shapes and ochre base distinguish the moon from Solfatara's yellow-green ground and dark deposits. |
+| Ice rifts (Floe) | Pale cyan ice crossed by two or three long, dark-blue fractures | Frost along fracture edges and smaller branching cracks | Rime shares the ice and fissures. Check that the broad fractures and round moon disk read in a mixed scene with Rime's ringed globe. |
+| Basalt plains (Mare) | Broad, smooth charcoal plains broken by islands of warm-gray highlands | Buried crater rims and overlapping lava flows | Halite also has a dark base. The highland islands have softer, darker edges than Halite's bright salt flats. |
+| Two-tone moon (Calico) | Ivory terrain meeting a broad rust-brown region along a ragged boundary | Dust streaks and bright rock exposed by small impacts | Ember shares the warm rock tones. The large ivory region and irregular boundary distinguish the moon from Ember's glowing fractures. |
+| Terraced basin (Cirque) | A smoky violet moon with a wide, pale ring around one deep impact basin | Stepped walls, slumped debris, and nested craters | Lune shares the impact theme. The closed rim reads differently from Lune's bright radial ejecta. |
+| Sulfur deposits (Cinnabar) | Golden-ochre ground with broad vermilion fans | Fine mineral bands and dark vents | Solfatara shares the sulfur theme. The red fan shapes and ochre base distinguish the moon from Solfatara's yellow-green ground and dark deposits. |
 
 ### Rendering and integration
 
