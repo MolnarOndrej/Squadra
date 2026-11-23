@@ -10,8 +10,6 @@ namespace Squadra
     [ExecuteAlways]
     public sealed class MenuScenery : MonoBehaviour
     {
-        static readonly int BodyRadiusId = Shader.PropertyToID("_BodyRadius");
-
         [SerializeField] CameraRig rig;
         [SerializeField] MeshRenderer planet;
         [SerializeField] MeshRenderer moon;
@@ -65,11 +63,7 @@ namespace Squadra
         // Sizes a planet-shader quad so the body it draws has the given radius.
         static void Place(MeshRenderer body, Vector2 center, float radius)
         {
-            Material material = body.sharedMaterial;
-            float fraction = material != null && material.HasProperty(BodyRadiusId)
-                ? Mathf.Max(0.05f, material.GetFloat(BodyRadiusId))
-                : 0.7f;
-            float side = radius * 2f / fraction;
+            float side = Shapes.BodyQuadSide(body.sharedMaterial, radius);
             body.transform.position = new Vector3(center.x, center.y, 0f);
             body.transform.localScale = new Vector3(side, side, 1f);
         }

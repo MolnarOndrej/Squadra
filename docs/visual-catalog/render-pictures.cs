@@ -258,20 +258,13 @@ try
 
     string Mark(bool candidate) => candidate ? " (candidate)" : "";
 
-    // A world's body: the surface quad, sized as WorldView.Layout sizes it from the share of the quad the
-    // material draws the body in. Keep these in step with it.
-    const string BodyRadiusProperty = "_BodyRadius";
-    const float MinBodyFraction = 0.05f;
-    const float DefaultBodyFraction = 0.7f;
+    // A world's body: the surface quad, sized by the game's own rule.
     MeshRenderer body = Shapes.CreateQuad("Body", stage.transform, null, stageOrder);
     body.transform.position = new Vector3(middle.x, middle.y, 0f);
     body.enabled = false;
     void ShowBody(Material material, float radius)
     {
-        float fraction = material.HasProperty(BodyRadiusProperty)
-            ? Mathf.Max(MinBodyFraction, material.GetFloat(BodyRadiusProperty))
-            : DefaultBodyFraction;
-        float side = radius * 2f / fraction;
+        float side = Shapes.BodyQuadSide(material, radius);
         body.sharedMaterial = material;
         body.transform.localScale = new Vector3(side, side, 1f);
         body.enabled = true;
