@@ -18,7 +18,6 @@ namespace Squadra
     public sealed class WorldView : MonoBehaviour
     {
         static readonly int TintId = Shader.PropertyToID("_Tint");
-        static readonly int BodyRadiusId = Shader.PropertyToID("_BodyRadius");
 
         // How the rings move: timing, not looks, so it stays here rather than in the style.
         const float OwnerRingSpin = 0.01f;     // turns per second
@@ -157,11 +156,7 @@ namespace Squadra
         {
             if (surface != null)
             {
-                Material material = surface.sharedMaterial;
-                float fraction = material != null && material.HasProperty(BodyRadiusId)
-                    ? Mathf.Max(0.05f, material.GetFloat(BodyRadiusId))
-                    : 0.7f;
-                float side = bodyRadius * 2f / fraction;
+                float side = Shapes.BodyQuadSide(surface.sharedMaterial, bodyRadius);
                 surface.transform.localScale = new Vector3(side, side, 1f);
             }
 
