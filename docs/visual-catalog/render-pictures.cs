@@ -322,9 +322,21 @@ try
         dartBatch.End();
     }
 
+    // The battlefield framing measured above. Backdrop.Show sizes the backdrop and places its sun for the
+    // camera's current view, so it must be back before every Show: a pass of close-ups leaves the camera
+    // on its last Dart.
+    void FrameField()
+    {
+        cam.aspect = 16f / 9f;
+        cam.orthographicSize = fieldHalfHeight;
+        cam.transform.position = new Vector3(middle.x, middle.y, cam.transform.position.z);
+    }
+
     // The close-ups, as the catalog shows them: the game's looks, or the candidates.
     void CloseUps(string directory, bool ofCandidates)
     {
+        FrameField();
+
         // Backdrop: the whole battlefield framing with nothing in front of it.
         foreach (var (id, material, candidate) in backdrops.Where(b => b.candidate == ofCandidates))
         {
