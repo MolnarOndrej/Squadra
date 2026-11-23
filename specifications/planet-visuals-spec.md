@@ -27,26 +27,26 @@ The names below describe the concepts. Choose display names and unique stable ID
 
 | Concept | Large feature at gameplay scale | Close-up detail |
 | --- | --- | --- |
-| Amber gas giant | Broad cream and caramel latitude bands, a large oval storm, and a broad, shallow-tilted champagne ring with a visible dark gap | Swirls along the storm edge and finer striations within the bands |
-| Ice world | A pale blue-white globe with deep blue fissures and a narrow, steeply tilted slate-blue dust ring | Branching cracks in the ice and a soft, dusty ring edge |
-| Dune world | Golden sand with long, sweeping dune belts | Wind-carved ridges and layered sand tones |
-| Ocean world | Open deep navy water with one large white spiral storm | Broken outer cloud arms and fine cloud wisps |
-| Verdant world | Dark green land broken up by broad, pale cloud banks | Tonal variation across the terrain and soft edges on the cloud banks |
-| Salt basin world | Large, irregular white salt flats on a charcoal globe | Layered basin edges and fine mineral textures |
-| Sulfur world | A yellow-green globe cut by broad, dark mineral streaks | Mottled mineral deposits and variation along the streak edges |
-| Cloud world | A lavender globe wrapped in thick, diagonal violet cloud belts | Layered cloud edges and finer wisps between belts |
+| Amber gas giant (Aureole) | Broad cream and caramel latitude bands, an elongated storm, and a broad, shallow-tilted champagne ring with a visible dark gap | Sheared storm edges, smaller eddies, and fine strands within the bands |
+| Ice world (Rime) | A pale blue-white globe with deep blue fissures and a narrow, steeply tilted slate-blue dust ring | Airless ice with frost textures, worn impact rims and scattered smaller craters |
+| Dune world (Sahra) | Golden dune fields among darker rock basins | Preserved dune ridges, exposed rock strata and eroded craters on a dry world with clear skies |
+| Ocean world (Pelagos) | Open deep blue water with several broken cloud fronts | Ocean eddies, fine cloud filaments and a soft sun glint |
+| Verdant world (Virelia) | Forested highlands and dark lakes under broken cloud banks | Steep ridges, branching valleys, lake shores and cloud shadows |
+| Salt basin world (Halite) | Large, irregular white salt flats on charcoal bedrock | Airless dry basins with stepped crust edges, mineral fans and fractured bedrock |
+| Sulfur world (Solfatara) | A yellow-green globe cut by broad, dark mineral deposits | Airless terrain with uneven sulfur deposits, broken escarpments and channels |
+| Cloud world (Vesper) | A lavender globe crossed by diagonal violet weather fronts | Broken cloud filaments, pockets of turbulence and wisps between the fronts |
 
 ### Rendering and integration
 
 - Use broad surface or cloud patterns for recognition, with finer details at close range. The visual work may use generated or hand-authored textures, new or customized shaders and materials, procedural effects, or dedicated geometry where they improve a look. Choose the rendering approach per look and keep the results coherent with Squadra's lighting and battlefield presentation.
-- Treat the two planetary rings as part of their planet looks. Show the far side passing behind the globe and the near side crossing in front, with the ownership, selection, and capture indicators readable wherever they overlap. Tune ring extent, opacity, and orientation against the labels and routes. Keep the planetary rings cosmetic.
+- Treat the two planetary rings as part of their planet looks. Show the far side passing behind the globe and the near side crossing in front, with the ownership, selection, and capture indicators readable wherever they overlap. Rotate the dust with the globe at a fixed ring tilt. Use the same light direction for the ring shadow and the globe shading. Tune ring extent, opacity, and orientation against the labels and routes. Keep the planetary rings cosmetic.
 - Use the profile comparison to guide texture sizes, shader cost, geometry, and ring effects across the full lineup. Choose techniques that deliver the intended detail at gameplay scale and in close views within the available frame-time headroom.
 - Register the eight accepted looks in the planet section of `WorldLooks.asset`. Use the existing material discovery workflow where it fits. A look can reference additional rendering assets as needed. Keep the visual selection interface, parameters, and shuffle rules unchanged. Each of the ten planet IDs is one equally eligible entry in the existing shuffle. The lower frequency of ringed planets comes solely from the pool containing two ringed looks and eight unringed looks. Individual missions can draw a different proportion when they use only part of the pool.
 - Add one entry per accepted look to the planet section of `visual-catalog.md` in the same change that registers the assets. Include the display name, stable ID, description of what reads at gameplay scale, a rendered thumbnail, and links to the defining assets. Update the shared rendering description to reflect the techniques used. Use the catalog's Sandbox framing and adapt the capture workflow as needed to show the actual in-game rendering in thumbnails and comparison views. Both ringed thumbnails show the entire ring.
 
 ## Testing Decisions
 
-- Use the visual catalog's Sandbox workflow to compare all ten looks at the default planet radius and normal battlefield framing, under the same camera, backdrop, and post-processing settings. Check each new look against its closest neighbor. The ocean storm should distinguish the ocean world from Thalassa, the dune belts should distinguish the dune world from Ember, and the cloud belts should distinguish the cloud world from the gas giant even when part of a ring is obscured.
+- Use the visual catalog's Sandbox workflow to compare all ten looks at the default planet radius and normal battlefield framing, under the same camera, backdrop, and post-processing settings. Check each new look against its closest neighbor. Open water and broken fronts distinguish Pelagos from Thalassa, golden dune fields distinguish Sahra from Ember, and diagonal weather fronts distinguish Vesper from Aureole even when part of its ring is obscured.
 - Inspect all eight looks up close and during rotation. Check that the large features remain recognizable and that seams, poles, cloud movement, and ring occlusion look coherent. At gameplay scale, check that the broad split ring and the narrow dust ring are distinct from each other and from ownership indicators.
 - In Sandbox Play Mode, view ringed planets in neutral and owned states, while selected and during capture. Check readability of the ownership, selection and capture indicators, labels, and nearby routes. Use a crowded representative layout to catch overlap.
 - Verify normal mission preparation with a setup containing ten planets and the existing selection settings. Confirm that all ten distinct IDs resolve to the intended looks, including both ringed variants, before any look repeats. Check a normal mission in Play Mode to confirm that the rings render there as well.
@@ -61,7 +61,7 @@ The names below describe the concepts. Choose display names and unique stable ID
 
 ## Further Notes
 
-- Follow the [visual variant workflow](visual-variant-workflow-spec.md) and use the [visual catalog](../docs/visual-catalog.md) as the reference for existing looks and preview conditions.
+- Fill in the [reusable visual brief](visual-variant-workflow-spec.md#reusable-visual-brief) before creating or refining a look. Use the [visual catalog](../docs/visual-catalog.md) for the existing lineup and preview conditions.
 
 ### Assumptions still to validate
 

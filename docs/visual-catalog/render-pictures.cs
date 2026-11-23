@@ -262,11 +262,16 @@ try
     MeshRenderer body = Shapes.CreateQuad("Body", stage.transform, null, stageOrder);
     body.transform.position = new Vector3(middle.x, middle.y, 0f);
     body.enabled = false;
+    int previewTime = Shader.PropertyToID("_PreviewTime");
+    var bodyProperties = new MaterialPropertyBlock();
     void ShowBody(Material material, float radius)
     {
         float side = Shapes.BodyQuadSide(material, radius);
         body.sharedMaterial = material;
         body.transform.localScale = new Vector3(side, side, 1f);
+        bodyProperties.Clear();
+        if (material.HasProperty(previewTime)) bodyProperties.SetFloat(previewTime, 0f);
+        body.SetPropertyBlock(bodyProperties);
         body.enabled = true;
     }
 
@@ -339,11 +344,12 @@ try
 
         backdrop.Show(sceneBackdrop);
 
-        // Bodies: every type at radius 1 in a view 3 units high, to compare surfaces, not sizes.
+        // Bodies: every type at radius 1. Widen the view where the surface quad extends past 3 units.
         foreach (var b in bodies.Where(b => b.candidate == ofCandidates))
         {
             ShowBody(b.material, 1f);
-            Save(Render(middle, 1.5f, 256, 256), directory, $"{b.type}-{b.id}.png", Mark(b.candidate));
+            float halfHeight = Mathf.Max(1.5f, body.transform.localScale.x * 0.5f);
+            Save(Render(middle, halfHeight, 256, 256), directory, $"{b.type}-{b.id}.png", Mark(b.candidate));
         }
 
         body.enabled = false;
@@ -366,15 +372,17 @@ try
     {
         CloseUps(comparisonDir, true);
 
-        const float Cell = 3f; // world units per look, wide and high
-        int cellPixels = Mathf.RoundToInt(Cell * pixelsPerUnit);
         foreach (var group in bodies.GroupBy(b => b.type))
         {
+            // Keep identical pixels per world unit while fitting the widest look in this strip.
+            float cellSize = Mathf.Max(3f, group.Max(b =>
+                Shapes.BodyQuadSide(b.material, (float)MissionRules.DefaultSize(b.missionType))));
+            int cellPixels = Mathf.CeilToInt(cellSize * pixelsPerUnit);
             var cells = new List<Texture2D>();
             foreach (var b in group)
             {
                 ShowBody(b.material, (float)MissionRules.DefaultSize(b.missionType));
-                cells.Add(Render(middle, Cell / 2f, cellPixels, cellPixels));
+                cells.Add(Render(middle, cellPixels / (2f * pixelsPerUnit), cellPixels, cellPixels));
             }
 
             Save(Strip(cells), comparisonDir, $"compare-{group.Key}.png",
