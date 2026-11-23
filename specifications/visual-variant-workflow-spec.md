@@ -30,6 +30,20 @@ Keep a single wiki-style visual catalog that the author can browse outside the g
 - For a new object type, use the intended on-screen role and scale to establish its first visual reference. Compare it with nearby objects that a player could confuse with it. Reuse the Sandbox if it can represent the type. Otherwise use an appropriate temporary preview and record which rendering, catalog, or gameplay support would be needed for integration, if requested.
 - Add or update the catalog entries in the same change that adds the accepted looks to the game. The catalog lists only looks that have been added, without a status; work in progress and candidates stay out of it. Keep scene or style changes made only for previews temporary unless the task calls for saving them.
 
+### Reusable visual brief
+
+Fill in the relevant fields for each candidate. Pelagos and Virelia are references for the level of detail a player can see up close. Pick a separate reference for the shape, materials, and natural processes that suit the proposed look.
+
+> Create or refine **[name and stable ID, if integrated]**, a **[planet, moon, asteroid, backdrop, Dart, or other type]** for **[scene and gameplay role]**. Deliver **[preview assets or a look integrated into the game]**. Preserve **[identity, palette, silhouette, motion, or other features that define an existing look]**.
+>
+> At **[normal gameplay size or frame]**, it should read as **[silhouette or composition, dominant palette, and one or two large features]**. Compare it with **[closest existing looks and neighboring gameplay elements]**. Up close, show **[specific fine features]** at several scales, with variation in shape, spacing and contrast. Use **[observational or art references]** for how those features form. If adapting source imagery, record its origin and attribution in the catalog.
+>
+> Set **[atmosphere, weather, lighting, shadows and motion]** to match the subject and scene. For worlds, specify whether they have an atmosphere and what processes shape the visible surface. Airless bodies can show impacts, ejecta, fractures, exposed strata or mineral deposits. Atmospheric bodies can have clear skies, haze or active weather according to their conditions. For a backdrop, specify the focal area, quiet areas behind gameplay, and behavior during camera motion.
+>
+> Deliver assets in the existing renderer's format at **[target display scale and texture or geometry budget]**. Specify projection or UV layout, color and data channels, and the import settings that preserve the intended detail. For a close-view mapped globe, start with a seamless 2:1 unlit surface map at 4096 × 2048 with mipmaps. Keep cloud coverage and relief available to the shader as data where the look needs them.
+>
+> Show matched renderer captures at gameplay scale and the closest intended view. Inspect any rotation, lighting, occlusion, seams, poles, camera crops or scrolling that matter for this type. Confirm that gameplay cues remain legible under the usual lighting and post-processing. Record the assets, sources, and verified behavior in the catalog when the look ships.
+
 ## Testing Decisions
 
 - Open the catalog from the README. Check that each current look appears once in the expected section, with a readable thumbnail and working asset links. Cross-check the entries against WorldLooks and the assigned Dart assets.

@@ -17,6 +17,22 @@ MonoBehaviour:
     material: {fileID: 2100000, guid: c1ae2e4ad4b5d3743af5c847e04af73f, type: 2}
   - id: thalassa
     material: {fileID: 2100000, guid: f2b46c0e2372994489439d5dfd5c3845, type: 2}
+  - id: aureole
+    material: {fileID: 2100000, guid: 9026599d843343a4a5880f622130a5d8, type: 2}
+  - id: halite
+    material: {fileID: 2100000, guid: 76dd8fd276fa41f7980b3278e5279d7a, type: 2}
+  - id: pelagos
+    material: {fileID: 2100000, guid: 0f4025cbe65b4040a212755fa1ca12d8, type: 2}
+  - id: rime
+    material: {fileID: 2100000, guid: 5725e4a8be12454bbcbac6a4f45752a1, type: 2}
+  - id: sahra
+    material: {fileID: 2100000, guid: 50f5a662374343a8a7a7bcbd17d0f1cf, type: 2}
+  - id: solfatara
+    material: {fileID: 2100000, guid: b756128277fc4e92a7c97a4c7ae5e6df, type: 2}
+  - id: vesper
+    material: {fileID: 2100000, guid: 2517710585574811af40f056fd1d774a, type: 2}
+  - id: virelia
+    material: {fileID: 2100000, guid: 9283084860744dc5a872c5c1e86dd90e, type: 2}
   moons:
   - id: lune
     material: {fileID: 2100000, guid: cb2c4a442be4c1e459013b9ba868a9ff, type: 2}
