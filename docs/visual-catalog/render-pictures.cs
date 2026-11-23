@@ -76,23 +76,31 @@ var looks = AssetDatabase.LoadAssetAtPath<WorldLooks>(LooksPath);
 var fleetStyle = AssetDatabase.LoadAssetAtPath<FleetStyle>(FleetStylePath);
 if (looks == null || fleetStyle == null) return $"Missing {LooksPath} or {FleetStylePath}.";
 
-var bodies = new List<(string type, NodeKind kind, MissionNodeType missionType, string id, Material material, bool candidate)>();
+// The world types, with the name of the folder their materials sit in.
+var bodyTypes = new[]
+{
+    (type: "planet", folder: "Planets", kind: NodeKind.Planet, missionType: MissionNodeType.Planet),
+    (type: "moon", folder: "Moons", kind: NodeKind.Moon, missionType: MissionNodeType.Moon),
+    (type: "asteroid", folder: "Asteroids", kind: NodeKind.Asteroid, missionType: MissionNodeType.Asteroid),
+};
+const string BackdropTypeFolder = "Backdrops";
+const string DartTypeFolder = "Darts";
+
+var bodies = new List<(string type, MissionNodeType missionType, string id, Material material, bool candidate)>();
 var backdrops = new List<(string id, Material material, bool candidate)>();
 var darts = new List<(string id, Material material, Mesh mesh, bool candidate)>();
 
 // The looks of the game: the pools missions are dealt from, and the Dart materials.
 WorldPools pools = looks.ToPools();
-void AddSurfaces(string type, NodeKind kind, MissionNodeType missionType)
+foreach (var bodyType in bodyTypes)
 {
-    foreach (string id in pools.For(missionType).VariantIds)
+    foreach (string id in pools.For(bodyType.missionType).VariantIds)
     {
-        if (looks.TryGetSurface(kind, id, out Material material)) bodies.Add((type, kind, missionType, id, material, false));
+        if (looks.TryGetSurface(bodyType.kind, id, out Material material))
+            bodies.Add((bodyType.type, bodyType.missionType, id, material, false));
     }
 }
 
-AddSurfaces("planet", NodeKind.Planet, MissionNodeType.Planet);
-AddSurfaces("moon", NodeKind.Moon, MissionNodeType.Moon);
-AddSurfaces("asteroid", NodeKind.Asteroid, MissionNodeType.Asteroid);
 foreach (string id in pools.Backdrops)
 {
     if (looks.TryGetBackdrop(id, out Material material)) backdrops.Add((id, material, false));
@@ -115,7 +123,7 @@ foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { DartFolde
 
 darts.Sort((a, b) => string.CompareOrdinal(a.id, b.id));
 
-string[] typeFolders = { "Planets", "Moons", "Asteroids", "Backdrops", "Darts" };
+string[] typeFolders = bodyTypes.Select(t => t.folder).Append(BackdropTypeFolder).Append(DartTypeFolder).ToArray();
 foreach (string entry in candidates)
 {
     string[] parts = entry.Split(';');
@@ -123,31 +131,48 @@ foreach (string entry in candidates)
     var material = AssetDatabase.LoadAssetAtPath<Material>(path);
     if (material == null) return $"Candidate material not found: {path}";
     if (bodies.Any(b => b.material == material) || backdrops.Any(b => b.material == material) || darts.Any(d => d.material == material))
-        continue; // already a look of the game
+    {
+        log.AppendLine($"{path} is already a look of the game; not drawn again as a candidate.");
+        continue;
+    }
+
     string id = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
     string folder = (Path.GetDirectoryName(path) ?? string.Empty).Replace('\\', '/').Split('/')
         .LastOrDefault(f => typeFolders.Contains(f));
-    switch (folder)
+    if (folder == null)
+        return $"Cannot tell the type of {path}: keep it under a folder named {string.Join(", ", typeFolders)}.";
+
+    if (folder == BackdropTypeFolder)
     {
-        case "Planets": bodies.Add(("planet", NodeKind.Planet, MissionNodeType.Planet, id, material, true)); break;
-        case "Moons": bodies.Add(("moon", NodeKind.Moon, MissionNodeType.Moon, id, material, true)); break;
-        case "Asteroids": bodies.Add(("asteroid", NodeKind.Asteroid, MissionNodeType.Asteroid, id, material, true)); break;
-        case "Backdrops": backdrops.Add((id, material, true)); break;
-        case "Darts":
-            Mesh mesh = parts.Length > 1 ? AssetDatabase.LoadAssetAtPath<Mesh>(parts[1].Trim()) : fleetStyle.DartMesh;
-            if (mesh == null) return $"Candidate mesh not found: {parts[1]}";
-            darts.Add((id, material, mesh, true));
-            break;
-        default:
-            return $"Cannot tell the type of {path}: keep it under a folder named Planets, Moons, Asteroids, Backdrops or Darts.";
+        backdrops.Add((id, material, true));
+    }
+    else if (folder == DartTypeFolder)
+    {
+        string meshPath = parts.Length > 1 ? parts[1].Trim() : null;
+        Mesh mesh = meshPath != null ? AssetDatabase.LoadAssetAtPath<Mesh>(meshPath) : fleetStyle.DartMesh;
+        if (mesh == null) return $"Candidate mesh not found: {meshPath}";
+        darts.Add((id, material, mesh, true));
+    }
+    else
+    {
+        var bodyType = bodyTypes.First(t => t.folder == folder);
+        bodies.Add((bodyType.type, bodyType.missionType, id, material, true));
     }
 }
 
 SceneSetup[] openScenes = EditorSceneManager.GetSceneManagerSetup();
+
+// Everything made here, destroyed at the end even when a step fails.
 var made = new List<UnityEngine.Object>();
+T Made<T>(T o) where T : UnityEngine.Object
+{
+    made.Add(o);
+    return o;
+}
+
 try
 {
-    EditorSceneManager.OpenScene(SandboxScene, OpenSceneMode.Single);
+    var sandbox = EditorSceneManager.OpenScene(SandboxScene, OpenSceneMode.Single);
     var preview = UnityEngine.Object.FindAnyObjectByType<SandboxPreview>();
     var backdrop = UnityEngine.Object.FindAnyObjectByType<Backdrop>();
     if (preview == null || backdrop == null || preview.Rig == null) return "The Sandbox scene has no SandboxPreview, Backdrop or camera rig.";
@@ -164,11 +189,14 @@ try
     float fieldHalfHeight = cam.orthographicSize;
     float pixelsPerUnit = 1080f / (2f * fieldHalfHeight);
 
-    var stage = new GameObject("Visual Catalog Stage") { hideFlags = HideFlags.DontSave };
-    made.Add(stage);
-    var hidden = Resources.FindObjectsOfTypeAll<Renderer>()
-        .Where(r => r.gameObject.scene.IsValid() && r.enabled && r != backdropRenderer).ToList();
-    foreach (Renderer r in hidden) r.enabled = false;
+    var stage = Made(new GameObject("Visual Catalog Stage") { hideFlags = HideFlags.DontSave });
+
+    // Hidden for good: the scene is opened again from disk at the end. FindObjectsOfTypeAll, as the
+    // SandboxPreview's worlds and fleets are DontSave objects, which FindObjectsByType leaves out.
+    foreach (Renderer r in Resources.FindObjectsOfTypeAll<Renderer>())
+    {
+        if (r.gameObject.scene == sandbox && r != backdropRenderer) r.enabled = false;
+    }
 
     Texture2D Render(Vector2 center, float halfHeight, int width, int height)
     {
@@ -183,22 +211,27 @@ try
         };
         // Taken before rendering, which can leave the picture's own texture active.
         RenderTexture previous = RenderTexture.active;
-        var full = new RenderTexture(desc);
-        var request = new RenderPipeline.StandardRequest { destination = full };
-        if (!RenderPipeline.SupportsRenderRequest(cam, request)) throw new InvalidOperationException("The render pipeline refused the render request.");
-        RenderPipeline.SubmitRenderRequest(cam, request);
+        RenderTexture full = RenderTexture.GetTemporary(desc);
+        RenderTexture small = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        try
+        {
+            var request = new RenderPipeline.StandardRequest { destination = full };
+            if (!RenderPipeline.SupportsRenderRequest(cam, request)) throw new InvalidOperationException("The render pipeline refused the render request.");
+            RenderPipeline.SubmitRenderRequest(cam, request);
 
-        var small = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-        Graphics.Blit(full, small);
-        RenderTexture.active = small;
-        var picture = new Texture2D(width, height, TextureFormat.RGB24, false);
-        picture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        picture.Apply();
-        RenderTexture.active = previous;
-        RenderTexture.ReleaseTemporary(small);
-        full.Release();
-        UnityEngine.Object.DestroyImmediate(full);
-        return picture;
+            Graphics.Blit(full, small);
+            RenderTexture.active = small;
+            var picture = Made(new Texture2D(width, height, TextureFormat.RGB24, false));
+            picture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            picture.Apply();
+            return picture;
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(small);
+            RenderTexture.ReleaseTemporary(full);
+        }
     }
 
     void Save(Texture2D picture, string directory, string file, string note)
@@ -212,7 +245,7 @@ try
     Texture2D Strip(List<Texture2D> cells)
     {
         int cellWidth = cells[0].width, cellHeight = cells[0].height;
-        var strip = new Texture2D(cellWidth * cells.Count, cellHeight, TextureFormat.RGB24, false);
+        var strip = Made(new Texture2D(cellWidth * cells.Count, cellHeight, TextureFormat.RGB24, false));
         for (int i = 0; i < cells.Count; i++)
         {
             strip.SetPixels(i * cellWidth, 0, cellWidth, cellHeight, cells[i].GetPixels());
@@ -225,13 +258,19 @@ try
 
     string Mark(bool candidate) => candidate ? " (candidate)" : "";
 
-    // A world's body: the surface quad, sized as WorldView sizes it from the material's body fraction.
+    // A world's body: the surface quad, sized as WorldView.Layout sizes it from the share of the quad the
+    // material draws the body in. Keep these in step with it.
+    const string BodyRadiusProperty = "_BodyRadius";
+    const float MinBodyFraction = 0.05f;
+    const float DefaultBodyFraction = 0.7f;
     MeshRenderer body = Shapes.CreateQuad("Body", stage.transform, null, stageOrder);
     body.transform.position = new Vector3(middle.x, middle.y, 0f);
     body.enabled = false;
     void ShowBody(Material material, float radius)
     {
-        float fraction = material.HasProperty("_BodyRadius") ? Mathf.Max(0.05f, material.GetFloat("_BodyRadius")) : 0.7f;
+        float fraction = material.HasProperty(BodyRadiusProperty)
+            ? Mathf.Max(MinBodyFraction, material.GetFloat(BodyRadiusProperty))
+            : DefaultBodyFraction;
         float side = radius * 2f / fraction;
         body.sharedMaterial = material;
         body.transform.localScale = new Vector3(side, side, 1f);
@@ -239,7 +278,7 @@ try
     }
 
     // Darts: a batch of the game's own, drawn with a temporary copy of the FleetStyle for another look.
-    var dartsObject = new GameObject("Darts") { hideFlags = HideFlags.DontSave };
+    var dartsObject = Made(new GameObject("Darts") { hideFlags = HideFlags.DontSave });
     dartsObject.transform.SetParent(stage.transform, false);
     var dartRenderer = dartsObject.AddComponent<MeshRenderer>();
     dartRenderer.sortingOrder = stageOrder;
@@ -247,16 +286,20 @@ try
     dartRenderer.receiveShadows = false;
     var dartFilter = dartsObject.AddComponent<MeshFilter>();
     var dartBatch = new DartBatch(dartFilter, dartRenderer);
-    made.Add(dartFilter.sharedMesh);
+    Made(dartFilter.sharedMesh);
     FleetStyle StyleFor(Material material, Mesh mesh)
     {
         if (material == fleetStyle.DartMaterial && mesh == fleetStyle.DartMesh) return fleetStyle;
-        FleetStyle copy = UnityEngine.Object.Instantiate(fleetStyle);
+        FleetStyle copy = Made(UnityEngine.Object.Instantiate(fleetStyle));
         copy.hideFlags = HideFlags.DontSave;
-        made.Add(copy);
+        // FleetStyle has no setters: these are its serialized field names, which SquadraAssetBuilder sets too.
         var so = new SerializedObject(copy);
-        so.FindProperty("dartMaterial").objectReferenceValue = material;
-        so.FindProperty("dartMesh").objectReferenceValue = mesh;
+        SerializedProperty materialProperty = so.FindProperty("dartMaterial");
+        SerializedProperty meshProperty = so.FindProperty("dartMesh");
+        if (materialProperty == null || meshProperty == null)
+            throw new InvalidOperationException("FleetStyle has no dartMaterial or dartMesh field; update this script.");
+        materialProperty.objectReferenceValue = material;
+        meshProperty.objectReferenceValue = mesh;
         so.ApplyModifiedPropertiesWithoutUndo();
         return copy;
     }
@@ -292,10 +335,10 @@ try
         backdrop.Show(sceneBackdrop);
 
         // Bodies: every type at radius 1 in a view 3 units high, to compare surfaces, not sizes.
-        foreach (var (type, kind, missionType, id, material, candidate) in bodies.Where(b => b.candidate == ofCandidates))
+        foreach (var b in bodies.Where(b => b.candidate == ofCandidates))
         {
-            ShowBody(material, 1f);
-            Save(Render(middle, 1.5f, 256, 256), directory, $"{type}-{id}.png", Mark(candidate));
+            ShowBody(b.material, 1f);
+            Save(Render(middle, 1.5f, 256, 256), directory, $"{b.type}-{b.id}.png", Mark(b.candidate));
         }
 
         body.enabled = false;
@@ -323,9 +366,9 @@ try
         foreach (var group in bodies.GroupBy(b => b.type))
         {
             var cells = new List<Texture2D>();
-            foreach (var (type, kind, missionType, id, material, candidate) in group)
+            foreach (var b in group)
             {
-                ShowBody(material, (float)MissionRules.DefaultSize(missionType));
+                ShowBody(b.material, (float)MissionRules.DefaultSize(b.missionType));
                 cells.Add(Render(middle, Cell / 2f, cellPixels, cellPixels));
             }
 
@@ -358,12 +401,13 @@ try
 
         log.AppendLine($"Gameplay scale: {pixelsPerUnit:0.#} pixels per world unit.");
     }
-
-    foreach (Renderer r in hidden) if (r != null) r.enabled = true;
 }
 finally
 {
     foreach (UnityEngine.Object o in made) if (o != null) UnityEngine.Object.DestroyImmediate(o);
+    // An empty scene first, so restoring opens every scene from disk: a scene still loaded, such as the
+    // Sandbox scene when it was open before the run, could otherwise keep the changes made here.
+    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
     if (openScenes.Length > 0) EditorSceneManager.RestoreSceneManagerSetup(openScenes);
 }
 
