@@ -1,7 +1,7 @@
 // Rocky asteroid drawn on a quad. A small rock is sphere-traced inside the quad from the camera's
 // direction, so its silhouette, lobes, ledges and facets are real shape that turns and self-shadows
 // under the battlefield's light. The form keyword picks the rock and its large surface feature; the
-// margin of the quad around the body holds the drifting dust plume and the tumbling shards some forms
+// margin of the quad around the body holds the drifting dust plume and the tumbling stones some forms
 // carry. The body always stays inside the unit disc, which the world's body radius maps to.
 Shader "Squadra/Asteroid"
 {
@@ -9,7 +9,7 @@ Shader "Squadra/Asteroid"
     {
         [Header(Shape)]
         _BodyRadius ("Body radius (fraction of quad)", Range(0.3, 1)) = 0.7
-        [KeywordEnum(Blade, Wedge, Pair, Crest, Mantle)] _Form ("Form", Float) = 0
+        [KeywordEnum(Blade, Split, Pair, Block, Mantle)] _Form ("Form", Float) = 0
         _Seed ("Seed", Float) = 1
         _Roll ("Roll in the view (radians)", Float) = 0
         _Yaw ("Turn about the vertical (radians)", Float) = 0
@@ -38,7 +38,6 @@ Shader "Squadra/Asteroid"
         _DetailColor ("Detail color", Color) = (0.5, 0.5, 0.5, 1)
         _FeatureWidth ("Feature width", Range(0, 0.5)) = 0.1
         _FeatureScale ("Feature detail scale", Float) = 12
-        _Shine ("Metal shine", Range(0, 3)) = 0
 
         [Header(Dust plume)]
         _DustColor ("Dust color", Color) = (0.7, 0.66, 0.62, 1)
@@ -48,14 +47,14 @@ Shader "Squadra/Asteroid"
         _DustReach ("Plume reach (body radii from the middle)", Range(1, 2)) = 1.6
         _DustSpeed ("Dust drift speed", Float) = 0.05
 
-        [Header(Shards)]
-        _ShardCount ("Shards", Range(0, 6)) = 0
-        _ShardSize ("Shard size", Range(0.02, 0.2)) = 0.09
-        _ShardAnchor ("Shard cloud direction (view)", Vector) = (-0.4, 0.55, 0.7, 0)
-        _ShardDistance ("Shard distance", Range(0.9, 1.4)) = 1.1
-        _ShardSpread ("Shard spread", Range(0, 1)) = 0.45
-        _ShardDrift ("Shard drift", Range(0, 0.3)) = 0.1
-        _ShardSpeed ("Shard speed", Float) = 0.12
+        [Header(Stones)]
+        _StoneCount ("Stones", Range(0, 32)) = 0
+        _StoneSize ("Largest stone", Range(0.02, 0.2)) = 0.1
+        _StoneOrbitAxis ("Orbit axis (view)", Vector) = (0, 1, 0.3, 0)
+        _StoneOrbit ("Orbit inner radius (body radii)", Range(1, 1.6)) = 1.1
+        _StoneBand ("Orbit band width", Range(0, 0.6)) = 0.3
+        _StoneThickness ("Orbit band thickness", Range(0, 0.3)) = 0.06
+        _StoneSpeed ("Orbit speed", Float) = 0.12
 
         [HideInInspector] _PreviewTime ("Fixed catalog time", Float) = -1
     }
@@ -80,13 +79,13 @@ Shader "Squadra/Asteroid"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
-            #pragma shader_feature_local _FORM_BLADE _FORM_WEDGE _FORM_PAIR _FORM_CREST _FORM_MANTLE
+            #pragma shader_feature_local _FORM_BLADE _FORM_SPLIT _FORM_PAIR _FORM_BLOCK _FORM_MANTLE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "SquadraNoise.hlsl"
 
-            #if defined(_FORM_WEDGE)
-                #define HAS_SHARDS 1
-                #define MAX_SHARDS 6
+            #if defined(_FORM_SPLIT)
+                #define HAS_STONES 1
+                #define MAX_STONES 32
             #endif
 
             struct Attributes
@@ -129,20 +128,19 @@ Shader "Squadra/Asteroid"
                 float4 _DetailColor;
                 float _FeatureWidth;
                 float _FeatureScale;
-                float _Shine;
                 float4 _DustColor;
                 float _DustAmount;
                 float _DustAngle;
                 float _DustSource;
                 float _DustReach;
                 float _DustSpeed;
-                float _ShardCount;
-                float _ShardSize;
-                float4 _ShardAnchor;
-                float _ShardDistance;
-                float _ShardSpread;
-                float _ShardDrift;
-                float _ShardSpeed;
+                float _StoneCount;
+                float _StoneSize;
+                float4 _StoneOrbitAxis;
+                float _StoneOrbit;
+                float _StoneBand;
+                float _StoneThickness;
+                float _StoneSpeed;
                 float _PreviewTime;
             CBUFFER_END
 
@@ -212,22 +210,21 @@ Shader "Squadra/Asteroid"
                 static const float3 BladeLayer = normalize(float3(0.62, 0.78, 0.1));
             #endif
 
-            #if defined(_FORM_WEDGE)
-                // The fresh break, lit by the sun, and the weathered faces of the wedge around it.
-                static const float3 WedgeBreak = normalize(float3(-0.38, 0.42, 0.82));
-                static const float WedgeBreakDepth = 0.30;
+            #if defined(_FORM_SPLIT)
+                // The fissure that splits the boulder lies across this direction. It wanders a little and
+                // opens wider toward the surface; the core stays whole, so the halves are one rock.
+                static const float3 SplitAcross = normalize(float3(0.8, 0.55, 0.2));
 
-                float WedgeWeathered(float3 q)
+                float SplitOffset(float3 q)
                 {
-                    float d = Plane(q, float3(0.3, 1.0, 0.25), 0.40);        // top, sloping to the tip
-                    d = max(d, Plane(q, float3(0.24, -1.0, 0.1), 0.44));     // underside
-                    d = max(d, Plane(q, float3(-1.0, 0.1, 0.05), 0.70));     // blunt end
-                    d = max(d, Plane(q, float3(1.0, -0.25, 0.15), 0.88));    // tip
-                    d = max(d, Plane(q, float3(0.1, 0.15, -1.0), 0.36));     // back
-                    d = max(d, Plane(q, float3(0.42, -0.45, 0.8), 0.30));    // old face below the break
-                    d = max(d, Plane(q, float3(-0.7, 0.72, 0.25), 0.60));    // chipped corner
-                    d = max(d, Plane(q, float3(0.45, 0.75, -0.45), 0.52));   // chipped back edge
-                    return d;
+                    return dot(q, SplitAcross) + 0.12 * (ValueNoise3(q * 2.2 + _Seed) - 0.5)
+                        + 0.04 * (ValueNoise3(q * 7.0 + _Seed) - 0.5);
+                }
+
+                float SplitHalfWidth(float3 q)
+                {
+                    float gape = 0.55 + 0.9 * ValueNoise3(q * 1.7 + _Seed * 2.3);
+                    return 0.015 + _FeatureWidth * gape * smoothstep(0.25, 0.9, length(q));
                 }
             #endif
 
@@ -237,22 +234,15 @@ Shader "Squadra/Asteroid"
                 static const float PairNeck = 0.06;
             #endif
 
-            #if defined(_FORM_CREST)
-                // The metal ridge follows the plane across this direction, along the arc facing CrestFront.
-                static const float3 CrestRidge = normalize(float3(0.55, 0.8, 0.45));
-                static const float3 CrestFront = normalize(float3(-0.35, -0.3, 0.9));
-
-                float CrestArc(float3 q)
-                {
-                    return smoothstep(-0.55, 0.1, dot(normalize(q + float3(0, 0, 1e-4)), CrestFront));
-                }
+            #if defined(_FORM_BLOCK)
+                // Faint layers of the block run across this direction, warped so they never lie flat along
+                // a facet.
+                static const float3 BlockLayer = normalize(float3(0.35, 1.0, 0.25));
             #endif
 
-            // The rock's large shape, before lumps and roughness. Mask: how much of a smooth, fresh
-            // surface the point is on (the wedge's break), which roughness spares.
-            float RockShape(float3 q, out float smooth)
+            // The rock's large shape, before lumps and roughness.
+            float RockShape(float3 q)
             {
-                smooth = 0.0;
                 #if defined(_FORM_BLADE)
                     float d = SdEllipsoid(q, float3(0.98, 0.36, 0.44));
                     d = max(d, Plane(q, float3(1.0, 0.45, 0.25), 0.84));
@@ -262,31 +252,28 @@ Shader "Squadra/Asteroid"
                     float layer = frac(dot(q, BladeLayer) * _FeatureScale);
                     d += 0.012 * smoothstep(0.7, 1.0, layer);
                     return d;
-                #elif defined(_FORM_WEDGE)
-                    float weathered = WedgeWeathered(q);
-                    float fracture = dot(q, WedgeBreak) - WedgeBreakDepth;
-                    smooth = smoothstep(-0.04, 0.0, fracture - weathered);
-                    return max(weathered, fracture) - 0.02;
+                #elif defined(_FORM_SPLIT)
+                    float d = SdEllipsoid(q, float3(0.94, 0.84, 0.82));
+                    float gap = min(SplitHalfWidth(q) - abs(SplitOffset(q)), length(q) - 0.3);
+                    return max(d, gap);
                 #elif defined(_FORM_PAIR)
                     float a = SdEllipsoid(q - PairCenterA, float3(0.53, 0.5, 0.47));
                     float b = SdEllipsoid(q - PairCenterB, float3(0.44, 0.4, 0.39));
                     return SMin(a, b, 0.09);
-                #elif defined(_FORM_CREST)
-                    float d = SdEllipsoid(q, float3(0.86, 0.74, 0.78));
-                    d = max(d, Plane(q, float3(1.0, 0.15, 0.2), 0.56));
-                    d = max(d, Plane(q, float3(-1.0, 0.3, 0.1), 0.55));
-                    d = max(d, Plane(q, float3(0.3, 0.2, 1.0), 0.52));
-                    d = max(d, Plane(q, float3(-0.2, -0.3, -1.0), 0.5));
-                    d = max(d, Plane(q, float3(0.6, -1.0, 0.3), 0.52));
-                    d = max(d, Plane(q, float3(-0.5, 1.0, -0.4), 0.52));
-                    d = max(d, Plane(q, float3(0.7, 0.7, -0.6), 0.56));
-                    d = max(d, Plane(q, float3(-0.7, -0.6, 0.7), 0.54));
-                    d = max(d, Plane(q, float3(0.8, -0.4, -0.8), 0.58));
-                    d = max(d, Plane(q, float3(-0.6, 0.6, 0.8), 0.55));
-                    // The crest: a ragged ridge of ore along one arc of the rock, raised above the facets.
-                    float across = dot(q, CrestRidge);
-                    float height = (0.05 + 0.04 * ValueNoise3(q * 3.0 + _Seed)) * CrestArc(q);
-                    return d - height * exp(-across * across / 0.006);
+                #elif defined(_FORM_BLOCK)
+                    // A chunky block: a few broad facets cut from a rock that fills nearly the whole radius.
+                    float d = SdEllipsoid(q, float3(0.97, 0.9, 0.9));
+                    d = max(d, Plane(q, float3(1.0, 0.12, 0.15), 0.66));
+                    d = max(d, Plane(q, float3(-1.0, 0.2, -0.1), 0.64));
+                    d = max(d, Plane(q, float3(0.2, 1.0, 0.1), 0.58));
+                    d = max(d, Plane(q, float3(-0.15, -1.0, 0.2), 0.58));
+                    d = max(d, Plane(q, float3(0.1, 0.15, 1.0), 0.6));
+                    d = max(d, Plane(q, float3(-0.2, -0.1, -1.0), 0.58));
+                    d = max(d, Plane(q, float3(0.7, 0.7, 0.4), 0.7));
+                    d = max(d, Plane(q, float3(-0.7, -0.6, 0.5), 0.7));
+                    d = max(d, Plane(q, float3(0.6, -0.6, -0.6), 0.72));
+                    d = max(d, Plane(q, float3(-0.6, 0.6, 0.6), 0.72));
+                    return d;
                 #else // _FORM_MANTLE
                     float d = SdEllipsoid(q, float3(0.97, 0.47, 0.74));
                     return SMin(d, -(q.y + 0.33), -0.08); // a flattened underside
@@ -295,8 +282,7 @@ Shader "Squadra/Asteroid"
 
             float RockDistance(float3 q)
             {
-                float smooth;
-                float d = RockShape(q, smooth);
+                float d = RockShape(q);
                 d = max(d, length(q) - BODY_LIMIT);
                 // Lumps and roughness never move the surface by more than this; far away they are skipped.
                 float relief = _Lumps + _Roughness;
@@ -305,91 +291,98 @@ Shader "Squadra/Asteroid"
                 float3 sp = q + _Seed * 7.13;
                 float lumps = (ValueNoise3(sp * 2.1) - 0.5) * 2.0 * _Lumps;
                 float rough = (Fbm3Lite(sp * _NoiseScale * 2.0) - 0.5) * 2.0 * _Roughness;
-                d += (lumps + rough) * (1.0 - smooth);
+                d += lumps + rough;
                 return max(d, length(q) - BODY_LIMIT);
             }
 
-            // ------------------------------------------------------------------ shards
+            // ------------------------------------------------------------------ stones
 
-            #if defined(HAS_SHARDS)
-                static float3 gShardAt[MAX_SHARDS];
-                static float3x3 gShardTurn[MAX_SHARDS];
-                static float3 gShardScale[MAX_SHARDS];
+            #if defined(HAS_STONES)
+                // The stones this pixel's ray can come near, found once per pixel: where each is and how
+                // big (w), and which stone it is. A stone's turn and shape are worked out from its hashes
+                // only when the ray reaches it.
+                static float4 gStone[MAX_STONES];
+                static int gStoneId[MAX_STONES];
+                static int gStoneCount;
 
-                // Each shard sits in a cloud off the break and drifts round a small closed path while it
-                // tumbles, so it never leaves the rock and its motion repeats without a jump.
-                void PlaceShards(float time)
+                float3 StoneHashA(int i) { return Hash33(float3(i * 3.17 + 1.3, _Seed * 1.91, 5.71)); }
+                float3 StoneHashB(int i) { return Hash33(float3(i * 1.37 + 9.1, _Seed * 0.73, 2.33)); }
+
+                // The stones orbit the rock in a loose band, many pebbles and a few larger stones. The
+                // band lies in the plane of the fissure, so in view it carries the crack on past both ends.
+                // Inner stones go round faster than outer ones, and every path is a closed circle, so the
+                // motion never jumps. The camera looks straight down z, so a stone whose outline, widened
+                // by the margin, does not cover the pixel can be left out of its ray.
+                void PlaceStones(float time, float2 pixel, float margin)
                 {
-                    float3 anchor = normalize(_ShardAnchor.xyz);
-                    float3 side = normalize(cross(anchor, float3(0, 0, 1)) + float3(0, 1e-4, 0));
-                    float3 up = cross(side, anchor);
-                    [unroll]
-                    for (int i = 0; i < MAX_SHARDS; i++)
+                    float3 axis = normalize(_StoneOrbitAxis.xyz);
+                    float3 along = normalize(cross(axis, float3(0, 0, 1)) + float3(0, 1e-4, 0));
+                    float3 across = cross(axis, along);
+                    int count = (int)_StoneCount;
+                    gStoneCount = 0;
+                    [loop]
+                    for (int i = 0; i < count; i++)
                     {
-                        float3 h = Hash33(float3(i * 3.17 + 1.3, _Seed * 1.91, 5.71));
-                        float3 g = Hash33(float3(i * 1.37 + 9.1, _Seed * 0.73, 2.33));
-                        float angle = (i + h.x * 0.6) * (TWO_PI / MAX_SHARDS);
-                        float ring = _ShardSpread * (0.35 + 0.65 * h.y);
-                        float3 dir = normalize(anchor + (side * cos(angle) + up * sin(angle)) * ring);
-                        float speed = _ShardSpeed * (0.6 + 0.8 * h.z);
-                        float3 drift = float3(
-                            sin(time * speed + g.x * TWO_PI),
-                            sin(time * speed * 0.73 + g.y * TWO_PI),
-                            sin(time * speed * 1.21 + g.z * TWO_PI)) * _ShardDrift;
-                        float away = _ShardDistance + 0.18 * (h.y - 0.5);
-                        gShardAt[i] = dir * max(away, 1.0) + drift;
-
-                        float3 axis = normalize(g - 0.5 + float3(1e-3, 0, 0));
-                        float tumble = time * _ShardSpeed * (2.0 + 4.0 * g.x) * (h.x > 0.5 ? 1.0 : -1.0) + h.z * TWO_PI;
-                        gShardTurn[i] = float3x3(
-                            RotateAxis(float3(1, 0, 0), axis, -tumble),
-                            RotateAxis(float3(0, 1, 0), axis, -tumble),
-                            RotateAxis(float3(0, 0, 1), axis, -tumble));
-                        gShardTurn[i] = transpose(gShardTurn[i]);
-                        gShardScale[i] = _ShardSize * (0.55 + 0.7 * h.z) * float3(1.0, 0.45 + 0.5 * g.y, 0.3 + 0.45 * g.z);
+                        float3 h = StoneHashA(i);
+                        float3 g = StoneHashB(i);
+                        float size = _StoneSize * (0.25 + 0.75 * g.x * g.x);
+                        // Never inside the rock, which lies within the unit sphere.
+                        float radius = max(_StoneOrbit, 1.0) + _StoneBand * h.y + size;
+                        float speed = _StoneSpeed * (0.8 + 0.4 * h.z) / (radius * sqrt(radius));
+                        float phase = h.x * TWO_PI + time * speed;
+                        float lift = (g.z - 0.5) * 2.0 * _StoneThickness;
+                        float3 at = (along * cos(phase) + across * sin(phase)) * radius + axis * lift;
+                        if (length(at.xy - pixel) > size * 1.2 + margin) continue;
+                        gStone[gStoneCount] = float4(at, size);
+                        gStoneId[gStoneCount] = i;
+                        gStoneCount++;
                     }
                 }
 
-                // An irregular splinter: a squashed tetrahedron with one corner knocked off.
-                float ShardFaces(float3 p, out int face)
+                // The point in the turning frame of the stone in slot k.
+                float3 StoneLocal(int k, float3 pos)
                 {
-                    float4 planes = float4(-p.x - p.y - p.z, p.x + p.y - p.z, -p.x + p.y + p.z, p.x - p.y + p.z);
-                    face = 0;
-                    float best = planes.x;
-                    if (planes.y > best) { best = planes.y; face = 1; }
-                    if (planes.z > best) { best = planes.z; face = 2; }
-                    if (planes.w > best) { best = planes.w; face = 3; }
-                    float chip = dot(p, float3(0.577, 0.577, 0.577)) - 0.55;
-                    if (chip > best) { best = chip; face = 4; }
-                    return best;
+                    int i = gStoneId[k];
+                    float3 h = StoneHashA(i);
+                    float3 g = StoneHashB(i);
+                    float3 axis = normalize(g - 0.5 + float3(1e-3, 0, 0));
+                    float tumble = gTime * _StoneSpeed * (1.0 + 2.5 * g.y) * (h.x > 0.5 ? 1.0 : -1.0) + h.z * TWO_PI;
+                    return RotateAxis(pos - gStone[k].xyz, axis, -tumble);
                 }
 
-                float ShardDistance(int i, float3 pos, out int face)
+                // A rough stone: a lumpy ellipsoid with a couple of flat broken faces.
+                float StoneDistance(int k, float3 pos)
                 {
-                    float3 local = mul(gShardTurn[i], pos - gShardAt[i]) / gShardScale[i];
-                    float d = (ShardFaces(local, face) - 0.6) * 0.577;
-                    return d * min(gShardScale[i].x, min(gShardScale[i].y, gShardScale[i].z));
+                    float3 local = StoneLocal(k, pos);
+                    int i = gStoneId[k];
+                    float3 h = StoneHashA(i);
+                    float3 g = StoneHashB(i);
+                    float r = gStone[k].w;
+                    float d = SdEllipsoid(local, r * float3(1.0, 0.6 + 0.35 * g.y, 0.5 + 0.4 * g.z));
+                    d = max(d, dot(local, normalize(Hash33(h * 7.3 + 1.1) - 0.5 + float3(1e-3, 0, 0))) - 0.5 * r);
+                    d = max(d, dot(local, normalize(Hash33(g * 5.9 + 2.7) - 0.5 + float3(0, 1e-3, 0))) - 0.6 * r);
+                    return d + 0.1 * r * (ValueNoise3(local / r * 2.2 + i * 7.1) - 0.5);
                 }
             #endif
 
             // ------------------------------------------------------------------ scene
 
-            // Distance to the nearest solid, in body radii. Id 0 is the rock, 1 + i is shard i.
+            // Distance to the nearest solid, in body radii. Id 0 is the rock, 1 + k is the stone in slot k.
             float Scene(float3 pos, out int id)
             {
                 id = 0;
                 float d = RockDistance(mul(gToRock, pos));
-                #if defined(HAS_SHARDS)
-                    int count = (int)_ShardCount;
+                #if defined(HAS_STONES)
                     [loop]
-                    for (int i = 0; i < count; i++)
+                    for (int k = 0; k < gStoneCount; k++)
                     {
-                        int face;
-                        float s = ShardDistance(i, pos, face);
+                        // A stone whose bounding sphere is farther than the nearest solid cannot be nearer.
+                        if (length(pos - gStone[k].xyz) - gStone[k].w * 1.2 >= d) continue;
+                        float s = StoneDistance(k, pos);
                         if (s < d)
                         {
                             d = s;
-                            id = 1 + i;
+                            id = 1 + k;
                         }
                     }
                 #endif
@@ -412,16 +405,27 @@ Shader "Squadra/Asteroid"
                     k.xxx * SceneDistance(pos + k.xxx * eps));
             }
 
-            float SoftShadow(float3 origin, float3 lightDir)
+            // Distance to the rock alone. Shadows and occlusion use it: stones would only cast specks.
+            float RockOnly(float3 pos)
             {
+                return RockDistance(mul(gToRock, pos));
+            }
+
+            // Fewer, longer steps when a pixel covers much of the rock: the shadow it finds is the same
+            // at that size, and the rock is small on screen at gameplay scale.
+            float SoftShadow(float3 origin, float3 lightDir, float pix)
+            {
+                bool coarse = pix > 0.03;
+                int steps = coarse ? 10 : 16;
+                float minStep = coarse ? 0.05 : 0.03;
                 float result = 1.0;
                 float t = 0.03;
                 [loop]
-                for (int i = 0; i < 16; i++)
+                for (int i = 0; i < steps; i++)
                 {
-                    float h = SceneDistance(origin + lightDir * t);
+                    float h = RockOnly(origin + lightDir * t);
                     result = min(result, 7.0 * h / t);
-                    t += clamp(h, 0.03, 0.2);
+                    t += clamp(h, minStep, 0.2);
                     if (result < 0.02 || t > 2.2) break;
                 }
                 return saturate(result);
@@ -432,7 +436,6 @@ Shader "Squadra/Asteroid"
             struct Surface
             {
                 float3 albedo;
-                float shine;    // metallic highlight strength
                 float sparkle;  // frost glints
             };
 
@@ -452,7 +455,6 @@ Shader "Squadra/Asteroid"
             Surface RockSurface(float3 q, float pix)
             {
                 Surface s;
-                s.shine = 0.0;
                 s.sparkle = 0.0;
 
                 // Fine detail fades out before it is smaller than a pixel.
@@ -481,17 +483,16 @@ Shader "Squadra/Asteroid"
                     float chip = smoothstep(0.55, 0.9, abs(q.x));
                     rock = lerp(rock, rock * 1.35 + _DetailColor.rgb * 0.08, chip * 0.6);
                     s.albedo = lerp(rock, pale, stripe);
-                #elif defined(_FORM_WEDGE)
-                    float weathered = WedgeWeathered(q);
-                    float fracture = dot(q, WedgeBreak) - WedgeBreakDepth;
-                    float aa = max(pix * 0.8, 0.008);
-                    float broken = smoothstep(-aa, aa, fracture - weathered + 0.006);
-                    // Conchoidal ripples spread from the point of impact across the break.
-                    float3 impact = float3(-0.42, 0.46, 0.0);
-                    float ripple = sin(length(q - impact) * 38.0 + ValueNoise3(q * 6.0) * 3.0);
-                    float3 chalk = _FeatureColor.rgb * (0.94 + 0.06 * ripple * detailFade + 0.08 * grain);
-                    chalk = lerp(chalk, _DetailColor.rgb, smoothstep(0.55, 0.8, ValueNoise3(q * 7.0 + _Seed)) * 0.12);
-                    s.albedo = lerp(rock, chalk, broken);
+                #elif defined(_FORM_SPLIT)
+                    // Cross-bedded sand layers and weathering pits; the fissure walls are dark, fresh rock.
+                    float3 bedNormal = normalize(float3(0.15, 1.0, 0.1));
+                    float bedding = frac(dot(q, bedNormal) * _FeatureScale + (Fbm3Lite(q * 2.0 + _Seed) - 0.5) * 1.2);
+                    rock *= lerp(1.0, 0.9 + 0.16 * smoothstep(0.2, 0.8, bedding), detailFade);
+                    float2 pits = Worley3(q * 14.0 + _Seed);
+                    rock *= 1.0 - 0.3 * (1.0 - smoothstep(0.0, 0.25, pits.x)) * step(0.6, pits.y) * detailFade;
+                    float halfWidth = SplitHalfWidth(q);
+                    float wall = 1.0 - smoothstep(halfWidth + 0.004, halfWidth + 0.03 + pix, abs(SplitOffset(q)));
+                    s.albedo = lerp(rock, _DetailColor.rgb * (0.8 + 0.4 * h), wall);
                 #elif defined(_FORM_PAIR)
                     // Frost gathers in the neck between the lobes; the outer faces are bare dark rock.
                     float neck = abs(q.x - PairNeck);
@@ -501,27 +502,17 @@ Shader "Squadra/Asteroid"
                     s.albedo = lerp(rock, rime, frost);
                     float glint = smoothstep(0.82, 0.95, ValueNoise3(q * 90.0 + _Seed));
                     s.sparkle = frost * glint * grainFade;
-                #elif defined(_FORM_CREST)
-                    float across = abs(dot(q, CrestRidge));
-                    float aa = max(pix * 0.7, 0.01);
-                    float arc = CrestArc(q);
-                    float ridge = (1.0 - smoothstep(_FeatureWidth * arc - aa, _FeatureWidth * arc + aa, across)) * arc;
-                    // Pitted ore: tight pits over the whole rock, dull oxide in patches.
-                    float2 pits = Worley3(q * _FeatureScale + _Seed);
-                    float pit = (1.0 - smoothstep(0.0, 0.28, pits.x)) * step(0.55, pits.y) * detailFade;
-                    rock *= 1.0 - 0.45 * pit;
-                    float oxide = smoothstep(0.55, 0.72, Fbm3Lite(q * 2.6 + _Seed * 2.0));
-                    rock = lerp(rock, _DetailColor.rgb * (0.85 + 0.3 * h), oxide * 0.75);
-                    // Thin metal veins branch off the ridge.
-                    float3 veinWarp = q * 4.0 + (Fbm3Lite(q * 3.0 + _Seed) - 0.5) * 1.6;
-                    float vein = abs(Fbm3Lite(veinWarp + _Seed * 1.3) - 0.5);
-                    // Only up close: at gameplay scale the veins would blur into a pale scribble.
-                    float veinFade = 1.0 - smoothstep(0.008, 0.02, pix);
-                    float veins = (1.0 - smoothstep(0.006, 0.014, vein)) * veinFade * (1.0 - oxide);
-                    float metal = max(ridge, veins * 0.55);
-                    float3 steel = _FeatureColor.rgb * (0.85 + 0.25 * grain + 0.15 * h);
-                    s.albedo = lerp(rock, steel, metal);
-                    s.shine = metal * _Shine;
+                #elif defined(_FORM_BLOCK)
+                    // Golden-ochre stone with darker mottling; faint layering shows only up close.
+                    float layer = dot(q, BlockLayer) * _FeatureScale + (Fbm3Lite(q * 1.3 + _Seed) - 0.5) * 1.1;
+                    float laminae = (ValueNoise3(float3(layer * 9.0, 0.0, _Seed)) - 0.5) * grainFade;
+                    float mottle = smoothstep(0.3, 0.75, Fbm3(q * 2.4 + _Seed * 3.0));
+                    float3 gold = lerp(_ColorMid.rgb, _FeatureColor.rgb, mottle);
+                    gold = lerp(gold, _ColorLow.rgb, smoothstep(0.55, 0.8, Fbm3(q * 5.0 + _Seed * 1.7)) * 0.55);
+                    float2 pits = Worley3(q * 12.0 + _Seed);
+                    gold *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 0.25, pits.x)) * step(0.55, pits.y) * detailFade;
+                    gold *= 0.94 + 0.12 * laminae + 0.12 * grain;
+                    s.albedo = Craters(gold, q, detailFade);
                 #else // _FORM_MANTLE
                     // A pale apron of loose ash round the base, studded with half-buried stones.
                     float edge = (Fbm3Lite(q * 4.0 + _Seed) - 0.5) * 0.3;
@@ -580,15 +571,18 @@ Shader "Squadra/Asteroid"
                 float pix = max(length(ddx(p)), length(ddy(p)));
 
                 float reach = 1.0;
-                #if defined(HAS_SHARDS)
-                    PlaceShards(gTime);
-                    if (_ShardCount >= 1.0) reach = _ShardDistance + 0.25 + _ShardDrift * 1.8 + _ShardSize;
+                #if defined(HAS_STONES)
+                    if (_StoneCount >= 1.0) reach = max(_StoneOrbit, 1.0) + _StoneBand + _StoneThickness + 3.2 * _StoneSize;
                 #endif
 
                 float4 result = 0;
                 float rr = dot(p, p);
                 if (rr < reach * reach)
                 {
+                    #if defined(HAS_STONES)
+                        // The margin covers the normal probes and the soft edge a near miss gets.
+                        PlaceStones(gTime, p, pix * 2.0 + 0.002);
+                    #endif
                     // March from the front of the bounding sphere straight away from the camera.
                     float zTop = sqrt(reach * reach - rr);
                     float3 origin = float3(p, zTop);
@@ -627,15 +621,17 @@ Shader "Squadra/Asteroid"
                         float3 q = mul(gToRock, pos);
 
                         Surface surface;
-                        #if defined(HAS_SHARDS)
+                        #if defined(HAS_STONES)
                             if (id > 0)
                             {
-                                // Shards: fresh chalky facets and dark weathered ones.
-                                int face;
-                                ShardDistance(id - 1, pos, face);
-                                float pick = Hash21(float2(face, id * 1.7 + _Seed));
-                                surface.albedo = pick > 0.55 ? _FeatureColor.rgb * 0.92 : _ColorMid.rgb * 0.9;
-                                surface.shine = 0.0;
+                                // Stones in the colors of the rock, a few of them freshly broken and paler.
+                                int k = id - 1;
+                                int i = gStoneId[k];
+                                float3 local = StoneLocal(k, pos) / gStone[k].w;
+                                float tone = Hash21(float2(i * 2.3, _Seed));
+                                float3 stone = lerp(_ColorLow.rgb, _ColorMid.rgb, saturate(0.3 + tone));
+                                stone = lerp(stone, _FeatureColor.rgb * 0.8, smoothstep(0.75, 0.95, tone) * 0.6);
+                                surface.albedo = stone * (0.78 + 0.44 * Fbm3Lite(local * 2.5 + i * 3.3));
                                 surface.sparkle = 0.0;
                             }
                             else
@@ -646,15 +642,11 @@ Shader "Squadra/Asteroid"
 
                         float ndl = dot(normal, lightDir);
                         float day = smoothstep(-0.12, 0.25, ndl);
-                        float shadow = ndl > -0.1 ? SoftShadow(pos + normal * 0.01, lightDir) : 0.0;
+                        float shadow = ndl > -0.1 ? SoftShadow(pos + normal * 0.01, lightDir, pix) : 0.0;
                         float diffuse = day * (0.2 + 0.85 * saturate(ndl)) * lerp(0.25, 1.0, shadow);
-                        float occlusion = saturate(0.45 + 0.55 * SceneDistance(pos + normal * 0.12) / 0.12);
+                        float occlusion = saturate(0.45 + 0.55 * RockOnly(pos + normal * 0.12) / 0.12);
                         float3 color = surface.albedo * (diffuse + _Ambient * occlusion * float3(0.85, 0.98, 1.32));
 
-                        float3 halfVector = normalize(lightDir + float3(0, 0, 1));
-                        float nh = saturate(dot(normal, halfVector));
-                        color += _FeatureColor.rgb * surface.shine * pow(nh, 36.0) * shadow * day;
-                        color += _FeatureColor.rgb * surface.shine * 0.12 * pow(nh, 6.0) * day;
                         color += surface.sparkle * 0.9 * shadow * day;
 
                         // A faint rim keeps the dark side of the outline against the sky.

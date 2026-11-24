@@ -45,14 +45,13 @@ Material:
     - _Roll: 0.3
     - _Roughness: 0.02
     - _Seed: 8.2
-    - _ShardCount: 0
-    - _ShardDistance: 1.1
-    - _ShardDrift: 0.1
-    - _ShardSize: 0.09
-    - _ShardSpeed: 0.12
-    - _ShardSpread: 0.45
-    - _Shine: 0
     - _SpinSpeed: 0.06
+    - _StoneBand: 0.3
+    - _StoneCount: 0
+    - _StoneOrbit: 1.1
+    - _StoneSize: 0.1
+    - _StoneSpeed: 0.12
+    - _StoneThickness: 0.06
     - _Sway: 0
     - _Yaw: 0.2
     m_Colors:
@@ -64,7 +63,7 @@ Material:
     - _FeatureColor: {r: 0.72, g: 0.9, b: 0.95, a: 1}
     - _LightDir: {r: -0.62, g: 0.45, b: 0.5, a: 0}
     - _RimColor: {r: 0.5, g: 0.6, b: 0.65, a: 1}
-    - _ShardAnchor: {r: -0.4, g: 0.55, b: 0.7, a: 0}
     - _SpinAxis: {r: 1, g: 0, b: 0, a: 0}
+    - _StoneOrbitAxis: {r: 0, g: 1, b: 0.3, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
