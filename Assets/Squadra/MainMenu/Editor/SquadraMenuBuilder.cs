@@ -28,6 +28,12 @@ namespace Squadra.EditorTools
         const string CampaignFolder = ProjectFolders.Root + "/Campaign";
         const string CatalogPath = CampaignFolder + "/Missions.asset";
 
+        /// <summary>The menu's own soundtracks. The first one by file name plays; without one, the synthesized theme does.</summary>
+        const string MusicFolder = ProjectFolders.Root + "/MainMenu/Music";
+
+        /// <summary>Silence after the menu track ends before it starts again.</summary>
+        const float MusicGapSeconds = 10f;
+
         // Sorting orders, back to front. The interface itself is drawn over everything by its panel.
         const int OrderBackdrop = -100;
         const int OrderOrbits = -60;
@@ -89,9 +95,10 @@ namespace Squadra.EditorTools
             SceneWiring.Relayout(scenery);
 
             var music = new GameObject("Music").AddComponent<MusicPlayer>();
-            AudioClip track = SquadraSoundBuilder.LoadMenuMusic();
-            if (track == null) Debug.LogWarning("Squadra: no menu track in " + SquadraSoundBuilder.MenuMusicFolder);
+            AudioClip track = SquadraSoundBuilder.FirstTrack(MusicFolder) ?? SquadraSoundBuilder.LoadMenuMusic();
+            if (track == null) Debug.LogWarning("Squadra: no menu track in " + MusicFolder + " or " + SquadraSoundBuilder.MenuMusicFolder);
             SceneWiring.Wire(music, "track", track);
+            SceneWiring.WireFloat(music, "gapSeconds", MusicGapSeconds);
 
             var sounds = new GameObject("Menu Sounds").AddComponent<MenuAudio>();
             SceneWiring.Wire(sounds, "hover", SquadraSoundBuilder.LoadClip(SquadraSoundBuilder.MenuHover));

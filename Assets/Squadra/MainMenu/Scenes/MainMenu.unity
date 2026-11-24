@@ -856,12 +856,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35f6b35b39a38f64893e7d1a7f041059, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Squadra.MusicPlayer
-  track: {fileID: 8300000, guid: 893e2892aa6b9c54d93b16a6aff742b9, type: 3}
+  track: {fileID: 8300000, guid: 7f3c097678223184faef54b8e84f69f5, type: 3}
   volume: 0.3
+  gapSeconds: 10
   fadeInSeconds: 3
   duckedLevel: 0.3
   duckSeconds: 0.5
   switchSeconds: 0.6
+  pauseSeconds: 0.25
 --- !u!4 &1109498642
 Transform:
   m_ObjectHideFlags: 0
