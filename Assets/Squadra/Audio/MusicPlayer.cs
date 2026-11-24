@@ -10,7 +10,8 @@ namespace Squadra
     /// player to wake keeps playing across scene loads. A later copy with the same track removes itself,
     /// so restarting a match or moving around the menu does not restart the music; a later copy with a
     /// different track hands its track over first, which is how the menu music gives way to the mission
-    /// music. A paused mission keeps its track playing, quieter.
+    /// music. A later copy without a track hands over silence the same way, which is how the Sandbox
+    /// fades the menu music out. A paused mission keeps its track playing, quieter.
     /// </summary>
     [AutoStaticsCleanup]
     public sealed partial class MusicPlayer : MonoBehaviour
@@ -68,13 +69,14 @@ namespace Squadra
         public static float Level => current != null && current.source != null ? current.source.volume : 0f;
 
         /// <summary>How far into its track the music is, in seconds. It only goes back when the track loops or changes.</summary>
-        public static float Position => current != null && current.source != null ? current.source.time : 0f;
+        public static float Position =>
+            current != null && current.source != null && current.source.clip != null ? current.source.time : 0f;
 
         void Awake()
         {
             if (current != null)
             {
-                if (track != null && track != current.track) current.SwitchTo(this);
+                if (track != current.track) current.SwitchTo(this);
                 else Destroy(gameObject);
                 return;
             }
@@ -127,7 +129,10 @@ namespace Squadra
             float deltaTime = Time.unscaledDeltaTime;
             if (next != null)
             {
-                fadeIn = switchSeconds > 0f ? Mathf.MoveTowards(fadeIn, 0f, deltaTime / switchSeconds) : 0f;
+                // Nothing to fade out while silent (no track, or the break between plays): switch at once.
+                fadeIn = switchSeconds > 0f && source.isPlaying
+                    ? Mathf.MoveTowards(fadeIn, 0f, deltaTime / switchSeconds)
+                    : 0f;
                 if (fadeIn <= 0f)
                 {
                     volume = next.volume;
@@ -142,7 +147,8 @@ namespace Squadra
                     source.clip = track;
                     source.loop = gapSeconds <= 0f;
                     silence = 0f;
-                    source.Play();
+                    if (track != null) source.Play();
+                    else source.Stop();
                 }
             }
             else
