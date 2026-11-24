@@ -36,6 +36,16 @@ MonoBehaviour:
   moons:
   - id: lune
     material: {fileID: 2100000, guid: cb2c4a442be4c1e459013b9ba868a9ff, type: 2}
+  - id: calico
+    material: {fileID: 2100000, guid: af73dcbc39fb4b00b0685e0a2d694870, type: 2}
+  - id: cinnabar
+    material: {fileID: 2100000, guid: 7a133139adfa43af987b7ade505b6171, type: 2}
+  - id: cirque
+    material: {fileID: 2100000, guid: 26df6978c9b343c88239b52e296c4c1e, type: 2}
+  - id: floe
+    material: {fileID: 2100000, guid: 48e91b2930b54377ad0e044327a7e46b, type: 2}
+  - id: mare
+    material: {fileID: 2100000, guid: 969886f957fe4538a42a40a20105b75d, type: 2}
   asteroids:
   - id: cinder
     material: {fileID: 2100000, guid: 29d7028615c08ad4087b2660073edc5b, type: 2}
