@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sleet
+  m_Shader: {fileID: 4800000, guid: 8548d42606f199542a24115a3c6219e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FORM_PAIR
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.035
+    - _BodyRadius: 0.7
+    - _CraterAmount: 0.35
+    - _CraterScale: 6
+    - _DustAmount: 0
+    - _DustAngle: 0
+    - _DustReach: 1.6
+    - _DustSource: 0.8
+    - _DustSpeed: 0.05
+    - _FeatureScale: 12
+    - _FeatureWidth: 0.3
+    - _Form: 2
+    - _Lumps: 0.05
+    - _NoiseScale: 3.4
+    - _PreviewTime: -1
+    - _Rim: 0.12
+    - _Roll: 0.3
+    - _Roughness: 0.02
+    - _Seed: 8.2
+    - _SpinSpeed: 0.06
+    - _StoneBand: 0.3
+    - _StoneCount: 0
+    - _StoneOrbit: 1.1
+    - _StoneSize: 0.1
+    - _StoneSpeed: 0.12
+    - _StoneThickness: 0.06
+    - _Sway: 0
+    - _Yaw: 0.2
+    m_Colors:
+    - _ColorHigh: {r: 0.33, g: 0.32, b: 0.31, a: 1}
+    - _ColorLow: {r: 0.08, g: 0.08, b: 0.09, a: 1}
+    - _ColorMid: {r: 0.2, g: 0.19, b: 0.19, a: 1}
+    - _DetailColor: {r: 0.5, g: 0.6, b: 0.65, a: 1}
+    - _DustColor: {r: 0.7, g: 0.65999997, b: 0.62, a: 1}
+    - _FeatureColor: {r: 0.72, g: 0.9, b: 0.95, a: 1}
+    - _LightDir: {r: -0.62, g: 0.45, b: 0.5, a: 0}
+    - _RimColor: {r: 0.5, g: 0.6, b: 0.65, a: 1}
+    - _SpinAxis: {r: 1, g: 0, b: 0, a: 0}
+    - _StoneOrbitAxis: {r: 0, g: 1, b: 0.3, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

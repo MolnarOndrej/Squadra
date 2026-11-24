@@ -51,6 +51,16 @@ MonoBehaviour:
     material: {fileID: 2100000, guid: 29d7028615c08ad4087b2660073edc5b, type: 2}
   - id: ferrite
     material: {fileID: 2100000, guid: 40063bfe86a5a5049a99bd595a4d014a, type: 2}
+  - id: kyanite
+    material: {fileID: 2100000, guid: d602c987fe40f1d479c301b28bbec5da, type: 2}
+  - id: sleet
+    material: {fileID: 2100000, guid: c8067cd8a049dfc4291718e6db02214f, type: 2}
+  - id: tephra
+    material: {fileID: 2100000, guid: 009cc26f06cd5024faee967fbac41aba, type: 2}
+  - id: arkose
+    material: {fileID: 2100000, guid: 23efe4924b5bc78428d52a23ef537c6a, type: 2}
+  - id: jasper
+    material: {fileID: 2100000, guid: 502675c667590ce4e8bcc97d7b85546d, type: 2}
   planetNames: {fileID: 4900000, guid: dc814247e41280543b180ac46f9fb785, type: 3}
   moonNames: {fileID: 4900000, guid: 38016a7b40cc6574a92f0fbb444a435a, type: 3}
   asteroidNames: {fileID: 4900000, guid: fa38e5fcf5d77e64c980c1601d510efb, type: 3}

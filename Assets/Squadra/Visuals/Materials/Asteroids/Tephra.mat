@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Tephra
+  m_Shader: {fileID: 4800000, guid: 8548d42606f199542a24115a3c6219e9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FORM_MANTLE
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.035
+    - _BodyRadius: 0.58
+    - _CraterAmount: 0.3
+    - _CraterScale: 6
+    - _DustAmount: 0.45
+    - _DustAngle: 0.25
+    - _DustReach: 1.65
+    - _DustSource: 0.8
+    - _DustSpeed: 0.04
+    - _FeatureScale: 7
+    - _FeatureWidth: 0.22
+    - _Form: 4
+    - _Lumps: 0.045
+    - _NoiseScale: 3.2
+    - _PreviewTime: -1
+    - _Rim: 0.12
+    - _Roll: 0.05
+    - _Roughness: 0.018
+    - _Seed: 6.4
+    - _SpinSpeed: 0.1
+    - _StoneBand: 0.3
+    - _StoneCount: 0
+    - _StoneOrbit: 1.1
+    - _StoneSize: 0.1
+    - _StoneSpeed: 0.12
+    - _StoneThickness: 0.06
+    - _Sway: 0.25
+    - _Yaw: 0
+    m_Colors:
+    - _ColorHigh: {r: 0.4, g: 0.25, b: 0.33, a: 1}
+    - _ColorLow: {r: 0.13, g: 0.07, b: 0.11, a: 1}
+    - _ColorMid: {r: 0.29, g: 0.16, b: 0.24, a: 1}
+    - _DetailColor: {r: 0.5, g: 0.45, b: 0.45, a: 1}
+    - _DustColor: {r: 0.72, g: 0.67, b: 0.64, a: 1}
+    - _FeatureColor: {r: 0.74, g: 0.7, b: 0.66, a: 1}
+    - _LightDir: {r: -0.62, g: 0.45, b: 0.5, a: 0}
+    - _RimColor: {r: 0.55, g: 0.45, b: 0.52, a: 1}
+    - _SpinAxis: {r: 0, g: 1, b: 0, a: 0}
+    - _StoneOrbitAxis: {r: 0, g: 1, b: 0.3, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
