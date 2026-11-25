@@ -129,6 +129,12 @@ namespace Squadra.EditorTools
             return FirstTrack(MenuMusicFolder, MenuThemePath) ?? AssetDatabase.LoadAssetAtPath<AudioClip>(MenuThemePath);
         }
 
+        /// <summary>The first track in a folder by file name, or null when there is none or no such folder.</summary>
+        public static AudioClip FirstTrack(string folder)
+        {
+            return FirstTrack(folder, null);
+        }
+
         static AudioClip FirstTrack(string folder, string except)
         {
             if (!AssetDatabase.IsValidFolder(folder)) return null;

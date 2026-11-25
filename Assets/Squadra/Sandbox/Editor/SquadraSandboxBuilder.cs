@@ -13,8 +13,8 @@ namespace Squadra.EditorTools
 {
     /// <summary>
     /// Makes the Sandbox scene: camera, post-processing, space backdrop, the sandbox's worlds and its
-    /// preview, the fleet, effect and sound layers, the control panel its run plays with and the pause
-    /// menu, built from the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox Scene</c>. The first
+    /// preview, the fleet, effect and sound layers, the control panel its run plays with, the pause
+    /// menu and a music player without a track, built from the same parts as the mission scene. Run from <c>Squadra &gt; Build Sandbox Scene</c>. The first
     /// run lays down the starting setup: three planets, one per player, at the corners of a triangle and a
     /// neutral moon in its middle, with routes along the edges and to the moon, a capture and a battle
     /// under way and two fleets on their way. From then on the scene belongs to its author: a later run
@@ -105,6 +105,9 @@ namespace Squadra.EditorTools
             PauseMenu pause = Object.FindAnyObjectByType<PauseMenu>();
             if (pause == null) SquadraSceneBuilder.BuildPause(run);
             else Wire(pause, "game", run);
+
+            // A music player without a track: the sandbox is silent, so the menu music fades out on entry.
+            if (Object.FindAnyObjectByType<MusicPlayer>() == null) new GameObject("Music").AddComponent<MusicPlayer>();
 
             if (!exists || scene.isDirty) EditorSceneManager.SaveScene(scene, ScenePath);
             SquadraMenuBuilder.ArrangeBuild();

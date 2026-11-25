@@ -6,10 +6,12 @@ using UnityEngine.SceneManagement;
 namespace Squadra
 {
     /// <summary>
-    /// Loops the background track. The first player to wake keeps playing across scene loads. A later
-    /// copy with the same track removes itself, so restarting a match or moving around the menu does not
-    /// restart the music; a later copy with a different track hands its track over first, which is how
-    /// the menu music gives way to the mission music. A paused mission keeps its track playing, quieter.
+    /// Loops the background track, back to back or with a stretch of silence between plays. The first
+    /// player to wake keeps playing across scene loads. A later copy with the same track removes itself,
+    /// so restarting a match or moving around the menu does not restart the music; a later copy with a
+    /// different track hands its track over first, which is how the menu music gives way to the mission
+    /// music. A later copy without a track hands over silence the same way, which is how the Sandbox
+    /// fades the menu music out. A paused mission keeps its track playing, quieter.
     /// </summary>
     [AutoStaticsCleanup]
     public sealed partial class MusicPlayer : MonoBehaviour
@@ -18,6 +20,8 @@ namespace Squadra
 
         [SerializeField] AudioClip track;
         [SerializeField, Range(0f, 1f)] float volume = 0.3f;
+        [Tooltip("Seconds of silence after the track ends before it plays again. 0 loops it without a break.")]
+        [SerializeField] float gapSeconds;
         [SerializeField] float fadeInSeconds = 3f;
         [Tooltip("Music level while a match result is on screen, as a fraction of the normal volume.")]
         [SerializeField, Range(0f, 1f)] float duckedLevel = 0.3f;
@@ -31,6 +35,7 @@ namespace Squadra
         float fadeIn;
         float level = 1f;
         float pauseLevel = 1f;
+        float silence;
         bool ducked;
         bool paused;
         MusicPlayer next;
@@ -64,13 +69,14 @@ namespace Squadra
         public static float Level => current != null && current.source != null ? current.source.volume : 0f;
 
         /// <summary>How far into its track the music is, in seconds. It only goes back when the track loops or changes.</summary>
-        public static float Position => current != null && current.source != null ? current.source.time : 0f;
+        public static float Position =>
+            current != null && current.source != null && current.source.clip != null ? current.source.time : 0f;
 
         void Awake()
         {
             if (current != null)
             {
-                if (track != null && track != current.track) current.SwitchTo(this);
+                if (track != current.track) current.SwitchTo(this);
                 else Destroy(gameObject);
                 return;
             }
@@ -81,7 +87,7 @@ namespace Squadra
 
             source = gameObject.AddComponent<AudioSource>();
             source.clip = track;
-            source.loop = true;
+            source.loop = gapSeconds <= 0f;
             source.playOnAwake = false;
             source.spatialBlend = 0f;
             source.priority = 0;
@@ -123,10 +129,14 @@ namespace Squadra
             float deltaTime = Time.unscaledDeltaTime;
             if (next != null)
             {
-                fadeIn = switchSeconds > 0f ? Mathf.MoveTowards(fadeIn, 0f, deltaTime / switchSeconds) : 0f;
+                // Nothing to fade out while silent (no track, or the break between plays): switch at once.
+                fadeIn = switchSeconds > 0f && source.isPlaying
+                    ? Mathf.MoveTowards(fadeIn, 0f, deltaTime / switchSeconds)
+                    : 0f;
                 if (fadeIn <= 0f)
                 {
                     volume = next.volume;
+                    gapSeconds = next.gapSeconds;
                     fadeInSeconds = next.fadeInSeconds;
                     duckedLevel = next.duckedLevel;
                     duckSeconds = next.duckSeconds;
@@ -135,12 +145,16 @@ namespace Squadra
                     next = null;
 
                     source.clip = track;
-                    source.Play();
+                    source.loop = gapSeconds <= 0f;
+                    silence = 0f;
+                    if (track != null) source.Play();
+                    else source.Stop();
                 }
             }
             else
             {
                 fadeIn = fadeInSeconds > 0f ? Mathf.Clamp01(fadeIn + deltaTime / fadeInSeconds) : 1f;
+                PlayAgainAfterGap(deltaTime);
             }
 
             float target = ducked ? duckedLevel : 1f;
@@ -151,6 +165,20 @@ namespace Squadra
                 ? Mathf.MoveTowards(pauseLevel, pauseTarget, deltaTime / pauseSeconds)
                 : pauseTarget;
             source.volume = volume * fadeIn * level * pauseLevel * GameSettings.MusicVolume;
+        }
+
+        // With a gap the source does not loop by itself: once the track has ended, wait out the silence
+        // and start it again from the top. Real time, so a paused mission does not stretch the break.
+        void PlayAgainAfterGap(float deltaTime)
+        {
+            if (source.loop || source.clip == null || source.isPlaying) return;
+
+            silence += deltaTime;
+            if (silence < gapSeconds) return;
+
+            silence = 0f;
+            source.time = 0f; // Play() would resume from the last position set through time, if any
+            source.Play();
         }
     }
 }
